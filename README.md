@@ -52,10 +52,12 @@ pre-filled budget or neighborhood: **Your deal** asks what you are looking for, 
 you answer is used.
 
 Saving that form the first time triggers one initial discovery scan, so the dashboard opens on
-real listings instead of an empty page — a first run typically stores a few hundred. The free
+real listings instead of an empty page — a first run typically stores several hundred. The free
 public sources are queried newest-first and return what they currently list. Where a source
 publishes a post date, that first scan keeps only the **last seven days**; a listing with no
-usable date is kept rather than discarded, since most public sources publish none.
+usable date is kept rather than discarded, since most public sources publish none. The city
+housing portal is the one free source that dates every entry, so its results are genuinely
+bounded to that window.
 
 After that, scans run at 10:00 and 18:00 America/Los_Angeles, and each later scan updates
 `last_seen` instead of inserting duplicates, so your stars, notes, and dismissals survive.
@@ -103,6 +105,8 @@ launchctl print gui/$(id -u)/com.sfhousing.monitor
 | Listings Project | Automatic | The public SF Bay Area collection, filtered to explicit San Francisco rentals and sublets. Each card keeps its direct lister-contact page. |
 | Abacus (small buildings) | Automatic | The public San Francisco availability feed, preserving the manager's Apply Now route. Building size stays unknown unless stated. |
 | SpareRoom | Automatic | Public SF result cards: price, area, type, and short description. |
+| SF Housing Portal | Automatic | The city's own below-market-rate portal (DAHLIA) over its public JSON API. No key, no scraping — one entry per unit type, with real rents and application deadlines. |
+| Apartment List | Automatic | Published schema.org data for SF buildings. Building-level starting rents; the feed does not say how many bedrooms, so the home size stays unconfirmed. |
 | Zillow | After one-time setup | Your own saved-search emails, imported locally after a read-only Gmail connection in **Alerts**. |
 | HotPads | After one-time setup | Official saved-search emails through the same read-only Gmail connection. |
 | Roomies | After one-time setup | Realtime or daily listing-alert emails through the same connection. |

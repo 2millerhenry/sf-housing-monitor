@@ -1,0 +1,869 @@
+{
+ "listings": [
+  {
+   "unitSummaries": {
+    "reserved": [
+     {
+      "unitType": "SRO",
+      "totalUnits": 20,
+      "minSquareFt": 158,
+      "minRentalMinIncome": 1300.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 650.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 259,
+      "maxRentalMinIncome": 1500.0,
+      "maxQualifyingAMI": 40.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 2,
+      "maxMonthlyRent": 750.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000J1wlNEAR",
+      "availability": 15.0,
+      "absoluteMinIncome": 1300,
+      "absoluteMaxIncome": 6423
+     }
+    ],
+    "general": null
+   },
+   "reservedDescriptor": [
+    {
+     "shortDescription": null,
+     "numberOfUnits": 20,
+     "name": "Senior",
+     "listingId": "a0W7y00000J1wlNEAR"
+    }
+   ],
+   "prioritiesDescriptor": [
+    {
+     "shortDescription": null,
+     "numberOfUnits": 2,
+     "name": "Mobility impairments",
+     "listingId": "a0W7y00000J1wlNEAR"
+    }
+   ],
+   "listingID": "a0W7y00000J1wlNEAR",
+   "chartTypes": null,
+   "attributes": {
+    "type": "Listing",
+    "url": "/services/data/v35.0/sobjects/Listing/a0W7y00000J1wlNEAR"
+   },
+   "Id": "a0W7y00000J1wlNEAR",
+   "Tenure": "Re-rental",
+   "Name": "1303 Larkin Street",
+   "Application_Due_Date": "2026-09-19T00:00:00.000+0000",
+   "Lottery_Results_Date": "2026-10-09",
+   "Reserved_community_type": "Senior",
+   "Reserved_community_minimum_age": 62,
+   "hasWaitlist": true,
+   "Units_Available": 15,
+   "Realtor_Commission_Unit": "percent",
+   "Building_Name": "Larkin Pine Senior Housing",
+   "Building_Name_for_Process": "1303 Larkin Street",
+   "Building_Street_Address": "1303 Larkin St",
+   "Building_City": "San Francisco",
+   "Building_State": "CA",
+   "Building_Zip_Code": "94109",
+   "Publish_Lottery_Results_on_DAHLIA": "Publish results in lottery modal on DAHLIA",
+   "Accepting_Online_Applications": true,
+   "Listing_Type": "Waitlist Listing",
+   "RecordTypeId": "0120P000000kPUSQA2",
+   "LastModifiedDate": "2026-09-03T19:29:24.000+0000",
+   "Status": "Active",
+   "Listing_Images": [
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fJ5TiAAK"
+     },
+     "Listing": "a0W7y00000J1wlNEAR",
+     "Id": "a0t7y00001fJ5TiAAK",
+     "Name": "SRO - Room",
+     "Image_URL": "https://media.api.sf.gov/images/SRO_1_F7PHbRx.original.jpg",
+     "Image_Description": "SRO - Room",
+     "Display_Order": 1,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J1wlNEAR-78bd06fdae74b46faa2926b3a95be1ee.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fJ8OjAAK"
+     },
+     "Listing": "a0W7y00000J1wlNEAR",
+     "Id": "a0t7y00001fJ8OjAAK",
+     "Name": "SRO - Room 2",
+     "Image_URL": "https://media.api.sf.gov/images/SRO_2.original.jpg",
+     "Image_Description": "SRO - Room 2",
+     "Display_Order": 2,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J1wlNEAR-3afcbea703f6787798dd7b22179c48d9.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fIQQaAAO"
+     },
+     "Listing": "a0W7y00000J1wlNEAR",
+     "Id": "a0t7y00001fIQQaAAO",
+     "Name": "SRO - Bathroom",
+     "Image_URL": "https://media.api.sf.gov/images/SRO_Bathroom.original.jpg",
+     "Image_Description": "SRO - Bathroom",
+     "Display_Order": 3,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J1wlNEAR-44610d01ba0649b7ab2bf052b349ed66.jpg"
+    }
+   ],
+   "RecordType": {
+    "attributes": {
+     "type": "RecordType",
+     "url": "/services/data/v35.0/sobjects/RecordType/0120P000000kPUSQA2"
+    },
+    "Id": "0120P000000kPUSQA2",
+    "Name": "Rental"
+   },
+   "imageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J1wlNEAR-78bd06fdae74b46faa2926b3a95be1ee.jpg"
+  },
+  {
+   "unitSummaries": {
+    "reserved": null,
+    "general": [
+     {
+      "unitType": "Studio",
+      "totalUnits": 3,
+      "minSquareFt": 500,
+      "minRentalMinIncome": 3252.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 1626.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 500,
+      "maxRentalMinIncome": 3252.0,
+      "maxQualifyingAMI": 60.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 2,
+      "maxMonthlyRent": 1626.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000IxrifEAB",
+      "availability": 1.0,
+      "absoluteMinIncome": 3252,
+      "absoluteMaxIncome": 6483
+     },
+     {
+      "unitType": "1 BR",
+      "totalUnits": 3,
+      "minSquareFt": 500,
+      "minRentalMinIncome": 3694.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 1847.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 500,
+      "maxRentalMinIncome": 3694.0,
+      "maxQualifyingAMI": 60.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 3,
+      "maxMonthlyRent": 1847.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000IxrifEAB",
+      "availability": 1.0,
+      "absoluteMinIncome": 3694,
+      "absoluteMaxIncome": 7295
+     }
+    ]
+   },
+   "reservedDescriptor": null,
+   "prioritiesDescriptor": null,
+   "listingID": "a0W7y00000IxrifEAB",
+   "chartTypes": null,
+   "attributes": {
+    "type": "Listing",
+    "url": "/services/data/v35.0/sobjects/Listing/a0W7y00000IxrifEAB"
+   },
+   "Id": "a0W7y00000IxrifEAB",
+   "Tenure": "Re-rental",
+   "Name": "Garden Court Apartments",
+   "Application_Due_Date": "2026-09-12T00:00:00.000+0000",
+   "Lottery_Results_Date": "2026-10-05",
+   "Reserved_community_minimum_age": 0,
+   "hasWaitlist": true,
+   "Units_Available": 2,
+   "Realtor_Commission_Unit": "percent",
+   "Building_Name": "Garden Court Apartments",
+   "Building_Name_for_Process": "Garden Court Apartments",
+   "Building_Street_Address": "1637 15th St",
+   "Building_City": "San Francisco",
+   "Building_State": "CA",
+   "Building_Zip_Code": "94103",
+   "Publish_Lottery_Results_on_DAHLIA": "Publish results in lottery modal on DAHLIA",
+   "Accepting_Online_Applications": true,
+   "Listing_Type": "Waitlist Listing",
+   "RecordTypeId": "0120P000000kPUSQA2",
+   "LastModifiedDate": "2026-09-03T19:14:58.000+0000",
+   "Status": "Active",
+   "Listing_Images": [
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ewH49AAE"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001ewH49AAE",
+     "Name": "Building Photo",
+     "Image_URL": "https://media.api.sf.gov/images/1637_15th_St-Exterior.original.jpg",
+     "Image_Description": "Building Photo",
+     "Display_Order": 1,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-95c2f8c12accc1cec1a8cc44bf0b563f.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001evz2SAAQ"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001evz2SAAQ",
+     "Name": "Courtyard",
+     "Image_URL": "https://media.api.sf.gov/images/Courtyard__1_MHDC_Rehab_Scattered_Site_1_1637_1.original.jpg",
+     "Image_Description": "Courtyard",
+     "Display_Order": 2,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-fa27cfb1dcd81e3417a8757e18f64b7e.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ewH5lAAE"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001ewH5lAAE",
+     "Name": "Living Room",
+     "Image_URL": "https://media.api.sf.gov/images/Living_1-1_MHDC_Rehab_Scattered_Site_1_1637_15t.original.jpg",
+     "Image_Description": "Living Room",
+     "Display_Order": 3,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-9853c774f1369282c5d843a193c4610a.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ewH7NAAU"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001ewH7NAAU",
+     "Name": "Kitchen",
+     "Image_URL": "https://media.api.sf.gov/images/Kitchen_1_MHDC_Rehab_Scattered_Site_1_1637_15th.original.jpg",
+     "Image_Description": "Kitchen",
+     "Display_Order": 4,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-b56082d11d0b71bb8c43c90472982c20.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001evq2NAAQ"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001evq2NAAQ",
+     "Name": "Bathroom",
+     "Image_URL": "https://media.api.sf.gov/images/Bathroom_1_MHDC_Rehab_Scattered_Site_1_1637_15t.original.jpg",
+     "Image_Description": "Bathroom",
+     "Display_Order": 5,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-6609fa447c0b6355b22ccb9d6e43c411.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001evq5aAAA"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001evq5aAAA",
+     "Name": "Bedroom",
+     "Image_URL": "https://media.api.sf.gov/images/BDR_1_1_MHDC_Rehab_Scattered_Site_1_1637_15th_S.original.jpg",
+     "Image_Description": "Bedroom",
+     "Display_Order": 6,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-92d89b16cfd3882c5f5b35ad46cf832c.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ew82UAAQ"
+     },
+     "Listing": "a0W7y00000IxrifEAB",
+     "Id": "a0t7y00001ew82UAAQ",
+     "Name": "Bedroom 2",
+     "Image_URL": "https://media.api.sf.gov/images/BDR_2__MHDC_Rehab_Scattered_Site_1_1637_15th_St.original.jpg",
+     "Image_Description": "Bedroom 2",
+     "Display_Order": 7,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-36dd6ac7b7c29907280add375c1e1ac3.jpg"
+    }
+   ],
+   "RecordType": {
+    "attributes": {
+     "type": "RecordType",
+     "url": "/services/data/v35.0/sobjects/RecordType/0120P000000kPUSQA2"
+    },
+    "Id": "0120P000000kPUSQA2",
+    "Name": "Rental"
+   },
+   "imageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IxrifEAB-95c2f8c12accc1cec1a8cc44bf0b563f.jpg"
+  },
+  {
+   "unitSummaries": {
+    "reserved": null,
+    "general": [
+     {
+      "unitType": "Studio",
+      "totalUnits": 1,
+      "minSquareFt": 428,
+      "minRentalMinIncome": 4286.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 2143.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 428,
+      "maxRentalMinIncome": 4286.0,
+      "maxQualifyingAMI": 80.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 2,
+      "maxMonthlyRent": 2143.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000IuXwbEAF",
+      "availability": 0.0,
+      "absoluteMinIncome": 4286,
+      "absoluteMaxIncome": 8645
+     },
+     {
+      "unitType": "1 BR",
+      "totalUnits": 4,
+      "minSquareFt": 749,
+      "minRentalMinIncome": 4882.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 2441.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 819,
+      "maxRentalMinIncome": 7476.0,
+      "maxQualifyingAMI": 120.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 3,
+      "maxMonthlyRent": 3738.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000IuXwbEAF",
+      "availability": 1.0,
+      "absoluteMinIncome": 4882,
+      "absoluteMaxIncome": 14591
+     }
+    ]
+   },
+   "reservedDescriptor": null,
+   "prioritiesDescriptor": null,
+   "listingID": "a0W7y00000IuXwbEAF",
+   "chartTypes": null,
+   "attributes": {
+    "type": "Listing",
+    "url": "/services/data/v35.0/sobjects/Listing/a0W7y00000IuXwbEAF"
+   },
+   "Id": "a0W7y00000IuXwbEAF",
+   "Tenure": "Re-rental",
+   "Name": "3800 Mission Street",
+   "Application_Due_Date": "2026-09-09T00:00:00.000+0000",
+   "Lottery_Results_Date": "2026-09-29",
+   "Reserved_community_minimum_age": 0,
+   "hasWaitlist": true,
+   "Units_Available": 1,
+   "Realtor_Commission_Unit": "percent",
+   "Building_Name": "3800 Mission Street",
+   "Building_Name_for_Process": "3800 Mission",
+   "Building_Street_Address": "3800 Mission St",
+   "Building_City": "San Francisco",
+   "Building_State": "CA",
+   "Building_Zip_Code": "94110",
+   "Publish_Lottery_Results_on_DAHLIA": "Publish results in lottery modal on DAHLIA",
+   "Accepting_Online_Applications": true,
+   "Listing_Type": "Waitlist Listing",
+   "RecordTypeId": "0120P000000kPUSQA2",
+   "LastModifiedDate": "2026-09-03T19:07:23.000+0000",
+   "Status": "Active",
+   "Listing_Images": [
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ebyVVAAY"
+     },
+     "Listing": "a0W7y00000IuXwbEAF",
+     "Id": "a0t7y00001ebyVVAAY",
+     "Name": "Building Photo",
+     "Image_URL": "https://media.api.sf.gov/images/3800_Mission_-Exterior_Resized_.original.jpg",
+     "Image_Description": "Building Photo",
+     "Display_Order": 1,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IuXwbEAF-e479f4166e6121ff1e94bb2662a6d95a.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ebor8AAA"
+     },
+     "Listing": "a0W7y00000IuXwbEAF",
+     "Id": "a0t7y00001ebor8AAA",
+     "Name": "Living",
+     "Image_URL": "https://media.api.sf.gov/images/3800_Mission-_living_room_resized.original.jpg",
+     "Image_Description": "Living",
+     "Display_Order": 2,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IuXwbEAF-63da8d776ad61efc3485b3ed431658c4.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ebAcSAAU"
+     },
+     "Listing": "a0W7y00000IuXwbEAF",
+     "Id": "a0t7y00001ebAcSAAU",
+     "Name": "Bedroom",
+     "Image_URL": "https://media.api.sf.gov/images/3800_Mission-bedroom_closet_resized.original.jpg",
+     "Image_Description": "Bedroom",
+     "Display_Order": 3,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IuXwbEAF-d26a050ebb42b7057847e1f0fc99f8cd.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001ebz6bAAA"
+     },
+     "Listing": "a0W7y00000IuXwbEAF",
+     "Id": "a0t7y00001ebz6bAAA",
+     "Name": "Hallway",
+     "Image_URL": "https://media.api.sf.gov/images/3800_Mission-hallway_resized.original.jpg",
+     "Image_Description": "Hallway",
+     "Display_Order": 4,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IuXwbEAF-c1c966e3d19a06df68c0afc4a9170bf4.jpg"
+    }
+   ],
+   "RecordType": {
+    "attributes": {
+     "type": "RecordType",
+     "url": "/services/data/v35.0/sobjects/RecordType/0120P000000kPUSQA2"
+    },
+    "Id": "0120P000000kPUSQA2",
+    "Name": "Rental"
+   },
+   "imageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000IuXwbEAF-e479f4166e6121ff1e94bb2662a6d95a.jpg"
+  },
+  {
+   "unitSummaries": {
+    "reserved": [
+     {
+      "unitType": "Studio",
+      "totalUnits": 1,
+      "minSquareFt": 344,
+      "minRentalMinIncome": 3092.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 1546.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 344,
+      "maxRentalMinIncome": 3092.0,
+      "maxQualifyingAMI": 80.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 2,
+      "maxMonthlyRent": 1546.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000J0jztEAB",
+      "availability": 0.0,
+      "absoluteMinIncome": 3092,
+      "absoluteMaxIncome": 8645
+     }
+    ],
+    "general": [
+     {
+      "unitType": "Studio",
+      "totalUnits": 23,
+      "minSquareFt": 247,
+      "minRentalMinIncome": 3092.0,
+      "minPriceWithParking": null,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": 1546.0,
+      "minHoaDuesWithParking": null,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 350,
+      "maxRentalMinIncome": 3092.0,
+      "maxQualifyingAMI": 80.0,
+      "maxPriceWithParking": null,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": 2,
+      "maxMonthlyRent": 1546.0,
+      "maxHoaDuesWithParking": null,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000J0jztEAB",
+      "availability": 1.0,
+      "absoluteMinIncome": 3092,
+      "absoluteMaxIncome": 8645
+     }
+    ]
+   },
+   "reservedDescriptor": [
+    {
+     "shortDescription": null,
+     "numberOfUnits": 1,
+     "name": "Senior",
+     "listingId": "a0W7y00000J0jztEAB"
+    }
+   ],
+   "prioritiesDescriptor": null,
+   "listingID": "a0W7y00000J0jztEAB",
+   "chartTypes": null,
+   "attributes": {
+    "type": "Listing",
+    "url": "/services/data/v35.0/sobjects/Listing/a0W7y00000J0jztEAB"
+   },
+   "Id": "a0W7y00000J0jztEAB",
+   "Tenure": "Re-rental",
+   "Name": "949 Post Street Unit 503",
+   "Application_Due_Date": "2026-09-08T00:00:00.000+0000",
+   "Lottery_Results_Date": "2026-09-22",
+   "Reserved_community_minimum_age": 0,
+   "hasWaitlist": false,
+   "Units_Available": 1,
+   "Realtor_Commission_Unit": "percent",
+   "Building_Name": "949 Post Street",
+   "Building_Name_for_Process": "949 Post Street",
+   "Building_Street_Address": "949 Post St",
+   "Building_City": "San Francisco",
+   "Building_State": "CA",
+   "Building_Zip_Code": "94109",
+   "Publish_Lottery_Results_on_DAHLIA": "Publish results in lottery modal on DAHLIA",
+   "Accepting_Online_Applications": true,
+   "Listing_Type": "Standard Lottery",
+   "RecordTypeId": "0120P000000kPUSQA2",
+   "LastModifiedDate": "2026-09-03T19:17:02.000+0000",
+   "Status": "Active",
+   "Listing_Images": [
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fJtjsAAC"
+     },
+     "Listing": "a0W7y00000J0jztEAB",
+     "Id": "a0t7y00001fJtjsAAC",
+     "Name": "Building Photo",
+     "Image_URL": "https://media.api.sf.gov/images/Building_Exterior_949-post-st-san-francisco-ca-.original.jpg",
+     "Image_Description": "Building Photo",
+     "Display_Order": 1,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-086d70af6e130191d7bc35c4cee703e8.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fKdzZAAS"
+     },
+     "Listing": "a0W7y00000J0jztEAB",
+     "Id": "a0t7y00001fKdzZAAS",
+     "Name": "Kitchen",
+     "Image_URL": "https://media.api.sf.gov/images/Kitchen_gMq7ZBb.original.jpg",
+     "Image_Description": "Kitchen",
+     "Display_Order": 2,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-809b1c2028b19cc6cd8c01ae653e65d3.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fKeM9AAK"
+     },
+     "Listing": "a0W7y00000J0jztEAB",
+     "Id": "a0t7y00001fKeM9AAK",
+     "Name": "Living",
+     "Image_URL": "https://media.api.sf.gov/images/Living_H9R6sDE.original.jpg",
+     "Image_Description": "Living",
+     "Display_Order": 3,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-b133976bc2a1aef074c15e82de67ec20.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fKenZAAS"
+     },
+     "Listing": "a0W7y00000J0jztEAB",
+     "Id": "a0t7y00001fKenZAAS",
+     "Name": "Lobby",
+     "Image_URL": "https://media.api.sf.gov/images/Lobby_949-post-st-san-francisco-ca-building-pho.original.jpg",
+     "Image_Description": "Lobby",
+     "Display_Order": 4,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-7c8f8f088783d524dc2aa844a074c4e7.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fKeyrAAC"
+     },
+     "Listing": "a0W7y00000J0jztEAB",
+     "Id": "a0t7y00001fKeyrAAC",
+     "Name": "Elevator",
+     "Image_URL": "https://media.api.sf.gov/images/Elevator_949-post-st-san-francisco-ca-building-.original.jpg",
+     "Image_Description": "Elevator",
+     "Display_Order": 5,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-f5adaa613d09c05521036cf39d4fa8c4.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001fKJsoAAG"
+     },
+     "Listing": "a0W7y00000J0jztEAB",
+     "Id": "a0t7y00001fKJsoAAG",
+     "Name": "Laundry",
+     "Image_URL": "https://media.api.sf.gov/images/Laundry_949-post-st-san-francisco-ca-building-p.original.jpg",
+     "Image_Description": "Laundry",
+     "Display_Order": 6,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-556da3bfe6f1da28c421c0377d0acd9a.jpg"
+    }
+   ],
+   "RecordType": {
+    "attributes": {
+     "type": "RecordType",
+     "url": "/services/data/v35.0/sobjects/RecordType/0120P000000kPUSQA2"
+    },
+    "Id": "0120P000000kPUSQA2",
+    "Name": "Rental"
+   },
+   "imageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J0jztEAB-086d70af6e130191d7bc35c4cee703e8.jpg"
+  },
+  {
+   "unitSummaries": {
+    "reserved": null,
+    "general": [
+     {
+      "unitType": "1 BR",
+      "totalUnits": 1,
+      "minSquareFt": 684,
+      "minRentalMinIncome": 0.0,
+      "minPriceWithParking": 399999,
+      "minPriceWithoutParking": null,
+      "minPercentIncome": null,
+      "minOccupancy": 1,
+      "minMonthlyRent": null,
+      "minHoaDuesWithParking": 898.0,
+      "minHoaDuesWithoutParking": null,
+      "maxSquareFt": 684,
+      "maxRentalMinIncome": 0.0,
+      "maxQualifyingAMI": 140.0,
+      "maxPriceWithParking": 399999,
+      "maxPriceWithoutParking": null,
+      "maxPercentIncome": null,
+      "maxOccupancy": null,
+      "maxMonthlyRent": null,
+      "maxHoaDuesWithParking": 898.0,
+      "maxHoaDuesWithoutParking": null,
+      "listingID": "a0W7y00000J55grEAB",
+      "availability": 1.0,
+      "absoluteMinIncome": null,
+      "absoluteMaxIncome": null
+     }
+    ]
+   },
+   "reservedDescriptor": null,
+   "prioritiesDescriptor": null,
+   "listingID": "a0W7y00000J55grEAB",
+   "chartTypes": null,
+   "attributes": {
+    "type": "Listing",
+    "url": "/services/data/v35.0/sobjects/Listing/a0W7y00000J55grEAB"
+   },
+   "Id": "a0W7y00000J55grEAB",
+   "Tenure": "Resale",
+   "Name": "65 Ora Way Unit C101",
+   "Application_Due_Date": "2026-09-24T00:00:00.000+0000",
+   "Lottery_Results_Date": "2026-10-08",
+   "Reserved_community_minimum_age": 0,
+   "hasWaitlist": false,
+   "Units_Available": 1,
+   "Realtor_Commission_Amount": 9524.0,
+   "Realtor_Commission_Unit": "dollars",
+   "Building_Name": "Goldmine Hill",
+   "Building_Name_for_Process": "Goldmine Hill",
+   "Building_Street_Address": "65 Ora Way",
+   "Building_City": "San Francisco",
+   "Building_State": "CA",
+   "Building_Zip_Code": "94131",
+   "Publish_Lottery_Results_on_DAHLIA": "Publish results in lottery modal on DAHLIA",
+   "Accepting_Online_Applications": true,
+   "Listing_Type": "Standard Lottery",
+   "RecordTypeId": "0120P000000kPURQA2",
+   "LastModifiedDate": "2026-09-03T15:29:07.000+0000",
+   "Status": "Active",
+   "Listing_Images": [
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gIbzhAAC"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gIbzhAAC",
+     "Name": "65 Ora Way C101 Ext.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Ext.original.png",
+     "Image_Description": "Concrete walkway through lush greenery leading to a modern building entrance.",
+     "Display_Order": 1,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-8be9c31172762fb00002587bd4524e7f.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gIcMHAA0"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gIcMHAA0",
+     "Name": "65 Ora Way C101 Kit LV.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Kit_LV.original.png",
+     "Image_Description": "Bright open-plan apartment interior with a compact kitchen, hardwood floors, and a living room overlooking trees through large windows.",
+     "Display_Order": 2,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-61376f5842abdce3f19ae60d5ce52383.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gIcXZAA0"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gIcXZAA0",
+     "Name": "65 Ora Way C101 Liv.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Liv.original.png",
+     "Image_Description": "Bright living room with wood floors, a television, fireplace, bay windows, patterned rug, coffee table, sofa, armchair, and potted plants.",
+     "Display_Order": 3,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-ba1a9c20ea4db2dbe972ca1d7fbe8e0c.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gHHGqAAO"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gHHGqAAO",
+     "Name": "65 Ora Way C101 Kit2.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Kit2.original.png",
+     "Image_Description": "Bright open kitchen with a white peninsula, two bar stools, stainless-steel appliances, dining furniture, and potted plants.",
+     "Display_Order": 4,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-7df9ea98c2882ed3b1b279951026ee9e.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gIWSCAA4"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gIWSCAA4",
+     "Name": "65 Ora Way C101 Kit.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Kit.original.png",
+     "Image_Description": "Modern kitchen with stainless-steel refrigerator, microwave, electric range, sink, and faucet.",
+     "Display_Order": 5,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-b0ace6797d943c925b7d4d3e4824cb90.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gHVBgAAO"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gHVBgAAO",
+     "Name": "65 Ora Way C101 BR1.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_BR1.original.png",
+     "Image_Description": "Bright bedroom with a single patterned bed, wooden nightstand, woven basket, and large window overlooking trees.",
+     "Display_Order": 6,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-81b7be42c9544f41cdb1b011bd278f81.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gIdGjAAK"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gIdGjAAK",
+     "Name": "65 Ora Way C101 BR2.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_BR2.original.png",
+     "Image_Description": "Bright bedroom with built-in white closets, a partially visible patterned bed, a nightstand with a lamp and vase, and a hallway leading to an adjoining room.",
+     "Display_Order": 7,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-0ddfc5d840b56004b9dfc045d8ecfeb3.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gHN67AAG"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gHN67AAG",
+     "Name": "65 Ora Way C101 Bath.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Bath.original.png",
+     "Image_Description": "Bright bathroom with a wood vanity and mirror beside a tiled bathtub-shower with a partially drawn white curtain.",
+     "Display_Order": 8,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-fe19e0c066e9514a199fe2bf3e3501aa.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gH9jBAAS"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gH9jBAAS",
+     "Name": "65 Ora Way C101 Courtyard.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_Courtyard.original.png",
+     "Image_Description": "Landscaped walkway between stone retaining walls, gardens, a sculpted evergreen tree, and a residential building under a blue sky.",
+     "Display_Order": 9,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-df1194c34966e60ca3352591afd3e18f.jpg"
+    },
+    {
+     "attributes": {
+      "type": "Listing_Image",
+      "url": "/services/data/v35.0/sobjects/Listing_Image/a0t7y00001gHT9mAAG"
+     },
+     "Listing": "a0W7y00000J55grEAB",
+     "Id": "a0t7y00001gHT9mAAG",
+     "Name": "65 Ora Way C101 View.png",
+     "Image_URL": "https://media.api.sf.gov/images/65_Ora_Way_C101_View.original.png",
+     "Image_Description": "Panoramic view of a dense coastal city and distant waterfront from a tree-covered hillside.",
+     "Display_Order": 10,
+     "displayImageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-74e907870f74c8b085a2bc0178c68564.jpg"
+    }
+   ],
+   "RecordType": {
+    "attributes": {
+     "type": "RecordType",
+     "url": "/services/data/v35.0/sobjects/RecordType/0120P000000kPURQA2"
+    },
+    "Id": "0120P000000kPURQA2",
+    "Name": "Ownership"
+   },
+   "imageURL": "https://media-housing-prod.dev.sf.gov/images/listings/a0W7y00000J55grEAB-8be9c31172762fb00002587bd4524e7f.jpg"
+  }
+ ]
+}

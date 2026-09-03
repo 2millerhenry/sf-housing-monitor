@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import replace
 from html import unescape
@@ -784,6 +785,233 @@ class AbacusSource:
             neighborhood=listing.neighborhood or visible_sf_area_hint(summary),
             metadata=metadata,
         )
+
+
+class SFHousingPortalSource:
+    """Read the City of San Francisco's own below-market-rate rental portal.
+
+    DAHLIA is public government data served as plain JSON, so unlike every
+    other source here it needs no key, conflicts with no site's terms, and
+    cannot quietly start refusing unattended requests. Each record is a
+    building offering several unit types, so a building with a studio and a
+    one-bedroom becomes two candidates the deal profile can judge separately.
+    """
+
+    platform = "SF Housing Portal"
+    mode = "automatic"
+    search_url = "https://housing.sfgov.org/listings"
+    api_url = "https://housing.sfgov.org/api/v1/listings.json"
+    manual_reason = None
+    detail_budget = 0
+    empty_result_message = "The city portal currently lists no open below-market rentals."
+
+    # DAHLIA's own unit vocabulary, mapped to the metadata hint that
+    # classification.py already understands. SRO is a single room, not a home.
+    UNIT_TYPES = {
+        "studio": ("studio", WHOLE_UNIT),
+        "sro": (None, ROOM),
+        "1 br": ("1 bedroom", WHOLE_UNIT),
+        "2 br": ("2 bedroom", WHOLE_UNIT),
+        "3 br": ("3 bedroom", WHOLE_UNIT),
+        "4 br": (None, WHOLE_UNIT),
+    }
+
+    @staticmethod
+    def _timestamp(value: object) -> str | None:
+        """Normalise Salesforce's +0000 offset to something fromisoformat accepts."""
+        text = str(value or "").strip()
+        if not text:
+            return None
+        if text.endswith("+0000"):
+            text = f"{text[:-5]}+00:00"
+        return text
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        response = client.get(self.api_url, headers={"Accept": "application/json"})
+        response.raise_for_status()
+        try:
+            payload = response.json()
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise SourceError("The SF housing portal returned a non-JSON response.") from exc
+        records = payload.get("listings") if isinstance(payload, dict) else None
+        if not isinstance(records, list):
+            raise SourceError(
+                "The SF housing portal response did not contain a listings array; its API may have changed."
+            )
+        listings: list[ListingCandidate] = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            # Resale and new-sale rows are ownership opportunities, not rentals.
+            if "rental" not in str(record.get("Tenure") or "").casefold():
+                continue
+            if _normal_text(record.get("Building_City")) != "san francisco":
+                continue
+            listings.extend(self._candidates(record))
+        return listings
+
+    def _candidates(self, record: dict) -> list[ListingCandidate]:
+        listing_id = _clean_text(str(record.get("Id") or record.get("listingID") or ""), 60)
+        name = _clean_text(record.get("Name"), 180)
+        if not listing_id or not name:
+            return []
+        address = _clean_text(record.get("Building_Street_Address"), 220)
+        modified = self._timestamp(record.get("LastModifiedDate"))
+        due = self._timestamp(record.get("Application_Due_Date"))
+        units_available = record.get("Units_Available")
+        reserved_for = _clean_text(record.get("Reserved_community_type"), 60)
+        summaries = record.get("unitSummaries")
+        if not isinstance(summaries, dict):
+            return []
+
+        # A building can publish the same unit type in both the general and the
+        # income-reserved bucket. Keep the lowest rent offered for each type
+        # rather than emitting two near-identical rows.
+        cheapest: dict[str, tuple[str, float, object]] = {}
+        for bucket in ("general", "reserved"):
+            for unit in summaries.get(bucket) or []:
+                if not isinstance(unit, dict):
+                    continue
+                raw_type = _clean_text(unit.get("unitType"), 40)
+                rent = unit.get("minMonthlyRent")
+                if not raw_type or not isinstance(rent, (int, float)) or rent <= 0:
+                    continue
+                key = raw_type.casefold()
+                if key not in cheapest or rent < cheapest[key][1]:
+                    cheapest[key] = (raw_type, float(rent), unit.get("totalUnits"))
+
+        listings: list[ListingCandidate] = []
+        for key, (raw_type, rent, total_units) in cheapest.items():
+            unit_hint, housing_kind = self.UNIT_TYPES.get(key, (None, UNKNOWN))
+            # The portal gives one page per building, but each unit type is a
+            # different home at a different rent. Without a distinct URL the
+            # repository's canonical-URL dedup treats them as one listing and
+            # the cheaper studio disappears behind the two-bedroom. The portal
+            # ignores the extra parameter and serves the same page.
+            unit_slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-") or "unit"
+            detail = [f"Below-market-rate {raw_type} through the San Francisco housing portal."]
+            if address:
+                detail.append(f"Building at {address}.")
+            if isinstance(total_units, (int, float)) and total_units:
+                detail.append(f"{int(total_units)} {raw_type} units in this listing.")
+            if due:
+                detail.append(f"Applications due {due[:10]}.")
+            if reserved_for:
+                detail.append(f"Reserved for {reserved_for.casefold()} applicants.")
+            metadata: dict[str, object] = {
+                "address": address,
+                "below_market_rate": True,
+                "application_due_date": due,
+                "units_available": units_available,
+                "sf_portal_unit_type": raw_type,
+            }
+            if unit_hint:
+                metadata["unit_type"] = unit_hint
+            if modified:
+                metadata["listing_timestamp"] = modified
+            if reserved_for:
+                metadata["reserved_community_type"] = reserved_for
+            listings.append(
+                ListingCandidate(
+                    platform=self.platform,
+                    source_id=f"{listing_id}:{key}",
+                    title=f"{name} - {raw_type}",
+                    original_url=f"{self.search_url}/{listing_id}?unit={unit_slug}",
+                    price=int(round(rent)),
+                    # A street address is not a neighborhood; only take one the
+                    # portal actually names.
+                    neighborhood=visible_sf_area_hint(f"{name} {address}"),
+                    listing_type=raw_type,
+                    summary=_clean_text(" ".join(detail), 1000),
+                    metadata=metadata,
+                    housing_kind=housing_kind,
+                )
+            )
+        return listings
+
+    def enrich(self, client: httpx.Client, listing: ListingCandidate) -> ListingCandidate:
+        return listing
+
+
+class ApartmentListSource:
+    """Read Apartment List's published schema.org data for San Francisco.
+
+    The search feed describes whole buildings rather than individual units, so
+    these candidates carry a starting rent and no unit mix. That is deliberately
+    left unknown instead of guessed: the dashboard labels an unknown unit type
+    for review rather than promoting it into a shortlist it may not belong in.
+    """
+
+    platform = "Apartment List"
+    mode = "automatic"
+    search_url = "https://www.apartmentlist.com/ca/san-francisco"
+    manual_reason = None
+    detail_budget = 0
+    empty_result_message = "Apartment List published no San Francisco buildings in its structured data."
+
+    @staticmethod
+    def _products(document: str) -> list[dict]:
+        soup = BeautifulSoup(document, "html.parser")
+        products: list[dict] = []
+        for node in soup.select('script[type="application/ld+json"]'):
+            try:
+                parsed = json.loads(node.string or node.get_text() or "")
+            except (ValueError, json.JSONDecodeError):
+                continue
+            for entry in parsed if isinstance(parsed, list) else [parsed]:
+                if isinstance(entry, dict) and entry.get("@type") == "Product":
+                    products.append(entry)
+        return products
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        response = client.get(self.search_url)
+        response.raise_for_status()
+        products = self._products(response.text)
+        if not products:
+            raise SourceError(
+                "Apartment List returned no structured building data; its page format may have changed."
+            )
+        listings: list[ListingCandidate] = []
+        for product in products:
+            name = _clean_text(product.get("name"), 180)
+            url = str(product.get("url") or "").strip()
+            if not name or not url.startswith("https://"):
+                continue
+            offers = product.get("offers")
+            offers = offers if isinstance(offers, dict) else {}
+            low = offers.get("lowPrice")
+            high = offers.get("highPrice")
+            price = int(round(low)) if isinstance(low, (int, float)) and low > 0 else None
+            detail = [f"Apartment building listed by Apartment List."]
+            if price and isinstance(high, (int, float)) and high > price:
+                detail.append(f"Published rents run from ${price:,} to ${int(round(high)):,} a month.")
+            elif price:
+                detail.append(f"Published rent from ${price:,} a month.")
+            detail.append("The search feed does not publish the unit mix, so the home size is unconfirmed.")
+            listings.append(
+                ListingCandidate(
+                    platform=self.platform,
+                    source_id=_source_id(url),
+                    title=name,
+                    original_url=url,
+                    price=price,
+                    neighborhood=visible_sf_area_hint(name),
+                    listing_type="Apartment building",
+                    summary=_clean_text(" ".join(detail), 600),
+                    metadata={
+                        "building_listing": True,
+                        "price_low": price,
+                        "price_high": int(round(high)) if isinstance(high, (int, float)) else None,
+                    },
+                    # The feed never says how many bedrooms, so the workflow this
+                    # belongs to stays genuinely unknown.
+                    housing_kind=UNKNOWN,
+                )
+            )
+        return listings
+
+    def enrich(self, client: httpx.Client, listing: ListingCandidate) -> ListingCandidate:
+        return listing
 
 
 class ApifyFacebookMarketplaceSource:
@@ -1951,12 +2179,16 @@ def default_sources(
     apify_tokens: ApifyTokenStore | None = None,
 ) -> list[ListingSource]:
     blocked_reason = "Public pages reject unattended requests (HTTP 403); use the direct search link."
-    direct_sources: list[ListingSource] = [
-        CraigslistSource(),
-        ListingsProjectSource(),
-        AbacusSource(),
-        SpareRoomSource(),
-    ]
+    # Named rather than indexed: the dashboard's ordering below interleaves these
+    # with the setup-required sources, and positional slicing made adding a
+    # source silently reorder the page.
+    craigslist = CraigslistSource()
+    listings_project = ListingsProjectSource()
+    abacus = AbacusSource()
+    spareroom = SpareRoomSource()
+    sf_portal = SFHousingPortalSource()
+    apartment_list = ApartmentListSource()
+    free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
     manual_sources: list[ListingSource] = [
         ManualSource("HotPads", "https://hotpads.com/san-francisco-ca/apartments-for-rent", blocked_reason),
         ManualSource("Apartments.com", "https://www.apartments.com/san-francisco-ca/", blocked_reason),
@@ -1977,7 +2209,7 @@ def default_sources(
                 "https://www.facebook.com/groups/",
                 "Connect Apify before monitoring a configured public Facebook group.",
             ),
-            *direct_sources[:3],
+            *free_sources,
             FurnishedFinderSource(apify_tokens) if apify_tokens is not None else ManualSource(
                 "Furnished Finder",
                 FurnishedFinderSource.search_url,
@@ -1987,7 +2219,9 @@ def default_sources(
             HotPadsAlertSource(mailbox),
             ApartmentsComAlertSource(mailbox),
             ZumperAlertSource(mailbox),
-            direct_sources[3],
+            spareroom,
+            sf_portal,
+            apartment_list,
             RoomiesAlertSource(mailbox),
         ]
     return [
@@ -2001,7 +2235,7 @@ def default_sources(
             "https://www.facebook.com/groups/",
             "Connect Apify before monitoring a configured public Facebook group.",
         ),
-        *direct_sources[:3],
+        *free_sources,
         ManualSource(
             "Furnished Finder",
             FurnishedFinderSource.search_url,
@@ -2009,6 +2243,8 @@ def default_sources(
         ),
         ManualSource("Zillow", "https://www.zillow.com/myzillow/savedsearches/", "Zillow alert email setup is not connected yet."),
         *manual_sources[:1],
-        direct_sources[3],
+        spareroom,
+        sf_portal,
+        apartment_list,
         *manual_sources[1:],
     ]
