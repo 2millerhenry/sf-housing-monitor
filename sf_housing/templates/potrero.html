@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}Potrero Hill Move Search · SF Housing Monitor{% endblock %}
+
+{% block content %}
+<section class="potrero-hero" aria-labelledby="potrero-title">
+  <div>
+    <p class="eyebrow">Verified {{ verified_date }} · strict Potrero core</p>
+    <h1 id="potrero-title">Potrero Hill move search</h1>
+    <p class="subtle">A decision-ready search across rooms, solo homes, and roommate splits. Ranked by your likely monthly cost, listing confidence, location, and move-in fit.</p>
+  </div>
+  <dl class="potrero-summary" aria-label="Search summary">
+    <div><dt>Active possibilities</dt><dd>{{ listings|length }}</dd></div>
+    <div><dt>Preferred range</dt><dd>{{ preferred_count }}</dd></div>
+    <div><dt>Facebook fits</dt><dd>0</dd></div>
+    <div><dt>Direct inventories</dt><dd>{{ official_audit|length }}</dd></div>
+  </dl>
+</section>
+
+<aside class="potrero-rule" aria-label="Cost and boundary assumptions">
+  <div>
+    <strong>How your share is calculated</strong>
+    <span>Room and solo prices are yours in full. Two-bedrooms are split two ways and three-bedrooms three ways. Every proposed household stays at four people or fewer.</span>
+  </div>
+  <details>
+    <summary>Boundary used</summary>
+    <p>{{ boundary_note }}</p>
+  </details>
+</aside>
+
+<section class="potrero-section" aria-labelledby="top-opportunities">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Start here</p>
+      <h2 id="top-opportunities">Eight best opportunities</h2>
+    </div>
+    <p>Best mix of price, household fit, address confidence, and timing.</p>
+  </div>
+  <ol class="potrero-picks">
+    {% for listing in shortlist %}
+    <li>
+      <div class="pick-rank" aria-hidden="true">{{ listing.rank }}</div>
+      <div>
+        <a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">{{ listing.title }}</a>
+        <p>{{ listing.why }}</p>
+      </div>
+      <div class="pick-cost">
+        <strong>${{ "{:,}".format(listing.personal_cost) }}</strong>
+        <span>/mo for you</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="potrero-section" aria-labelledby="all-options">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Full comparison</p>
+      <h2 id="all-options">{{ listings|length }} active possibilities</h2>
+    </div>
+    <p>Unknowns are shown explicitly. Open each source again before applying because rental status changes quickly.</p>
+  </div>
+  <div class="potrero-table-wrap" tabindex="0" role="region" aria-label="Potrero Hill housing comparison table">
+    <table class="potrero-table">
+      <thead>
+        <tr>
+          <th class="potrero-rank" scope="col">Rank</th>
+          <th class="potrero-listing" scope="col">Listing and location</th>
+          <th class="potrero-home" scope="col">Home</th>
+          <th class="potrero-total" scope="col">Total rent</th>
+          <th class="potrero-share" scope="col">Your share</th>
+          <th class="potrero-move" scope="col">Move-in</th>
+          <th class="potrero-source" scope="col">Source</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for listing in listings %}
+        <tr data-potrero-listing>
+          <td class="potrero-rank"><span>{{ listing.rank }}</span></td>
+          <td class="potrero-listing">
+            <a class="potrero-title-link" href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">{{ listing.title }}</a>
+            <span class="fit-label">{{ listing.fit }}</span>
+            <address>{{ listing.address }}</address>
+            <details class="listing-disclosure">
+              <summary>Household, furnishing, and checks</summary>
+              <dl>
+                <div><dt>Furnishing</dt><dd>{{ listing.furnished }}</dd></div>
+                <div><dt>Household</dt><dd>{{ listing.household }}</dd></div>
+                <div><dt>Why it fits</dt><dd>{{ listing.why }}</dd></div>
+                <div class="uncertain"><dt>Confirm</dt><dd>{{ listing.uncertainty }}</dd></div>
+              </dl>
+            </details>
+          </td>
+          <td class="potrero-home">
+            <strong>{{ listing.housing_type }}</strong>
+            <span>{{ listing.beds_baths }}</span>
+          </td>
+          <td class="potrero-total"><strong>${{ "{:,}".format(listing.total_rent) }}</strong><span>/mo</span></td>
+          <td class="potrero-share"><strong>${{ "{:,}".format(listing.personal_cost) }}</strong><span>{{ listing.cost_basis }}</span></td>
+          <td class="potrero-move"><strong>{{ listing.availability }}</strong><span>{{ listing.furnished }}</span></td>
+          <td class="potrero-source"><a href="{{ listing.url }}" target="_blank" rel="noopener noreferrer">{{ listing.source }}</a><span>Verified {{ listing.verified }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="potrero-section" aria-labelledby="official-sites">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Official inventory · checked directly</p>
+      <h2 id="official-sites">Building and manager site sweep</h2>
+    </div>
+    <p>{{ official_audit|length }} direct inventories checked. No additional active option met the $3,000 personal cap; The Grid was closest at $3,057/person.</p>
+  </div>
+  <div class="official-ledger">
+    {% for item in official_audit %}
+    <article data-official-site>
+      <div class="official-source">
+        <a href="{{ item.url }}" target="_blank" rel="noopener noreferrer">{{ item.name }}</a>
+        <span>{{ item.type }} · {{ item.address }}</span>
+      </div>
+      <p class="official-inventory">{{ item.inventory }}</p>
+      <div class="official-result">
+        <span class="audit-badge audit-{{ item.tone }}">{{ item.status }}</span>
+        <p>{{ item.result }}</p>
+      </div>
+      <small>Verified {{ item.verified }}</small>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="potrero-section" aria-labelledby="contact-list">
+  <div class="section-heading">
+    <div>
+      <p class="eyebrow">Off-market watchlist</p>
+      <h2 id="contact-list">Worth contacting directly</h2>
+    </div>
+    <p>Promising buildings, managers, and addresses without a qualifying public opening today.</p>
+  </div>
+  <div class="contact-ledger">
+    {% for contact in contacts %}
+    <article>
+      <div>
+        <a href="{{ contact.url }}" target="_blank" rel="noopener noreferrer">{{ contact.name }}</a>
+        <span>{{ contact.type }} · {{ contact.address }}</span>
+      </div>
+      <p>{{ contact.reason }}</p>
+      <small>{{ contact.status }}</small>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="potrero-section methodology" aria-labelledby="search-coverage">
+  <details open>
+    <summary id="search-coverage">Search coverage and exclusions</summary>
+    <p>This is a broad public-source search, not a claim that every private or unindexed vacancy was discoverable. Each retained option had a live listing or inquiry surface during this review.</p>
+    <dl class="coverage-ledger">
+      {% for item in source_coverage %}
+      <div><dt>{{ item.source }}</dt><dd>{{ item.result }}</dd></div>
+      {% endfor %}
+    </dl>
+    <p class="coverage-note">Excluded: Dogpatch-only buildings, duplicate syndications, pending Facebook posts, households over four adults, clearly removed pages, waitlists, and suspicious or implausibly priced posts.</p>
+  </details>
+</section>
+{% endblock %}

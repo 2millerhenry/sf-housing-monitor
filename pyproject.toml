@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sf-housing-monitor"
+version = "0.3.9"
+description = "A small local monitor for San Francisco room and housing listings"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Henry Miller" }]
+requires-python = ">=3.11"
+dependencies = [
+  "APScheduler>=3.11,<4",
+  "beautifulsoup4>=4.13,<5",
+  "fastapi>=0.115,<1",
+  "google-api-python-client>=2.180,<3",
+  "google-auth-httplib2>=0.2,<1",
+  "google-auth-oauthlib>=1.2,<2",
+  "httpx>=0.28,<1",
+  "jinja2>=3.1,<4",
+  "python-multipart>=0.0.20,<1",
+  "PyYAML>=6.0,<7",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.3,<9"]
+
+[project.urls]
+Homepage = "https://github.com/2millerhenry/sf-housing-monitor"
+Source = "https://github.com/2millerhenry/sf-housing-monitor"
+Issues = "https://github.com/2millerhenry/sf-housing-monitor/issues"
+
+[project.scripts]
+sf-housing = "sf_housing.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sf_housing", "sf_housing.*"]
+namespaces = true
+
+[tool.setuptools.package-data]
+"sf_housing.templates" = ["*.html"]
+"sf_housing.static" = ["*.css", "*.js", "*.zip"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

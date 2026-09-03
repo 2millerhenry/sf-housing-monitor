@@ -1,0 +1,193 @@
+# Illustrative, fully-populated deal profile used only by the ranking
+# benchmark in tests/ranking_benchmark.py. It is a test fixture: the
+# application never reads it, the wheel never packages it, and a real
+# installation starts from a blank draft profile instead (see
+# sf_housing/settings.py and sf_housing/deal_profile.py:DealProfile.blank).
+# Its numbers are load-bearing for the benchmark's assertions -- changing
+# them changes what the ranker is graded against. Unknown listing details
+# receive neutral credit; they are never treated as confirmed negatives.
+minimum_score: 60
+
+budget:
+  min_monthly: 800
+  max_monthly: 2700
+  ideal_monthly: 1500
+  sweet_spot_min: 1200
+  sweet_spot_max: 1800
+  # A listing up to 5% outside the wider range is still worth reviewing.
+  flexible_margin_percent: 0.05
+
+# A separate shortlist for an entire place. It shares the neighborhood list
+# below but does not apply private-room, household, or property-style rules.
+whole_unit:
+  enabled: true
+  max_monthly: 3000
+  unit_types: [studio, one_bedroom]
+  # Known buildings above this size stay in the archive. Unknown size remains
+  # reviewable and is labeled for manual verification.
+  max_building_units: 50
+
+# A combined whole-apartment shortlist. Each bedroom count keeps its own hard
+# per-person cap; a 2-bedroom cannot borrow the higher 3-bedroom total cap.
+two_bedroom:
+  enabled: true
+  occupants: 2
+  max_per_person: 2700
+  max_building_units: 50
+
+three_bedroom:
+  enabled: true
+  occupants: 3
+  max_per_person: 2500
+  max_building_units: 50
+
+ideal_neighborhoods:
+  - Duboce Triangle
+  - Potrero Hill
+
+preferred_neighborhoods:
+  - Mission Dolores
+  - Bernal Heights
+  - Noe Valley
+
+acceptable_neighborhoods:
+  - NOPA
+  - North of the Panhandle
+  - Lower Haight
+  - Hayes Valley
+  - Mission District
+  - Eureka Valley
+  - Castro
+  - Glen Park
+  - Inner Richmond
+  - Inner Sunset
+  - Richmond District
+  - Inner Parkside
+  - Cole Valley
+  - Dogpatch
+  - Pacific Heights
+  - Marina
+
+# Listing sites use inconsistent neighborhood labels. These are only aliases for
+# the matching areas above; a generic "San Francisco" label remains unknown.
+neighborhood_aliases:
+  Duboce Triangle: [Duboce, Duboce Park]
+  Potrero Hill: [Potrero]
+  Mission Dolores: [Dolores Park]
+  Bernal Heights: [Bernal]
+  Noe Valley: [Noe]
+  NOPA: [NoPa, North of Panhandle, Alamo Square]
+  Eureka Valley: [Castro / Upper Market]
+  Richmond District: [Central Richmond, Sea Cliff, Seacliff, Richmond / Seacliff, Outer Richmond]
+
+# Direct Zillow room-rental searches supplied by Henry. These are the links the
+# Alerts page opens when setting up Zillow Instant email notifications. Zillow
+# may email up to the saved-search cap; the monitor's actual room budget remains
+# $800–$2,700 above, so an over-budget listing does not enter results.
+zillow_searches:
+  - name: Duboce Triangle
+    url: https://www.zillow.com/duboce-triangle-san-francisco-ca/rentals/?searchQueryState=%7B%22isMapVisible%22%3Atrue%2C%22mapBounds%22%3A%7B%22north%22%3A37.77254975668848%2C%22south%22%3A37.76155809123041%2C%22east%22%3A-122.42412801846314%2C%22west%22%3A-122.43884798153687%7D%2C%22filterState%22%3A%7B%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22mf%22%3A%7B%22value%22%3Afalse%7D%2C%22land%22%3A%7B%22value%22%3Afalse%7D%2C%22manu%22%3A%7B%22value%22%3Afalse%7D%2C%22mp%22%3A%7B%22min%22%3A800%2C%22max%22%3A2400%7D%2C%22r4re%22%3A%7B%22value%22%3Afalse%7D%2C%22r4r%22%3A%7B%22value%22%3Atrue%7D%7D%2C%22isListVisible%22%3Atrue%2C%22mapZoom%22%3A16%2C%22curatedCollection%22%3Anull%2C%22usersSearchTerm%22%3A%22Duboce%20Triangle%2C%20San%20Francisco%2C%20CA%22%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A417518%2C%22regionType%22%3A8%7D%5D%7D
+  - name: Potrero Hill
+    url: https://www.zillow.com/potrero-hill-san-francisco-ca/rentals/?searchQueryState=%7B%22filterState%22%3A%7B%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22mp%22%3A%7B%22min%22%3A800%2C%22max%22%3A2400%7D%2C%22r4re%22%3A%7B%22value%22%3Afalse%7D%2C%22r4r%22%3A%7B%22value%22%3Atrue%7D%7D%7D
+  - name: Mission Dolores
+    url: https://www.zillow.com/mission-dolores-san-francisco-ca/rentals/?searchQueryState=%7B%22isMapVisible%22%3Atrue%2C%22mapBounds%22%3A%7B%22north%22%3A37.774979541045795%2C%22south%22%3A37.75299529883263%2C%22east%22%3A-122.41144203692626%2C%22west%22%3A-122.44088196307372%7D%2C%22filterState%22%3A%7B%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22mf%22%3A%7B%22value%22%3Afalse%7D%2C%22land%22%3A%7B%22value%22%3Afalse%7D%2C%22manu%22%3A%7B%22value%22%3Afalse%7D%2C%22mp%22%3A%7B%22min%22%3A800%2C%22max%22%3A2400%7D%2C%22r4re%22%3A%7B%22value%22%3Afalse%7D%2C%22r4r%22%3A%7B%22value%22%3Atrue%7D%7D%2C%22isListVisible%22%3Atrue%2C%22mapZoom%22%3A15%2C%22curatedCollection%22%3Anull%2C%22usersSearchTerm%22%3A%22Mission%20Dolores%2C%20San%20Francisco%2C%20CA%22%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A786314%2C%22regionType%22%3A8%7D%5D%7D
+  - name: Bernal Heights
+    url: https://www.zillow.com/bernal-heights-san-francisco-ca/rentals/?searchQueryState=%7B%22isMapVisible%22%3Atrue%2C%22mapBounds%22%3A%7B%22north%22%3A37.75111531046152%2C%22south%22%3A37.7291239756948%2C%22east%22%3A-122.40036253692627%2C%22west%22%3A-122.42980246307373%7D%2C%22filterState%22%3A%7B%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22mf%22%3A%7B%22value%22%3Afalse%7D%2C%22land%22%3A%7B%22value%22%3Afalse%7D%2C%22manu%22%3A%7B%22value%22%3Afalse%7D%2C%22mp%22%3A%7B%22min%22%3A800%2C%22max%22%3A2400%7D%2C%22r4re%22%3A%7B%22value%22%3Afalse%7D%2C%22r4r%22%3A%7B%22value%22%3Atrue%7D%7D%2C%22isListVisible%22%3Atrue%2C%22mapZoom%22%3A15%2C%22curatedCollection%22%3Anull%2C%22usersSearchTerm%22%3A%22Bernal%20Heights%2C%20San%20Francisco%2C%20CA%22%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A268020%2C%22regionType%22%3A8%7D%5D%7D
+  - name: Noe Valley
+    url: https://www.zillow.com/noe-valley-san-francisco-ca/rentals/?searchQueryState=%7B%22isMapVisible%22%3Atrue%2C%22mapBounds%22%3A%7B%22north%22%3A37.758669056327776%2C%22south%22%3A37.73667996615452%2C%22east%22%3A-122.41855853692626%2C%22west%22%3A-122.44799846307372%7D%2C%22filterState%22%3A%7B%22fr%22%3A%7B%22value%22%3Atrue%7D%2C%22fsba%22%3A%7B%22value%22%3Afalse%7D%2C%22fsbo%22%3A%7B%22value%22%3Afalse%7D%2C%22nc%22%3A%7B%22value%22%3Afalse%7D%2C%22cmsn%22%3A%7B%22value%22%3Afalse%7D%2C%22auc%22%3A%7B%22value%22%3Afalse%7D%2C%22fore%22%3A%7B%22value%22%3Afalse%7D%2C%22mf%22%3A%7B%22value%22%3Afalse%7D%2C%22land%22%3A%7B%22value%22%3Afalse%7D%2C%22manu%22%3A%7B%22value%22%3Afalse%7D%2C%22mp%22%3A%7B%22min%22%3A800%2C%22max%22%3A2400%7D%2C%22r4re%22%3A%7B%22value%22%3Afalse%7D%2C%22r4r%22%3A%7B%22value%22%3Atrue%7D%7D%2C%22isListVisible%22%3Atrue%2C%22mapZoom%22%3A15%2C%22curatedCollection%22%3Anull%2C%22usersSearchTerm%22%3A%22Noe%20Valley%20CA%20homes%22%2C%22regionSelection%22%3A%5B%7B%22regionId%22%3A268338%2C%22regionType%22%3A8%7D%5D%7D
+
+private_room: true
+property_types:
+  - house
+  - townhouse
+  - victorian
+  - shared flat
+
+lease:
+  ideal_min_months: 3
+  ideal_max_months: 8
+  min_months: 1
+  max_months: 12
+  flexible: true
+
+# A listing explicitly opening in August scores highest. September and October
+# remain useful near-term fallbacks; anything later stays in the archive.
+availability:
+  preferred_by: "2026-08-31"
+  latest_by: "2026-10-31"
+
+household:
+  ideal_people: 3
+  min_people: 2
+  max_people: 5
+
+features:
+  sunlight: true
+  park_access: true
+  outdoor_space: true
+
+# Positive signals only. Their absence is unknown, not a mismatch.
+lifestyle_keywords:
+  - outdoorsy
+  - social
+  - chill
+  - clean
+  - mature
+  - respectful
+  - communicative
+  - quiet
+  - friendly
+  - independent
+  - creative
+  - young professional
+  - biking
+  - skating
+  - hybrid work
+  - laundry
+  - guests allowed
+
+# Only explicit mentions trigger these penalties.
+dealbreakers:
+  - apartment complex
+  - shared bedroom
+  - shared room
+  - per bed
+  - per-bed
+
+# Weights only apply when the corresponding preference is configured.
+weights:
+  # A known target neighborhood must outrank a perfect price in the wrong area.
+  price: 20
+  neighborhood: 35
+  private_room: 12
+  property_type: 10
+  lease: 10
+  availability: 12
+  household: 8
+  sunlight: 6
+  park_access: 5
+  outdoor_space: 3
+  lifestyle: 3
+
+sources:
+  max_results_per_source: 120
+  craigslist_detail_pages_per_scan: 10
+  # Apartment cards with only a generic "San Francisco" location need their
+  # detail page before they can be verified against the target neighborhoods.
+  craigslist_unit_detail_pages_per_scan: 30
+  # The combined 2–3 bedroom search keeps 2BR coverage broad.
+  craigslist_two_bedroom_detail_pages_per_scan: 25
+  # Exact 3BR search prevents newer 2BR cards from crowding 3BR inventory out.
+  craigslist_three_bedroom_detail_pages_per_scan: 25
+  # The dedicated sublet category is only admitted with an explicit 6+ month
+  # term, and these detail reads provide the term and real home shape.
+  craigslist_sublet_detail_pages_per_scan: 15
+  facebook_marketplace_results_per_scan: 10
+  # Furnished Finder's community connector is capped at five rooms per scheduled
+  # scan and 300 returned listings per month, so it stays within free-credit scale.
+  furnished_finder_results_per_scan: 5
+  furnished_finder_monthly_listing_limit: 300
+  # Public-only connector. Scheduled scans read five posts; manual scans and
+  # the Groups test read twenty so Bay Area noise cannot crowd out SF offers.
+  facebook_group_urls:
+    - https://www.facebook.com/groups/1105487206638421/

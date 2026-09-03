@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+data/
+*.egg-info/
+build/
+dist/
+*.zip.sha256
+
+# Scaffolding for the open-source push; not part of the project.
+OPEN_SOURCE_SPEC.md
+.DS_Store

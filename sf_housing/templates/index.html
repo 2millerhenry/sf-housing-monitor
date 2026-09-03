@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero dashboard-hero">
+  <div>
+    <p class="eyebrow">Twice daily · 10 AM and 6 PM</p>
+    {% if view == 'saved' %}
+      <h1>Your saved homes</h1>
+      <p class="subtle">A focused list of places worth revisiting or contacting.</p>
+    {% elif view == 'dismissed' %}
+      <h1>Passed listings</h1>
+      <p class="subtle">Nothing is deleted. Restore anything you want to reconsider.</p>
+    {% elif view == 'all' %}
+      <h1>Every listing found</h1>
+      <p class="subtle">The full archive, including low scores and dismissed homes.</p>
+    {% elif view == 'near_matches' %}
+      <h1>Near matches</h1>
+      <p class="subtle">Homes that missed a hard limit or need more fit, kept separate so the shortlist stays honest.</p>
+    {% else %}
+      <h1>{% if housing_mode == 'two_bedroom' %}2–3 bedrooms worth splitting{% elif housing_mode == 'whole_unit' %}Studios &amp; 1-bedrooms worth a look{% else %}Rooms worth a look{% endif %}</h1>
+      <p class="subtle">
+        {% if housing_mode == 'two_bedroom' %}Entire homes in your target areas:{% if 'two_bedroom' in enabled_paths %} 2 bedrooms up to ${{ "{:,}".format(two_bedroom_max_per_person) }}/person{% endif %}{% if 'two_bedroom' in enabled_paths and 'three_bedroom' in enabled_paths %}, or{% endif %}{% if 'three_bedroom' in enabled_paths %} 3 bedrooms up to ${{ "{:,}".format(three_bedroom_max_per_person) }}/person{% endif %}.{% elif housing_mode == 'whole_unit' %}Entire places under ${{ "{:,}".format(whole_unit_max_monthly) }} in your target areas. Building size is never guessed.{% else %}Ranked against your actual housing deal. Unknown details stay neutral.{% endif %}
+      </p>
+    {% endif %}
+  </div>
+  <form action="/scan" method="post">
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    <button class="primary scan-button" type="submit" {% if scan_running %}disabled aria-disabled="true"{% endif %}>
+      {% if scan_running %}<span class="activity-dot" aria-hidden="true"></span>Scanning now{% else %}Check for new homes{% endif %}
+    </button>
+  </form>
+</section>
+
+{% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+{% if scan_feedback %}
+<section class="scan-progress" data-scan-progress aria-live="polite" aria-label="Housing scan progress">
+  <div class="scan-progress-heading">
+    <strong data-scan-title>{% if scan_progress.current_source %}Checking {{ scan_progress.current_source }}{% else %}Starting source checks{% endif %}</strong>
+    <span data-scan-percent>{{ scan_progress.percent }}%</span>
+  </div>
+  <div class="scan-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ scan_progress.percent }}">
+    <span data-scan-bar style="--scan-progress: {{ scan_progress.percent / 100 }}"></span>
+  </div>
+  <div class="scan-progress-meta">
+    <span data-scan-detail>{{ scan_progress.elapsed_seconds }}s elapsed · {{ scan_progress.sources_completed }} of {{ scan_progress.sources_total }} sources · {{ scan_progress.listings_seen }} listings checked</span>
+    <span data-scan-estimate>{% if typical_scan_seconds %}Usually about {{ typical_scan_seconds }}s{% else %}May take up to 2 minutes{% endif %}</span>
+  </div>
+</section>
+<script src="{{ url_for('static', path='scan-progress.js') }}?v={{ app_version }}" defer></script>
+{% endif %}
+{% if profile_incomplete %}
+<div class="notice warning" role="alert">
+  Your housing deal needs a budget and target areas.
+  <a href="/preferences">Finish your deal</a> to make the ranking useful.
+</div>
+{% endif %}
+
+<nav class="housing-tabs" aria-label="Housing search">
+  {% if 'room' in enabled_housing_modes %}
+  <a href="/?housing=room&amp;view=active&amp;sort=score" {% if housing_mode == 'room' %}class="active" aria-current="page"{% endif %}>
+    <strong>Private rooms</strong><span>Your original shared-home search</span>
+  </a>
+  {% endif %}
+  {% if 'whole_unit' in enabled_housing_modes %}
+  <a href="/?housing=whole_unit&amp;view=active&amp;sort=score" {% if housing_mode == 'whole_unit' %}class="active" aria-current="page"{% endif %}>
+    <strong>Studios &amp; 1-bedrooms</strong><span>Entire place · up to ${{ "{:,}".format(whole_unit_max_monthly) }} · 50 units max</span>
+  </a>
+  {% endif %}
+  {% if 'two_bedroom' in enabled_housing_modes %}
+  <a href="/?housing=two_bedroom&amp;view=active&amp;sort=score" {% if housing_mode == 'two_bedroom' %}class="active" aria-current="page"{% endif %}>
+    <strong>2–3 bedrooms to split</strong><span>{% if 'two_bedroom' in enabled_paths %}2BR ${{ "{:,}".format(two_bedroom_max_per_person) }} each{% endif %}{% if 'two_bedroom' in enabled_paths and 'three_bedroom' in enabled_paths %} · {% endif %}{% if 'three_bedroom' in enabled_paths %}3BR ${{ "{:,}".format(three_bedroom_max_per_person) }} each{% endif %}</span>
+  </a>
+  {% endif %}
+</nav>
+
+<section class="workflow-bar" aria-label="Listing controls">
+  <nav class="view-tabs" aria-label="Listing views">
+    <a href="/?housing={{ housing_mode }}&amp;view=active&amp;sort=score" {% if view == 'active' %}class="active" aria-current="page"{% endif %}>Shortlist</a>
+    <a href="/?housing={{ housing_mode }}&amp;view=saved&amp;sort=score" {% if view == 'saved' %}class="active" aria-current="page"{% endif %}>Saved</a>
+    <a href="/?housing={{ housing_mode }}&amp;view=dismissed&amp;sort=newest" {% if view == 'dismissed' %}class="active" aria-current="page"{% endif %}>Passed</a>
+    <a href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score" {% if view == 'near_matches' %}class="active" aria-current="page"{% endif %}>Near matches</a>
+    <a href="/?housing={{ housing_mode }}&amp;view=all&amp;sort=score" {% if view == 'all' %}class="active" aria-current="page"{% endif %}>Archive</a>
+  </nav>
+
+  <form class="filters" method="get" action="/" data-filter-form>
+    <input type="hidden" name="view" value="{{ view }}">
+    <input type="hidden" name="housing" value="{{ housing_mode }}">
+    <label>Order
+      <select name="sort" data-auto-submit-order{% if sort != 'score' %} class="is-selected"{% endif %}>
+        <option value="score" {% if sort == 'score' %}selected{% endif %}>Best match</option>
+        <option value="contact" {% if sort == 'contact' %}selected{% endif %}>Fastest to contact</option>
+        <option value="available" {% if sort == 'available' %}selected{% endif %}>Soonest move-in</option>
+        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest found</option>
+        <option value="unopened" {% if sort == 'unopened' %}selected{% endif %}>Not opened yet first</option>
+        <option value="price" {% if sort == 'price' %}selected{% endif %}>Lowest price</option>
+      </select>
+    </label>
+    <label>Neighborhood
+      <select name="neighborhood"{% if selected_neighborhood %} class="is-selected"{% endif %}>
+        <option value="">Every neighborhood</option>
+        {% for item in neighborhoods %}<option value="{{ item }}" {% if selected_neighborhood == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Source
+      <select name="platform"{% if selected_platform %} class="is-selected"{% endif %}>
+        <option value="">Every source</option>
+        {% for item in platforms %}<option value="{{ item }}" {% if selected_platform == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+      </select>
+    </label>
+    {% if housing_mode in ['whole_unit', 'two_bedroom'] %}
+      <label>Area priority
+        <select name="area_priority"{% if selected_area_priority %} class="is-selected"{% endif %}>
+          <option value="">All target areas</option>
+          <option value="dream_strong" {% if selected_area_priority == 'dream_strong' %}selected{% endif %}>Dream + strong only</option>
+          <option value="secondary" {% if selected_area_priority == 'secondary' %}selected{% endif %}>Secondary only</option>
+        </select>
+      </label>
+    {% endif %}
+    {% if housing_mode in ['whole_unit', 'two_bedroom'] %}
+      <label>Unit type
+        <select name="unit_type"{% if selected_unit_type %} class="is-selected"{% endif %}>
+          {% if housing_mode == 'two_bedroom' %}
+            <option value="">Every enabled split</option>
+            {% if 'two_bedroom' in enabled_paths %}<option value="two_bedroom" {% if selected_unit_type == 'two_bedroom' %}selected{% endif %}>2 bedrooms</option>{% endif %}
+            {% if 'three_bedroom' in enabled_paths %}<option value="three_bedroom" {% if selected_unit_type == 'three_bedroom' %}selected{% endif %}>3 bedrooms</option>{% endif %}
+          {% else %}
+            <option value="">Every enabled whole home</option>
+            {% if 'studio' in enabled_paths %}<option value="studio" {% if selected_unit_type == 'studio' %}selected{% endif %}>Studio</option>{% endif %}
+            {% if 'one_bedroom' in enabled_paths %}<option value="one_bedroom" {% if selected_unit_type == 'one_bedroom' %}selected{% endif %}>1 bedroom</option>{% endif %}
+          {% endif %}
+        </select>
+      </label>
+    {% elif housing_mode == 'room' %}
+      <label>Home
+        <select name="home_style"{% if selected_home_style %} class="is-selected"{% endif %}>
+          <option value="">Any home</option>
+          <option value="house" {% if selected_home_style == 'house' %}selected{% endif %}>House</option>
+          <option value="shared_flat" {% if selected_home_style == 'shared_flat' %}selected{% endif %}>Shared flat / apartment</option>
+          <option value="townhouse" {% if selected_home_style == 'townhouse' %}selected{% endif %}>Townhouse</option>
+          <option value="victorian" {% if selected_home_style == 'victorian' %}selected{% endif %}>Victorian</option>
+          <option value="condo" {% if selected_home_style == 'condo' %}selected{% endif %}>Condo</option>
+        </select>
+      </label>
+    {% endif %}
+    <button class="compact-button" type="submit">Update filters</button>
+    {% if selected_neighborhood or selected_platform or selected_home_style or selected_unit_type or selected_area_priority %}<a class="clear-filters" href="/?housing={{ housing_mode }}&amp;view={{ view }}&amp;sort={{ sort }}">Clear</a>{% endif %}
+  </form>
+</section>
+<script>
+  document.addEventListener("change", function (event) {
+    const order = event.target.closest("select[data-auto-submit-order]");
+    if (order && order.form) order.form.requestSubmit();
+  });
+</script>
+
+<section class="results-surface" aria-labelledby="results-title">
+  <header class="results-heading">
+    <div>
+      <h2 id="results-title">
+        {% if view == 'saved' %}Starred listings{% elif view == 'dismissed' %}Passed listings{% elif view == 'near_matches' %}Worth a second look{% elif view == 'all' %}Full archive{% else %}Recommended for you{% endif %}
+      </h2>
+      <p>
+        {% if view == 'active' and housing_mode == 'two_bedroom' %}Only confirmed entire 2- or 3-bedroom homes within the matching per-person cap{% elif view == 'active' and housing_mode == 'whole_unit' %}Only confirmed studios and 1-bedrooms; large known buildings stay out{% elif view == 'active' %}Showing matches at {{ minimum_score }} or higher{% else %}Your review history is always preserved{% endif %}{% if selected_area_priority == 'dream_strong' %} · Dream and strong target areas only{% elif selected_area_priority == 'secondary' %} · Secondary target areas only{% endif %}
+      </p>
+    </div>
+    <span class="result-count">{{ listings|length }} {% if housing_mode == 'two_bedroom' %}apartment{% elif housing_mode == 'whole_unit' %}unit{% else %}home{% endif %}{% if listings|length != 1 %}s{% endif %}</span>
+  </header>
+
+  {% if listings %}
+  <div class="listing-table-scroll" tabindex="0" aria-label="Housing results table">
+    <table class="listing-table">
+      <thead>
+        <tr>
+          <th scope="col" class="cell-score"{% if sort == 'score' %} aria-sort="descending"{% endif %}><a href="{{ sort_urls.score }}">Score <span aria-hidden="true">{% if sort == 'score' %}↓{% endif %}</span></a></th>
+          <th scope="col" class="cell-quick-open">Contact</th>
+          <th scope="col" class="cell-price"{% if sort == 'price' %} aria-sort="ascending"{% endif %}><a href="{{ sort_urls.price }}">{% if housing_mode == 'two_bedroom' %}Total / person{% else %}Price{% endif %} <span aria-hidden="true">{% if sort == 'price' %}↑{% endif %}</span></a></th>
+          <th scope="col" class="cell-area">Area</th>
+          <th scope="col" class="cell-home">{% if housing_mode != 'room' %}Type &amp; building{% else %}Home &amp; room{% endif %}</th>
+          <th scope="col" class="cell-available"{% if sort == 'available' %} aria-sort="ascending"{% endif %}><a href="{{ sort_urls.available }}">Move-in <span aria-hidden="true">{% if sort == 'available' %}↑{% endif %}</span></a></th>
+          <th scope="col" class="cell-source">Source</th>
+          <th scope="col" class="cell-listing">Listing</th>
+          <th scope="col" class="cell-fit">Best matches</th>
+          <th scope="col" class="cell-check">Check</th>
+          <th scope="col" class="cell-found"{% if sort == 'newest' %} aria-sort="descending"{% endif %}><a href="{{ sort_urls.newest }}">Found <span aria-hidden="true">{% if sort == 'newest' %}↓{% endif %}</span></a></th>
+          <th scope="col" class="cell-actions"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for listing in listings %}
+        <tr class="listing-row{% if listing.is_recently_posted %} new-listing{% endif %}{% if listing.status == 'saved' %} saved-listing{% endif %}{% if listing.opened_at %} opened-listing{% endif %}">
+          <td class="cell-score">
+            <strong>{{ listing.score }}</strong>
+            <span class="score-state">
+              {% if listing.is_recently_posted %}<b class="new-badge" title="Posted in the last two days">New</b>{% endif %}
+              <span class="match-grade">{% if listing.score >= 85 %}Excellent{% elif listing.score >= 75 %}Strong{% else %}Possible{% endif %}</span>
+            </span>
+            <small class="confidence-label">{{ listing.confidence }}% evidence</small>
+            {% if listing.eligibility == 'needs_verification' %}<small class="verification-label">Needs verification</small>{% elif listing.eligibility == 'ineligible' %}<small class="ineligible-label">Outside deal</small>{% endif %}
+          </td>
+          <td class="cell-quick-open">
+            {% if listing.application_url %}
+              <a class="quick-open contact-ready" href="{{ listing.application_url }}" target="_blank" rel="noopener noreferrer" aria-label="Apply now for {{ listing.title }}" data-mark-opened="/listings/{{ listing.id }}/opened">Apply <span aria-hidden="true">↗</span></a>
+            {% elif listing.direct_lister %}
+              <a class="quick-open contact-ready" href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" aria-label="Contact the lister for {{ listing.title }}" data-mark-opened="/listings/{{ listing.id }}/opened">Contact <span aria-hidden="true">↗</span></a>
+            {% else %}
+              <a class="quick-open" href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" aria-label="Open {{ listing.title }}" data-mark-opened="/listings/{{ listing.id }}/opened">Open <span aria-hidden="true">↗</span></a>
+            {% endif %}
+          </td>
+          <td class="cell-price">{% if listing.price is not none %}<strong>${{ "{:,}".format(listing.price) }}</strong><span>{% if housing_mode == 'two_bedroom' and listing.per_person_monthly %}${{ "{:,}".format(listing.per_person_monthly) }}/person{% else %}/mo{% endif %}</span>{% else %}<span>Unknown</span>{% endif %}</td>
+          <td class="cell-area"><span>{{ listing.neighborhood or 'Unknown' }}</span>{% if listing.neighborhood_priority %}<small class="area-priority area-priority-{{ listing.neighborhood_priority }}">{% if listing.neighborhood_priority == 'dream' %}Dream area{% elif listing.neighborhood_priority == 'strong' %}Strong area{% else %}Secondary area{% endif %}</small>{% endif %}{% if listing.location_hint %}<small class="location-hint">Near {{ listing.location_hint }}</small>{% endif %}</td>
+          <td class="cell-home">
+            <strong>{{ listing.home_facts.primary or listing.listing_type or 'Room details unknown' }}</strong>
+            {% if listing.home_facts.secondary %}<span>{{ listing.home_facts.secondary|join(' · ') }}</span>{% endif %}
+          </td>
+          <td class="cell-available">
+            {% if listing.available_on %}<strong>{{ listing.available_on|compact_move_in_date }}</strong><span>available</span>{% else %}<span class="unknown">Not stated</span>{% endif %}
+          </td>
+          <td class="cell-source">
+            <span class="source-name">{{ listing.platform }}</span>
+            {% if listing.was_checked_today %}<small class="checked-badge">Checked today</small>{% else %}<small>Checked {{ listing.last_seen|compact_pacific_date }}</small>{% endif %}
+          </td>
+          <td class="cell-listing">
+            <h3 title="{{ listing.title }}"><a class="listing-title-link" href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">{{ listing.title }} <span aria-hidden="true">↗</span></a></h3>
+            <p class="listing-compact-meta">
+              <span class="meta-source">{{ listing.platform }}</span>
+              <span class="meta-found">{{ listing.first_found|compact_pacific_date }}</span>
+              <span class="meta-area">{{ listing.neighborhood or 'Area unknown' }}</span>
+              <span class="meta-price">{% if listing.price is not none %}${{ "{:,}".format(listing.price) }}/mo{% if housing_mode == 'two_bedroom' and listing.per_person_monthly %}, ${{ "{:,}".format(listing.per_person_monthly) }}/person{% endif %}{% else %}Price unknown{% endif %}</span>
+              {% if listing.sublease_months %}<span class="contact-signal">{{ listing.sublease_months }}-mo sublet</span>{% endif %}
+              {% if listing.application_url %}<span class="contact-signal">Direct application</span>{% elif listing.direct_lister %}<span class="contact-signal">Direct lister</span>{% endif %}
+              {% if listing.note %}<span class="note-indicator">Note saved</span>{% endif %}
+            </p>
+            <details class="compact-row-details">
+              <summary>Why this score</summary>
+              <div>
+                {% if listing.match_reasons %}<ul>{% for reason in listing.match_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>{% else %}<p>Not enough listing detail yet.</p>{% endif %}
+                <p><strong>{% if housing_mode != 'room' %}Type{% else %}Home{% endif %}:</strong> {{ listing.home_facts.primary or listing.listing_type or 'Details not stated' }}{% if listing.home_facts.secondary %} · {{ listing.home_facts.secondary|join(' · ') }}{% endif %}</p>
+                <p><strong>Move-in:</strong> {{ listing.available_on|compact_move_in_date }}</p>
+                <p><strong>Check:</strong> {{ listing.concern }}</p>
+                <p><strong>Evidence:</strong> {{ listing.confidence }}% coverage{% if listing.unknowns %}. {{ listing.unknowns[:2]|join(' ') }}{% endif %}</p>
+              </div>
+            </details>
+            <details class="compact-row-details outreach-note">
+              <summary>Copy contact note</summary>
+              <div>
+                <p>Personalize the brackets before sending; only claim what is true for you.</p>
+                <textarea id="outreach-{{ listing.id }}" readonly aria-label="Contact note for {{ listing.title }}">Hi — I’m interested in {{ listing.title }}. I’m looking to move around [move-in date] and can tour [two specific time windows]. I can provide the usual application documents promptly if helpful. Is it still available? Thanks, [name] · [phone]</textarea>
+                <button class="compact-button" type="button" data-copy-outreach="outreach-{{ listing.id }}">Copy note</button>
+              </div>
+            </details>
+          </td>
+          <td class="cell-fit">
+            {% if listing.match_reasons %}<ul>{% for reason in listing.match_reasons[:3] %}<li>{{ reason }}</li>{% endfor %}</ul>{% else %}<span class="unknown">Not enough detail yet.</span>{% endif %}
+          </td>
+          <td class="cell-check"><span class="{% if listing.concern[:8] == 'Unknown:' %}unknown{% endif %}">{{ listing.concern }}</span></td>
+          <td class="cell-found"><span title="{{ listing.first_found|pacific_datetime }}">{{ listing.first_found|compact_pacific_date }}</span></td>
+          <td class="cell-actions">
+            <div class="row-actions">
+              <form method="post" action="/listings/{{ listing.id }}/status">
+                <input type="hidden" name="return_to" value="{{ return_to }}">
+                <input type="hidden" name="status" value="{% if listing.status == 'saved' %}active{% else %}saved{% endif %}">
+                <button class="row-action save-button{% if listing.status == 'saved' %} saved{% endif %}" type="submit" aria-label="{% if listing.status == 'saved' %}Remove from starred listings{% else %}Add to starred listings{% endif %}">{% if listing.status == 'saved' %}★ Starred{% else %}☆ Star{% endif %}</button>
+              </form>
+              <form method="post" action="/listings/{{ listing.id }}/status">
+                <input type="hidden" name="return_to" value="{{ return_to }}">
+                <input type="hidden" name="status" value="{% if listing.status == 'dismissed' %}active{% else %}dismissed{% endif %}">
+                <button class="row-action quiet-button" type="submit">{% if listing.status == 'dismissed' %}Restore{% else %}Pass{% endif %}</button>
+              </form>
+              <details class="table-note{% if listing.note %} has-note{% endif %}">
+                <summary class="row-action">{% if listing.note %}Edit note{% else %}Note{% endif %}</summary>
+                <div class="note-popover">
+                  <form class="note-form" method="post" action="/listings/{{ listing.id }}/note">
+                    <input type="hidden" name="return_to" value="{{ return_to }}">
+                    <label class="sr-only" for="note-{{ listing.id }}">Personal note for {{ listing.title }}</label>
+                    <textarea id="note-{{ listing.id }}" name="note" maxlength="4000" placeholder="Tour time, contact details, questions…">{{ listing.note }}</textarea>
+                    <button type="submit">Save note</button>
+                  </form>
+                </div>
+              </details>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <script>
+    document.addEventListener("click", function (event) {
+      const link = event.target.closest("a[data-mark-opened]");
+      if (link) {
+        const row = link.closest(".listing-row");
+        if (row) row.classList.add("opened-listing");
+        fetch(link.dataset.markOpened, { method: "POST", credentials: "same-origin", keepalive: true }).catch(function () {});
+      }
+      const copyButton = event.target.closest("button[data-copy-outreach]");
+      if (!copyButton) return;
+      const field = document.getElementById(copyButton.dataset.copyOutreach);
+      if (!field) return;
+      field.select();
+      const copied = navigator.clipboard && navigator.clipboard.writeText
+        ? navigator.clipboard.writeText(field.value)
+        : Promise.reject();
+      copied.catch(function () { document.execCommand("copy"); }).finally(function () {
+        copyButton.textContent = "Copied";
+        window.setTimeout(function () { copyButton.textContent = "Copy note"; }, 1300);
+      });
+    });
+  </script>
+  {% else %}
+  <div class="empty">
+    <div class="empty-mark" aria-hidden="true">⌂</div>
+    <h3>{% if view == 'saved' %}Nothing saved yet{% elif view == 'dismissed' %}Nothing passed yet{% elif view == 'near_matches' %}No near matches right now{% elif selected_platform %}No {{ selected_platform }} matches yet{% else %}No homes made the shortlist yet{% endif %}</h3>
+    {% if view == 'saved' %}
+      <p>Save a promising home from your shortlist and it will stay here.</p>
+    {% elif selected_platform %}
+      <p>This source has no homes at your {{ minimum_score }}-point threshold. <a href="/?housing={{ housing_mode }}&amp;view=all&amp;sort=score&amp;platform={{ selected_platform|urlencode }}">View every imported {{ selected_platform }} listing</a>.</p>
+    {% elif view == 'near_matches' %}
+      <p>No collected homes are just outside this deal. Check again later or review the deal without changing it automatically.</p>
+    {% else %}
+      <p>{% if scan_running %}Sources are still checking. Results appear as they are saved.{% elif source_attention_count %}{{ source_attention_count }} source{% if source_attention_count != 1 %}s need{% else %} needs{% endif %} attention. Open System status for the exact recovery step.{% elif scans and scans[0].sources_failed %}The last check had a source problem. Open System status for the exact source and recovery action.{% elif scans %}The last check finished, but no collected homes met this path and threshold. <a href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score">See near matches</a> or <a href="/preferences">review your deal</a>.{% else %}Run the first source check. If inventory is genuinely empty, the source status below will explain what happened.{% endif %}</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</section>
+
+<details class="system-disclosure">
+  <summary>
+    <span>
+      <strong>System status</strong>
+      <small>{% if source_attention_count %}{{ source_attention_count }} source{% if source_attention_count != 1 %}s need{% else %} needs{% endif %} attention{% elif scans %}Last checked {{ scans[0].started_at|pacific_datetime }} · {{ scans[0].sources_failed }} source error{% if scans[0].sources_failed != 1 %}s{% endif %}{% else %}No scans yet{% endif %}</small>
+    </span>
+    <span class="disclosure-action">View details</span>
+  </summary>
+  <div class="system-grid">
+    <section aria-labelledby="sources-title">
+      <div class="system-heading"><h2 id="sources-title">Sources</h2><span><a href="/alerts">Manage sources</a> · <a href="/support">Run ready check</a></span></div>
+      <div class="status-list">
+        {% for source in source_statuses %}
+        <div class="status-item">
+          <div>
+            <strong>{{ source.platform }}</strong>
+            <span class="status {{ source.status }}">
+              {{ source.freshness_label }}
+            </span>
+          </div>
+          <p>{{ source.freshness_explanation }}</p>
+          {% if source.status in ['attention', 'stale', 'backoff'] %}<small class="source-recovery">{{ source.recovery_action }}</small>{% endif %}
+          <a href="{{ source.search_url }}" target="_blank" rel="noopener noreferrer">Open source ↗</a>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    <section aria-labelledby="scans-title">
+      <div class="system-heading"><h2 id="scans-title">Recent checks</h2><span>Pacific time</span></div>
+      {% if scans %}
+      <div class="scan-list">
+        {% for scan in scans[:6] %}
+        <div>
+          <span class="status {{ scan.status }}">{{ scan.status|replace('_', ' ') }}</span>
+          <strong>{{ scan.started_at|pacific_datetime }}</strong>
+          <small>{{ scan.listings_seen }} checked · {{ scan.listings_added }} new · {{ scan.sources_failed }} errors</small>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}<p class="system-empty">No checks have run yet.</p>{% endif %}
+    </section>
+  </div>
+</details>
+{% endblock %}

@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}{% if welcome %}Set up your housing search{% else %}Your deal{% endif %} · SF Home Finder{% endblock %}
+{% block content %}
+<section class="hero compact preferences-hero">
+  <div>
+    <p class="eyebrow">{% if welcome %}Welcome{% else %}Your deal{% endif %}</p>
+    <h1>{% if welcome %}Build the search once{% else %}What should rise to the top?{% endif %}</h1>
+    <p class="subtle">Choose the homes, limits, and areas that are genuinely acceptable. The same answers drive collection, eligibility, ranking, and every explanation.</p>
+  </div>
+  {% if deal_values.active %}<a class="button" href="/">Back to shortlist</a>{% endif %}
+</section>
+
+{% if welcome %}
+<section class="onboarding-intro" aria-label="How setup works">
+  <span><strong>1</strong> Describe the deal</span>
+  <span><strong>2</strong> Check free public sources</span>
+  <span><strong>3</strong> Review the shortlist</span>
+</section>
+{% endif %}
+
+{% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+{% if error %}<div class="notice error" role="alert" tabindex="-1">{{ error }}</div>{% endif %}
+
+<form class="deal-form deal-wizard" method="post" action="/preferences/deal" data-deal-form {% if welcome and not deal_values.active %}data-draft-autosave="1"{% endif %} novalidate>
+  <section class="deal-section" aria-labelledby="paths-title">
+    <div class="deal-section-copy">
+      <span class="step-number" aria-hidden="true">1</span>
+      <div>
+        <h2 id="paths-title">Which kinds of homes should we look for?</h2>
+        <p>Choose every path you would honestly consider. Each one keeps its own budget.</p>
+      </div>
+    </div>
+    <fieldset class="choice-fieldset">
+      <legend class="sr-only">Housing paths and budgets</legend>
+      <div class="path-choice-list" aria-live="polite">
+      {% set path_options = [
+        ('private_room', 'Private room', 'A private bedroom in a shared home'),
+        ('studio', 'Studio', 'An entire studio for yourself'),
+        ('one_bedroom', '1-bedroom', 'An entire one-bedroom for yourself'),
+        ('two_bedroom', '2-bedroom split', 'Split the total with your group'),
+        ('three_bedroom', '3-bedroom split', 'Split the total with your group')
+      ] %}
+      {% for key, label, help in path_options %}
+      {% set budget = deal_values.budgets.get(key, {}) %}
+      <article class="path-choice" data-path-card="{{ key }}">
+        <label class="path-choice-toggle">
+          <input type="checkbox" name="housing_paths" value="{{ key }}" data-path-toggle="{{ key }}" {% if key in deal_values.enabled_paths %}checked{% endif %}>
+          <span><strong>{{ label }}</strong><small>{{ help }}</small></span>
+        </label>
+        <div class="path-budget-inline" data-path-fields="{{ key }}">
+          <div class="path-budget-heading"><strong>{% if key in ['two_bedroom', 'three_bedroom'] %}Budget per person{% else %}Monthly budget{% endif %}</strong><span>Choose this home type to use it</span></div>
+        <div class="field-grid {% if key in ['two_bedroom', 'three_bedroom'] %}three-fields{% else %}two-fields{% endif %}">
+          <label>{% if key in ['two_bedroom', 'three_bedroom'] %}Maximum per person{% else %}Absolute monthly maximum{% endif %}
+            <span class="money-field"><span>$</span><input type="number" name="{{ key }}_maximum" min="1" max="30000" value="{{ budget.get('maximum', '') }}" inputmode="numeric" data-path-required></span>
+          </label>
+          <label>Ideal target <small>Optional</small>
+            <span class="money-field"><span>$</span><input type="number" name="{{ key }}_ideal" min="1" max="30000" value="{{ budget.get('ideal', '') }}" inputmode="numeric"></span>
+          </label>
+          {% if key in ['two_bedroom', 'three_bedroom'] %}
+          <label>People splitting the rent
+            <select name="{{ key }}_occupants" data-path-required>
+              {% for count in range(1, 7) %}<option value="{{ count }}" {% if budget.get('occupants', 2 if key == 'two_bedroom' else 3) == count %}selected{% endif %}>{{ count }}</option>{% endfor %}
+            </select>
+          </label>
+          {% endif %}
+        </div>
+        {% if key in ['two_bedroom', 'three_bedroom'] %}<p class="calculated-total" data-split-total="{{ key }}">The total maximum is calculated from the per-person limit and group size.</p>{% endif %}
+        {% if key != 'private_room' %}<input type="hidden" name="{{ key }}_building_units" value="50">{% endif %}
+        </div>
+      </article>
+      {% endfor %}
+      </div>
+    </fieldset>
+  </section>
+
+  <section class="deal-section" aria-labelledby="areas-title">
+    <div class="deal-section-copy">
+      <span class="step-number" aria-hidden="true">2</span>
+      <div><h2 id="areas-title">Where would you live?</h2><p>Use priority groups to control order. A known listing outside every acceptable group stays out of the shortlist.</p></div>
+    </div>
+    <label class="choice-row anywhere-choice">
+      <input type="checkbox" name="anywhere_in_sf" value="1" data-anywhere-toggle {% if deal_values.anywhere_in_sf %}checked{% endif %}>
+      <span><strong>Anywhere in San Francisco</strong><small>Do not filter by neighborhood</small></span>
+    </label>
+    <div class="area-picker" data-area-picker {% if deal_values.anywhere_in_sf %}hidden{% endif %}>
+      <div class="area-columns">
+        {% for tier, title, help in [('dream', 'Dream', 'Your best possible areas'), ('strong', 'Strong', 'A very good fit'), ('okay', 'Secondary', 'Still genuinely worth seeing'), ('avoid', 'Avoid', 'Known listings stay out')] %}
+        <section class="area-tier" data-area-tier="{{ tier }}" data-area-limit="5" aria-labelledby="areas-{{ tier }}-title">
+          <div class="area-tier-heading">
+            <div><h3 id="areas-{{ tier }}-title">{{ title }}</h3><p>{{ help }}</p></div>
+            <span data-area-count>0 of 5</span>
+          </div>
+          <label class="sr-only" for="add-area-{{ tier }}">Add a {{ title|lower }} neighborhood</label>
+          <select id="add-area-{{ tier }}" data-area-add="{{ tier }}">
+            <option value="">Add a neighborhood</option>
+            {% for area in neighborhood_options %}<option value="{{ area }}">{{ area }}</option>{% endfor %}
+          </select>
+          <ul class="area-selected" data-area-selected aria-label="Selected {{ title|lower }} neighborhoods">
+            {% for area in deal_values.areas.get(tier, []) %}
+            <li class="area-chip"><span>{{ area }}</span><input type="hidden" name="areas_{{ tier }}" value="{{ area }}" data-area-value><button type="button" class="area-remove" data-area-remove aria-label="Remove {{ area }} from {{ title|lower }} areas">Remove</button></li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+      </div>
+      <p class="field-help">Choose up to five neighborhoods in each group. A neighborhood can belong to only one group.</p>
+    </div>
+  </section>
+
+  <section class="deal-section" aria-labelledby="timing-title">
+    <div class="deal-section-copy">
+      <span class="step-number" aria-hidden="true">3</span>
+      <div><h2 id="timing-title">Timing and household</h2><p>Only set limits you would actually reject a home for. Flexible answers keep uncertain listings reviewable.</p></div>
+    </div>
+    <label class="choice-row">
+      <input type="checkbox" name="move_in_flexible" value="1" data-flexible-toggle {% if deal_values.move_in_flexible %}checked{% endif %}>
+      <span><strong>My move-in timing is flexible</strong><small>Missing listing dates will not count against a home</small></span>
+    </label>
+    <div class="field-grid two-fields" data-date-fields {% if deal_values.move_in_flexible %}hidden{% endif %}>
+      <label>Earliest acceptable move-in <input type="date" name="earliest_move_in" value="{{ deal_values.earliest_move_in }}"></label>
+      <label>Prefer to move by <input type="date" name="preferred_by" value="{{ deal_values.preferred_by }}"></label>
+    </div>
+    <div class="field-grid three-fields compact-fields">
+      <label>Shortest acceptable lease
+        <select name="lease_min_months"><option value="">Flexible</option>{% for count in [1, 3, 6, 9, 12] %}<option value="{{ count }}" {% if deal_values.lease_min_months == count %}selected{% endif %}>{{ count }} month{% if count != 1 %}s{% endif %}</option>{% endfor %}</select>
+      </label>
+      <label>Longest acceptable lease
+        <select name="lease_max_months"><option value="">Flexible</option>{% for count in [3, 6, 9, 12, 18, 24] %}<option value="{{ count }}" {% if deal_values.lease_max_months == count %}selected{% endif %}>{{ count }} months</option>{% endfor %}</select>
+      </label>
+      <label>Largest shared household <small>Rooms only</small>
+        <select name="household_maximum"><option value="">Doesn't matter</option>{% for count in range(2, 11) %}<option value="{{ count }}" {% if deal_values.household_maximum == count %}selected{% endif %}>{{ count }} people total</option>{% endfor %}</select>
+      </label>
+    </div>
+  </section>
+
+  <section class="deal-section" aria-labelledby="preferences-title">
+    <div class="deal-section-copy">
+      <span class="step-number" aria-hidden="true">4</span>
+      <div><h2 id="preferences-title">Fine-tune the order</h2><p>These never replace your hard limits. Missing facts stay unknown and lower confidence instead of pretending to match.</p></div>
+    </div>
+    <div class="preference-matrix">
+      {% for key, label, coverage in [('natural_light', 'Natural light', 'Often missing'), ('laundry', 'Laundry', 'Usually stated'), ('outdoor_space', 'Outdoor space', 'Sometimes stated'), ('furnished', 'Furnished', 'Usually stated'), ('pets', 'Pet friendly', 'Sometimes stated'), ('parking', 'Parking', 'Sometimes stated')] %}
+      {% set selected = deal_values.preferences.get(key, 'ignore') %}
+      <fieldset class="preference-row">
+        <legend><strong>{{ label }}</strong><small>{{ coverage }}</small></legend>
+        <label><input type="radio" name="preference_{{ key }}" value="important" {% if selected == 'important' %}checked{% endif %}> Important</label>
+        <label><input type="radio" name="preference_{{ key }}" value="nice" {% if selected == 'nice' %}checked{% endif %}> Nice to have</label>
+        <label><input type="radio" name="preference_{{ key }}" value="ignore" {% if selected == 'ignore' %}checked{% endif %}> Doesn't matter</label>
+      </fieldset>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="deal-section review-section" aria-labelledby="review-title">
+    <div class="deal-section-copy">
+      <span class="step-number" aria-hidden="true">5</span>
+      <div><h2 id="review-title">Review your deal</h2><p>Read this as if you were explaining the search to a friend. You can edit it later without losing stars, dismissals, notes, or first-found dates.</p></div>
+    </div>
+    <p class="deal-summary" data-deal-summary>{{ deal_values.summary }}</p>
+    <details class="deal-consequences">
+      <summary>What happens after saving?</summary>
+      <ul>
+        <li>Free public sources start checking immediately on a first setup.</li>
+        <li>Known budget, home-shape, or area violations stay in near matches, not the shortlist.</li>
+        <li>Unknown facts are labeled for verification and lower confidence.</li>
+        <li>Optional Gmail, Facebook, and Furnished Finder setup never blocks first results.</li>
+      </ul>
+    </details>
+  </section>
+
+  <div class="deal-actions">
+    <p>{% if welcome %}Your first check can include current listings and honestly available results from the last five days. <span data-draft-status>Your choices save on this Mac as you go.</span>{% else %}Saving reranks stored homes without changing your decisions.{% endif %}</p>
+    <div class="deal-submit-group">
+      <p class="submit-status" data-submit-status role="status" aria-live="polite"></p>
+      <button class="primary" type="submit" data-deal-submit data-first-activation="{{ 'true' if welcome else 'false' }}"><span data-deal-submit-label>{% if welcome %}Save deal and find matches{% else %}Save deal and rerank{% endif %}</span></button>
+    </div>
+  </div>
+</form>
+<script src="{{ url_for('static', path='/deal-form.js') }}?v={{ app_version }}" defer></script>
+{% endblock %}

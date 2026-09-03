@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Sources · SF Housing Monitor{% endblock %}
+{% block content %}
+<section class="hero compact">
+  <div>
+    <p class="eyebrow">Coverage setup</p>
+    <h1>Connect only what helps</h1>
+    <p class="subtle">Public sources already work. Add email, Furnished Finder, or Facebook coverage when you want it. None of them blocks your shortlist.</p>
+  </div>
+  <div class="connector-action"><a class="button" href="/support">Run ready check</a><a class="button" href="/">Back to listings</a></div>
+</section>
+
+{% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+{% if error %}<div class="notice error" role="alert">{{ error }}</div>{% endif %}
+
+<section class="source-order" aria-labelledby="source-order-title">
+  <div><p class="eyebrow">A simple order</p><h2 id="source-order-title">Start with the sources that need nothing from you</h2></div>
+  <ol>
+    <li><strong>Free public sources</strong><span>Already included, and checked automatically from the deal you saved.</span></li>
+    <li><strong>Add only useful coverage</strong><span>Gmail, Furnished Finder, and Facebook are optional additions.</span></li>
+    <li><strong>Trust observed results</strong><span>A connector is shown as working only after its own bounded check succeeds.</span></li>
+  </ol>
+</section>
+
+<section class="source-checklist" aria-labelledby="coverage-title">
+  <header><div><p class="eyebrow">Available now</p><h2 id="coverage-title">Free public sources</h2></div><span class="connector-state working">Ready, no account needed</span></header>
+  <p>Craigslist, Listings Project, Abacus, and SpareRoom are checked through the normal bounded scanner. A problem with one never stops the others.</p>
+</section>
+
+<section class="source-checklist" aria-labelledby="gmail-title">
+  <header>
+    <div><p class="eyebrow">Saved-search alerts</p><h2 id="gmail-title">Email listings</h2></div>
+    <span class="connector-state {{ gmail_state.state if gmail_state else 'not_configured' }}">{{ gmail_state.label if gmail_state else 'Optional' }}</span>
+  </header>
+  <p>One read-only Gmail connection can collect supported Zillow, HotPads, Apartments.com, Zumper, Roomies, and Facebook Marketplace saved-search alerts.</p>
+  <div class="gmail-privacy" aria-label="Gmail privacy promise">
+    <span><strong>Read-only</strong> Google shows the exact permission before approval.</span>
+    <span><strong>Narrow searches</strong> Only known housing-alert senders and subjects are queried.</span>
+    <span><strong>Stays local</strong> Tokens remain on this Mac; email bodies are never stored.</span>
+  </div>
+  {% if gmail_state and gmail_state.message %}<p class="connector-message">{{ gmail_state.message }}</p>{% endif %}
+  <div class="connector-action">
+    {% if gmail_connected %}
+      <form method="post" action="/alerts/gmail/test"><button class="primary" type="submit">Test saved-search alerts</button></form>
+      <a class="button" href="/alerts/gmail/connect">Reconnect Gmail</a>
+      <span>Keep at least one provider alert enabled, then test. A provider stays unverified until a real alert is observed.</span>
+      <details class="quiet-action">
+        <summary>Disconnect</summary>
+        <p>This removes the local token and asks Google to revoke access. Public sources continue working.</p>
+        <form method="post" action="/alerts/gmail/disconnect"><button type="submit">Disconnect Gmail</button></form>
+      </details>
+    {% elif has_client_secret %}
+      <a class="button primary" href="/alerts/gmail/connect">Connect Gmail read-only</a><span>The owner client is ready{% if gmail_client_kind %} ({{ gmail_client_kind }}){% endif %}. You only approve Google’s read-only screen.</span>
+    {% else %}
+      <div class="gmail-owner-setup">
+        <div><p class="eyebrow">Owner setup required once</p><h3>Before you can connect Gmail</h3></div>
+        <p>{{ gmail_client_error or "The person preparing this copy needs to provide a Google OAuth Desktop or Web client JSON file once." }} Your Gmail password is never requested or stored.</p>
+        <ol>
+          <li>In Google Cloud, create a Desktop or Web OAuth client with a <code>localhost</code> or <code>127.0.0.1</code> redirect.</li>
+          <li>Download its JSON file and save it here. The app validates it before storing it privately on this computer.</li>
+          <li>Then use the Gmail connect button, approve Google, and test the alerts you actually receive.</li>
+        </ol>
+        <form class="upload-form" method="post" action="/alerts/gmail/client-secret" enctype="multipart/form-data">
+          <label>Google OAuth Web client JSON (Desktop clients also accepted) <input type="file" name="client_secret" accept="application/json,.json" required></label>
+          <button class="primary" type="submit">Save OAuth client locally</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+  <div class="gmail-provider-status" aria-label="Saved-search provider status">
+    {% for provider in gmail_providers %}
+    <div>
+      <strong>{{ provider.name }}</strong>
+      {% if provider.state %}
+        <span class="connector-state {{ provider.state.state }}">{{ provider.state.label }}</span>
+        <small>{{ provider.state.message }}</small>
+      {% elif gmail_connected %}
+        <span class="connector-state configured_unverified">Ready to test</span>
+        <small>Turn on this provider’s alert, then run the bounded Gmail test. No alert is not an error.</small>
+      {% else %}
+        <span class="connector-state disabled">Optional</span>
+        <small>Connect Gmail, then enable this provider’s saved-search alert when you want its coverage.</small>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <details class="connector-details">
+    <summary>Set up provider alerts</summary>
+    <div class="provider-ledger">
+      <section><h3>Zillow</h3><p>Open each prepared search, save it, and choose Instant email.</p><ul>
+        {% for search in zillow_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open prepared {{ search.name }} search</a></li>{% endfor %}
+        {% for search in zillow_unit_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} studio and 1-bedroom search</a></li>{% endfor %}
+        {% for search in zillow_split_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} {{ search.bedrooms }}-bedroom split search</a></li>{% endfor %}
+      </ul></section>
+      <section><h3>HotPads, Apartments.com, and Zumper</h3><p>Save separate studio/1-bedroom, exact 2-bedroom, and exact 3-bedroom SF searches using the maximums from Your deal, then enable email alerts.</p></section>
+      <section><h3>Roomies</h3><p>Turn on Realtime or Daily Listing Alerts for your SF room search. Only stable individual listing links import.</p></section>
+      <section><h3>Facebook email fallback</h3><p>Use Facebook's own Notify Me action for the prepared searches. No Facebook password or cookies are stored.</p><p>{% for search in facebook_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} ({{ search.bedrooms }}BR)</a>{% if not loop.last %} · {% endif %}{% endfor %}</p></section>
+    </div>
+  </details>
+</section>
+
+<section class="source-checklist" aria-labelledby="ff-title">
+  <header>
+    <div><p class="eyebrow">Chrome bridge</p><h2 id="ff-title">Furnished Finder</h2></div>
+    <span class="connector-state {{ furnished_finder_state.state if furnished_finder_state else 'not_configured' }}">{{ furnished_finder_state.label if furnished_finder_state else 'Optional' }}</span>
+  </header>
+  <p>The bundled bridge reads cards already visible in Chrome and sends only listing facts to this Mac. It supports up to three saved searches and stores no Furnished Finder password.</p>
+  {% if furnished_finder_state and furnished_finder_state.message %}<p class="connector-message">{{ furnished_finder_state.message }}</p>{% endif %}
+  <div class="connector-action">
+    <form method="post" action="/alerts/furnished-finder/show-folder"><button class="primary" type="submit">Show extension folder</button></form>
+    <a class="button" href="/alerts/furnished-finder-bridge.zip">Download bridge {{ bridge_version }}</a>
+    <form method="post" action="/alerts/furnished-finder/test"><button type="submit">Test bridge</button></form>
+  </div>
+  <details class="connector-details">
+    <summary>Four installation steps</summary>
+    <ol>
+      <li>Choose <strong>Show extension folder</strong>. Repair restores it if it is missing.</li>
+      <li>Open <code>chrome://extensions</code> and enable Developer mode.</li>
+      <li>Choose <strong>Load unpacked</strong> and select the unzipped folder.</li>
+      <li>Open a Furnished Finder SF housing search, click the extension, and choose <strong>Save this search &amp; sync</strong>.</li>
+    </ol>
+    <p>Chrome and the local monitor must be running at check time. The setup status shows the bridge version, heartbeat, and saved-search count rather than assuming installation worked.</p>
+  </details>
+</section>
+
+<section class="source-checklist" aria-labelledby="facebook-title">
+  <header>
+    <div><p class="eyebrow">Optional public coverage</p><h2 id="facebook-title">Facebook through Apify</h2></div>
+    <span class="connector-state {{ apify_state.state if apify_state else 'not_configured' }}">{{ apify_state.label if apify_state else 'Optional' }}</span>
+  </header>
+  <p>Automate Facebook without your Facebook login. The token stays local, every run is bounded, and allowance or Actor failures affect only Facebook.</p>
+  {% if apify_state and apify_state.message %}<p class="connector-message">{{ apify_state.message }}</p>{% endif %}
+  {% if apify_configured %}
+    <p class="connection-good">Facebook automation is configured, but it is labeled Working only after a real bounded check succeeds.</p>
+    <div class="connector-action">
+      <form method="post" action="/alerts/apify/test"><button class="primary" type="submit">Test Facebook connection</button></form>
+      <details><summary>Replace token</summary><form class="upload-form" method="post" action="/alerts/apify/token"><label>Replace Apify API token <input type="password" name="apify_token" autocomplete="off" placeholder="apify_api_…" required></label><button type="submit">Save replacement</button></form></details>
+    </div>
+  {% else %}
+    <form class="upload-form" method="post" action="/alerts/apify/token">
+      <label>Apify API token <input type="password" name="apify_token" autocomplete="off" placeholder="apify_api_…" required></label>
+      <button class="primary" type="submit">Save token locally</button>
+    </form>
+  {% endif %}
+  <details class="connector-details">
+    <summary>Public Facebook Groups</summary>
+    <p>Only public housing-offer posts are supported. Private groups, Messenger, WhatsApp, iMessage, wanted ads, and known non-SF posts are excluded.</p>
+    {% if facebook_groups %}<ul class="saved-source-list">{% for group in facebook_groups %}<li><a href="{{ group.url }}" target="_blank" rel="noopener noreferrer">{{ group.name }}</a><form method="post" action="/alerts/facebook-groups/remove"><input type="hidden" name="group_url" value="{{ group.url }}"><button type="submit">Remove</button></form></li>{% endfor %}</ul>{% endif %}
+    <form class="upload-form" method="post" action="/alerts/facebook-groups">
+      <label>Public Facebook group URL <input type="url" name="group_url" placeholder="https://www.facebook.com/groups/…/" required></label>
+      <button type="submit">Add public group</button>
+    </form>
+    {% if apify_configured and facebook_groups %}<form method="post" action="/alerts/apify/groups/test"><button type="submit">Test public groups</button></form>{% endif %}
+  </details>
+</section>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Ready check · SF Housing Monitor{% endblock %}
+{% block content %}
+<section class="hero compact support-hero">
+  <div>
+    <p class="eyebrow">Ready check</p>
+    <h1>{{ report.headline }}</h1>
+    <p class="subtle">{{ report.summary }}</p>
+  </div>
+  <span class="readiness-badge {{ report.overall }}">
+    {% if report.overall == 'ready' %}Ready{% elif report.overall == 'setup_incomplete' %}Setup incomplete{% else %}Needs attention{% endif %}
+  </span>
+</section>
+
+{% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+<div class="notice support-copy-result" role="status" data-copy-result hidden></div>
+
+{% if report.action_checks %}
+<section class="support-surface" aria-labelledby="next-actions-title">
+  <header class="support-section-heading">
+    <div><p class="eyebrow">Do these next</p><h2 id="next-actions-title">{{ report.action_checks|length }} action{% if report.action_checks|length != 1 %}s{% endif %}</h2></div>
+    <span>Required or already configured</span>
+  </header>
+  <div class="diagnostic-list">
+    {% for check in report.action_checks %}
+    <article class="diagnostic-row {{ check.status }}">
+      <div class="diagnostic-state" aria-label="{{ check.status|replace('_', ' ') }}">
+        <span aria-hidden="true">{% if check.status == 'blocked' %}!{% else %}·{% endif %}</span>
+        {{ check.status|replace('_', ' ')|title }}
+      </div>
+      <div class="diagnostic-copy">
+        <p class="diagnostic-category">{{ check.category }}</p>
+        <h3>{{ check.label }}</h3>
+        <p>{{ check.explanation }}</p>
+      </div>
+      <div class="diagnostic-action"><span>{{ check.owner }}</span><strong>{{ check.action }}</strong></div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="support-surface" aria-labelledby="healthy-title">
+  <header class="support-section-heading">
+    <div><p class="eyebrow">Working now</p><h2 id="healthy-title">{{ report.passing_checks|length }} healthy checks</h2></div>
+    <span>Observed on this Mac</span>
+  </header>
+  {% if report.passing_checks %}
+  <div class="diagnostic-list compact">
+    {% for check in report.passing_checks %}
+    <article class="diagnostic-row pass">
+      <div class="diagnostic-state" aria-label="Pass"><span aria-hidden="true">✓</span> Pass</div>
+      <div class="diagnostic-copy"><p class="diagnostic-category">{{ check.category }}</p><h3>{{ check.label }}</h3><p>{{ check.explanation }}</p></div>
+      <div class="diagnostic-action"><span>{{ check.owner }}</span><strong>{{ check.action }}</strong></div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<p class="system-empty">Healthy checks will appear after setup completes.</p>{% endif %}
+</section>
+
+{% if report.optional_checks %}
+<details class="support-optional">
+  <summary><span><strong>Optional and unverified</strong><small>{{ report.optional_checks|length }} checks that do not block first value</small></span><span class="disclosure-action">View</span></summary>
+  <div class="diagnostic-list compact">
+    {% for check in report.optional_checks %}
+    <article class="diagnostic-row {{ check.status }}">
+      <div class="diagnostic-state"><span aria-hidden="true">○</span> {% if check.status == 'unknown' %}Unverified{% else %}Optional{% endif %}</div>
+      <div class="diagnostic-copy"><p class="diagnostic-category">{{ check.category }}</p><h3>{{ check.label }}</h3><p>{{ check.explanation }}</p></div>
+      <div class="diagnostic-action"><span>{{ check.owner }}</span><strong>{{ check.action }}</strong></div>
+    </article>
+    {% endfor %}
+  </div>
+</details>
+{% endif %}
+
+<section class="support-actions" aria-labelledby="support-tools-title">
+  <div><h2 id="support-tools-title">Check again or share a safe report</h2><p>Reports omit tokens, OAuth codes, email contents, personal notes, and account-specific paths.</p></div>
+  <div class="support-button-row">
+    <a class="button primary" href="/support">Run checks again</a>
+    <a class="button" href="/support?probe=1">{% if connectivity_checked %}Public connections checked{% else %}Check public connections{% endif %}</a>
+    <button type="button" data-copy-report>Copy redacted report</button>
+  </div>
+  <p class="support-time">Generated {{ report.generated_at }} UTC. Connectivity checks are bounded and never start a scan or consume Apify allowance.</p>
+</section>
+
+<nav class="support-shortcuts" aria-label="Recovery shortcuts">
+  <a href="/preferences"><strong>Your deal</strong><span>Complete or correct the housing search</span></a>
+  <a href="/alerts"><strong>Sources</strong><span>Connect or recover optional coverage</span></a>
+  <a href="/"><strong>Shortlist</strong><span>Review current results and source history</span></a>
+</nav>
+
+<script src="{{ url_for('static', path='/support.js') }}?v={{ app_version }}" defer></script>
+{% endblock %}

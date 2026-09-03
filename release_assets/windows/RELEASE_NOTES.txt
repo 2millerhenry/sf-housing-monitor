@@ -1,0 +1,18 @@
+SF Housing Monitor 0.3.9 for Windows x64
+
+This Windows release uses the same local-only SF Housing Monitor application as
+the macOS release. A blank install contains no housing profile, listings,
+credentials, tokens, or personal paths.
+
+The installer runs only for the signed-in Windows user. It downloads a private
+Python 3.12 runtime, creates an app-owned environment under LocalAppData, and
+starts the local dashboard at http://127.0.0.1:8000. It creates a normal user
+sign-in task so scheduled checks can continue after the browser closes.
+
+No optional connector blocks the account-free public-source workflow. Gmail is
+read-only and needs an owner Google OAuth client plus real saved-search alerts
+before individual providers are called working. Furnished Finder needs Chrome.
+Facebook automation needs an optional Apify token and supports only the public
+coverage described in Sources.
+
+The ZIP is unsigned. Keep it private and only run a copy supplied by the owner.

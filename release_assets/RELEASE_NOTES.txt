@@ -1,0 +1,56 @@
+SF Housing Monitor 0.3.9
+
+Source setup now explains the safe order: start with account-free public
+sources, add only optional coverage, and trust connectors only after their
+own observed checks. Gmail makes its one owner OAuth-client prerequisite clear
+before you start, and explains that a provider remains unverified until a
+real saved-search alert arrives.
+
+SF Housing Monitor 0.3.8
+
+Setup is easier to scan: each housing choice now shows its own monthly budget
+immediately, and the deal form uses the full available width instead of leaving
+large blank regions. Split-rent choices still calculate a clear total from the
+per-person budget and group size.
+
+SF Housing Monitor 0.3.7
+========================
+
+Release scope
+-------------
+
+This is the local build. It starts blank, runs only on this Mac, and keeps the profile, listings, decisions, connector tokens, and logs under the user's Library/Application Support folder.
+
+The included Verify command opens a local Ready Check that validates the runtime, private storage, SQLite integrity/schema, deal activation, scan/source state, optional connectors, and login service. Its copyable report redacts credentials and personal paths.
+
+This release adds one actionable Ready Check/Repair Doctor and makes Gmail a provider-level, exact-scope alert connector for Zillow, HotPads, Apartments.com, Zumper, Roomies, and supported Facebook Marketplace alert mail. Gmail remains optional and never blocks public-source first value.
+
+It also adds a source freshness watchdog. Craigslist, SpareRoom, and every active Gmail-backed provider retain their own durable source history. A successful zero-result check stays "Working, no matches"; parser/network failures, stale results, and repeated-failure cooldowns are shown with one next step while last-known-good listings remain available. Gmail Marketplace alerts and the optional Apify Marketplace fallback are reported as separate providers.
+
+The isolated Verify/Repair path now explicitly carries its local no-LaunchAgent test mode through both Verify and Open into the temporary service, so clean-install diagnostics distinguish an intentionally unregistered test service from a real missing login service. The user-facing Open, Verify, Repair, and Uninstall commands now consistently hand their chosen app root to those tools too, which makes recovery behavior deterministic and safely testable. Install and Open now recognize the monitor's current healthy `/health` response, so an already-running monitor is never mistaken for an unrelated process on port 8000.
+
+The first-run deal form is blank, uses plain neighborhood dropdowns with every SF neighborhood and a five-area cap per priority tier, and gives immediate Save/rerank feedback. The dashboard preserves a short progress or completion view even when a source check finishes too quickly to otherwise be seen.
+
+Verified for this artifact
+--------------------------
+
+- macOS 15.6.1 on Apple Silicon (arm64)
+- clean installation without sudo, Homebrew, Git, or a preinstalled Python
+- a home folder path containing spaces
+- blank onboarding, canonical deal creation, live Craigslist collection, classification, ranking, SQLite persistence, and rendered shortlist/near-match recovery
+- honest live zero-inventory states for Listings Project and Abacus
+- open, save, note, restart, Repair, uninstall-with-data-preservation, and reinstall recovery
+- occupied-port refusal without stopping the other app
+- generated LaunchAgent plist syntax and dynamic paths
+- release checksum, bundled-file checksums, private-path scan, and personal-data exclusion
+
+Important limitations
+---------------------
+
+- This unsigned build may require Control-click, Open the first time.
+- Intel Macs are not supported by this ZIP.
+- The generated login LaunchAgent was syntax-checked but was not loaded into the builder's real login domain during automated validation. Install/Repair report a clear error if macOS rejects it.
+- The release does not contain an owner Google OAuth client. Gmail email-alert coverage therefore shows Owner setup required until the owner supplies that client. No Gmail token is bundled.
+- Gmail authorization, Apify/Facebook, and the Furnished Finder Chrome bridge have fixture/failure-path coverage but were not live-authorized with owner credentials in this build.
+- Furnished Finder requires Chrome's manual Load unpacked step. Chrome does not allow this local unsigned extension to install itself silently.
+- A first-time usability test by an uninvolved nontechnical person still has to be completed before calling the build fully production-ready.
