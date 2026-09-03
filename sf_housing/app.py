@@ -45,6 +45,7 @@ from .furnished_finder_bridge import (
 )
 from .gmail_alerts import GmailAlertError, GmailAlertMailbox
 from .imap_alerts import AlertMailboxRouter, ImapAlertError, ImapAlertMailbox, host_for_address
+from .liveness import describe_age, next_run_label, schedule_health
 from .preferences import (
     PreferenceError,
     Preferences,
@@ -660,6 +661,7 @@ def create_app(
     application.state.repository = repository
     application.state.scanner = scanner
     application.state.scheduler = scheduler
+    application.state.scheduler_enabled = enable_scheduler
     application.state.mailbox = mailbox
     application.state.apify_tokens = apify_tokens
     application.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
@@ -841,6 +843,19 @@ def create_app(
         }
         recent_scans = repository.recent_scans()
         scan_progress = scanner.progress
+        schedule_state = schedule_health(
+            scheduler,
+            recent_scans,
+            scan_running=scanner.is_running,
+            managed=enable_scheduler,
+        )
+        dashboard_liveness = {
+            "state": schedule_state.state,
+            "summary": schedule_state.summary,
+            "last_checked": describe_age(schedule_state.last_finished_at, datetime.now(UTC)),
+            "next_check": next_run_label(schedule_state),
+            "ok": schedule_state.ok,
+        }
         return templates.TemplateResponse(
             request=request,
             name="index.html",
@@ -873,6 +888,7 @@ def create_app(
                 "source_statuses": source_statuses,
                 "source_attention_count": source_attention_count,
                 "scans": recent_scans,
+                "liveness": dashboard_liveness,
                 "scan_running": scanner.is_running,
                 # A scan can finish before the redirected dashboard response
                 # renders. Preserve one short, truthful completion state so a
@@ -1328,6 +1344,8 @@ def create_app(
             # it needs that mailbox rather than whichever backend is live.
             gmail_mailbox,
             apify_tokens,
+            scheduler=scheduler,
+            scheduler_managed=enable_scheduler,
             request_host=request.url.hostname or "unknown",
             request_port=request.url.port or 8000,
             app_version=__version__,
@@ -1858,15 +1876,29 @@ def create_app(
 
     @application.get("/health")
     def health():
-        latest = repository.recent_scans(1)
+        scans = repository.recent_scans(8)
+        health_state = schedule_health(
+            scheduler,
+            scans,
+            scan_running=scanner.is_running,
+            managed=enable_scheduler,
+        )
         return JSONResponse(
             {
+                # "ok" keeps its original meaning: this process is up and serving.
+                # The installer and the Open/Repair tools poll it with `curl -fsS`
+                # and require ok to be true, so degrading it would turn a merely
+                # unscheduled install into a failed one, which is a worse outcome
+                # than installing and flagging the schedule.
                 "ok": True,
                 "app": "sf-housing-monitor",
                 "version": __version__,
                 "scan_running": scanner.is_running,
                 "schedule": ["10:00 America/Los_Angeles", "18:00 America/Los_Angeles"],
-                "last_scan": latest[0] if latest else None,
+                # Whether checking is actually being kept is a different question
+                # from whether the server answers, and it is observed, not asserted.
+                "scheduled_checking": health_state.as_dict(),
+                "last_scan": scans[0] if scans else None,
             }
         )
 

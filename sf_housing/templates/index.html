@@ -70,6 +70,15 @@
   {% endfor %}
 </nav>
 
+{% if liveness and not liveness.ok %}
+<p class="liveness-warning" role="status">
+  <strong>{% if liveness.state == 'stopped' %}Automatic checking is not running{% else %}Checks are behind schedule{% endif %}</strong>
+  {{ liveness.summary }} <a href="/support">Open Support</a>
+</p>
+{% elif liveness and liveness.state in ['current', 'scanning'] %}
+<p class="liveness-line">Last checked {{ liveness.last_checked }} · next check {{ liveness.next_check }}</p>
+{% endif %}
+
 <section class="workflow-bar" aria-label="Listing controls">
   <nav class="view-tabs" aria-label="Listing views">
     <a href="/?housing={{ housing_mode }}&amp;view=active&amp;sort=score" {% if view == 'active' %}class="active" aria-current="page"{% endif %}>Shortlist</a>

@@ -16,6 +16,7 @@ import httpx
 from .apify import ApifyTokenStore
 from .database import SCHEMA_VERSION, Repository
 from .furnished_finder_bridge import BRIDGE_VERSION
+from .liveness import next_run_label, schedule_health
 from .freshness import evaluate_source_freshness, source_key as freshness_source_key
 from .gmail_alerts import GmailAlertMailbox
 from .preferences import PreferenceError, load_preferences
@@ -285,6 +286,69 @@ def _profile_check(settings: Settings) -> DiagnosticCheck:
         "Nothing to do.",
         owner="App",
         metadata={"enabled_paths": list(preferences.deal_profile.enabled_paths)},
+    )
+
+
+def _schedule_check(
+    repository: Repository,
+    scanner: Scanner,
+    scheduler: object,
+    managed: bool,
+    now: datetime,
+) -> DiagnosticCheck:
+    """Report scheduled checking from what the scheduler holds, never from a constant.
+
+    The health endpoint used to print the schedule whether or not anything was
+    keeping it, which meant a scheduler that died at start-up looked identical to
+    a healthy one. This reads the same observation the dashboard shows.
+    """
+    health = schedule_health(
+        scheduler,
+        repository.recent_scans(8),
+        scan_running=scanner.is_running,
+        managed=managed,
+        now=now,
+    )
+    metadata = health.as_dict()
+    if health.state == "unmanaged":
+        return _check(
+            "schedule", "Scanning", "not_applicable",
+            "Automatic checking is not run here",
+            "This process was not asked to keep the twice-daily schedule.",
+            "Nothing to do. The installed app keeps the schedule.",
+            owner="App", metadata=metadata,
+        )
+    if health.state == "stopped":
+        return _check(
+            "schedule", "Scanning", "blocked",
+            "Automatic checking is not running",
+            "Nothing is scheduled, so the 10:00 and 18:00 checks will not happen "
+            "and the shortlist will quietly stop updating.",
+            "Double-click Repair SF Housing Monitor, then run this check again.",
+            owner="Repair", metadata=metadata,
+        )
+    if health.state == "overdue":
+        return _check(
+            "schedule", "Scanning", "attention",
+            "Checks are behind schedule",
+            health.summary + " The Mac may have been asleep or offline at both times.",
+            "Choose Check for new homes now. If it stays behind, double-click Repair.",
+            owner="You", metadata=metadata,
+        )
+    if health.state == "not_yet":
+        return _check(
+            "schedule", "Scanning", "not_applicable",
+            "Waiting for the first completed check",
+            f"Automatic checking is scheduled; the next one runs at {next_run_label(health)}.",
+            "Nothing to do.",
+            owner="App", metadata=metadata,
+        )
+    return _check(
+        "schedule", "Scanning", "pass",
+        "Checking on schedule",
+        f"{health.summary} The next check runs at {next_run_label(health)}.",
+        "Nothing to do.",
+        owner="App", metadata=metadata,
     )
 
 
@@ -822,6 +886,8 @@ def run_diagnostics(
     request_host: str = "127.0.0.1",
     request_port: int = 8000,
     app_version: str = "unknown",
+    scheduler: object = None,
+    scheduler_managed: bool = False,
     sources: Iterable[ListingSource] = (),
     include_connectivity: bool = False,
     now: datetime | None = None,
@@ -881,6 +947,13 @@ def run_diagnostics(
         label="Your deal could not be verified",
         action="Open Your deal and save it again. Run Repair if it repeats.",
         owner="You",
+    )
+    append_guarded(
+        lambda: _schedule_check(repository, scanner, scheduler, scheduler_managed, current),
+        key="schedule",
+        category="Scanning",
+        label="Automatic checking could not be verified",
+        action="Run Repair, then retry the Ready Check.",
     )
     append_guarded(
         lambda: _scan_check(repository, scanner, current),

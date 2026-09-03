@@ -1081,3 +1081,11 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .saved-outreach { width: 100%; }
 }
 
+/* Liveness is a statement of fact, so it is quiet when true and unmissable when
+   the schedule has actually stopped. */
+.liveness-line { margin: 12px 0 0; color: var(--muted); font-size: 0.76rem; }
+.liveness-warning { margin: 12px 0 0; padding: 11px 14px; display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: baseline; border: 1px solid var(--caution-line, oklch(84% 0.07 73)); border-radius: 10px;
+  background: var(--caution-soft, oklch(96% 0.035 82)); color: var(--ink); font-size: 0.82rem; }
+.liveness-warning strong { font-weight: 660; }
+

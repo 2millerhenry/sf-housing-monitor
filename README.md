@@ -148,6 +148,10 @@ search. They are deliberately not presented as working integrations.
   at any time; when it does, the adapter fails visibly instead of silently reporting no listings.
 - Scans need the computer awake and logged in. Missed scheduled runs are caught up after wake or
   reboot; a machine that is asleep or off does no network work.
+- Whether checking is actually happening is observed, not assumed. The dashboard shows when the
+  last check finished and when the next one runs, `/health` reports the scheduler's real state
+  under `scheduled_checking`, and Support raises it if the scheduler has stopped or two
+  scheduled checks have passed without one completing. All three read the same computation.
 - Email is read with an app password over IMAP: messages are opened without being marked as
   read, only known alert senders are searched, message bodies are never stored, and the
   password is written to this machine alone with owner-only permissions. Gmail's OAuth path
