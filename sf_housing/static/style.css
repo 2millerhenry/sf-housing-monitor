@@ -1036,3 +1036,48 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-note strong { color: var(--ink); font-weight: 650; }
 /* A found date is weaker evidence than a posting date; say which one it is. */
 .found-only { color: var(--muted); font-size: 0.94em; }
+
+/* ---- Saved: a few homes you already chose, not a scanning grid ---- */
+.saved-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.saved-item { padding: 20px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.saved-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 20px; }
+.saved-facts { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; color: var(--muted); font-size: 0.86rem; }
+.saved-facts strong { color: var(--ink); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.saved-facts strong span { color: var(--muted); font-size: 0.8rem; font-weight: 550; }
+.saved-facts > span + span::before { content: "·"; margin-right: 10px; color: var(--line-strong); }
+.saved-score { margin: 0; color: var(--muted); font-size: 0.78rem; }
+.saved-score strong { color: var(--accent-hover); font-size: 0.95rem; font-weight: 700; }
+.saved-caution { color: var(--caution); font-weight: 620; }
+.saved-title { margin: 8px 0 0; font-size: 1.0625rem; font-weight: 660; line-height: 1.35; }
+.saved-title a { color: var(--ink); text-decoration: none; }
+.saved-title a:hover { color: var(--accent-hover); text-decoration: underline; }
+.saved-origin { margin: 4px 0 0; color: var(--muted); font-size: 0.76rem; }
+
+.saved-evidence { margin-top: 14px; padding-top: 14px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; border-top: 1px solid var(--line); }
+.saved-evidence h4 { margin: 0 0 5px; color: var(--muted); font-size: 0.7rem; font-weight: 650; letter-spacing: 0.015em; }
+.saved-evidence ul { margin: 0; padding-left: 17px; color: var(--ink); font-size: 0.82rem; line-height: 1.55; }
+.saved-evidence p { margin: 0; color: var(--ink); font-size: 0.82rem; line-height: 1.55; }
+.saved-evidence .unknown { color: var(--muted); }
+
+/* The note is the reason this page exists, so it is never behind a disclosure. */
+.saved-note { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: end; }
+.saved-note label { grid-column: 1 / -1; color: var(--muted); font-size: 0.7rem; font-weight: 650; letter-spacing: 0.015em; }
+.saved-note textarea { width: 100%; min-height: 46px; border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.84rem; resize: vertical; }
+.saved-note textarea:focus-visible { border-color: var(--accent); outline: 0; box-shadow: 0 0 0 3px oklch(43% 0.09 162 / 0.12); }
+.saved-note button { min-height: 42px; }
+
+.saved-actions { margin-top: 14px; padding-top: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 9px; border-top: 1px solid var(--line); }
+.saved-actions form { display: contents; }
+.saved-outreach > summary { padding: 9px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); cursor: pointer; color: var(--ink); font-size: 0.8rem; font-weight: 620; list-style: none; }
+.saved-outreach > summary::-webkit-details-marker { display: none; }
+.saved-outreach[open] > summary { border-color: var(--accent-line); color: var(--accent-hover); }
+.saved-outreach > div { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
+.saved-outreach p { margin: 0 0 8px; color: var(--muted); font-size: 0.76rem; }
+.saved-outreach textarea { width: 100%; min-height: 92px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.79rem; line-height: 1.5; }
+
+@media (max-width: 760px) {
+  .saved-evidence { grid-template-columns: 1fr; gap: 12px; }
+  .saved-note { grid-template-columns: 1fr; }
+  .saved-outreach { width: 100%; }
+}
+

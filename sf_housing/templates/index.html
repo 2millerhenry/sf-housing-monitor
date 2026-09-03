@@ -166,6 +166,74 @@
   </header>
 
   {% if listings %}
+  {% if view == 'saved' %}
+  {# Saved is a different job from the shortlist: a handful of homes you have
+     already chosen, where the next step is contacting someone. Nothing is
+     truncated, the note is always open, and the contact action leads. #}
+  <ol class="saved-list">
+    {% for listing in listings %}
+    <li class="saved-item">
+      <div class="saved-head">
+        <p class="saved-facts">
+          {% if listing.price is not none %}<strong>${{ "{:,}".format(listing.price) }}<span>/mo</span></strong>{% else %}<strong>Price unknown</strong>{% endif %}
+          <span>{{ listing.home_facts.primary or listing.listing_type or 'Type not stated' }}</span>
+          <span>{{ listing.neighborhood or 'Area unknown' }}</span>
+        </p>
+        <p class="saved-score"><strong>{{ listing.score }}</strong> match{% if listing.eligibility == 'needs_verification' %} · <span class="saved-caution">needs verification</span>{% endif %}</p>
+      </div>
+      <h3 class="saved-title">
+        <a href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">{{ listing.title }} <span aria-hidden="true">↗</span></a>
+      </h3>
+      <p class="saved-origin">
+        {{ listing.platform }}
+        {% if listing.published_at %}· Posted {{ listing.published_at|compact_pacific_date }}{% else %}· Found {{ listing.first_found|compact_pacific_date }}{% endif %}
+        {% if listing.available_on %}· Available {{ listing.available_on|compact_move_in_date }}{% endif %}
+      </p>
+      <div class="saved-evidence">
+        <div>
+          <h4>Why it fits</h4>
+          {% if listing.match_reasons %}<ul>{% for reason in listing.match_reasons[:3] %}<li>{{ reason }}</li>{% endfor %}</ul>{% else %}<p class="unknown">Not enough listing detail yet.</p>{% endif %}
+        </div>
+        <div>
+          <h4>Worth checking</h4>
+          <p>{{ listing.concern }}</p>
+        </div>
+      </div>
+      <form class="saved-note" method="post" action="/listings/{{ listing.id }}/note">
+        <input type="hidden" name="return_to" value="{{ return_to }}">
+        <label for="saved-note-{{ listing.id }}">Your note</label>
+        <textarea id="saved-note-{{ listing.id }}" name="note" maxlength="4000" rows="2" placeholder="Tour time, who you spoke to, questions to ask…">{{ listing.note }}</textarea>
+        <button type="submit">Save note</button>
+      </form>
+      <div class="saved-actions">
+        {% if listing.application_url %}
+          <a class="button primary" href="{{ listing.application_url }}" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">Apply <span aria-hidden="true">↗</span></a>
+        {% else %}
+          <a class="button primary" href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">{% if listing.direct_lister %}Contact lister{% else %}Open listing{% endif %} <span aria-hidden="true">↗</span></a>
+        {% endif %}
+        <details class="saved-outreach">
+          <summary>Copy contact note</summary>
+          <div>
+            <p>Personalize the brackets before sending; only claim what is true for you.</p>
+            <textarea id="outreach-{{ listing.id }}" readonly aria-label="Contact note for {{ listing.title }}">Hi — I’m interested in {{ listing.title }}. I’m looking to move around [move-in date] and can tour [two specific time windows]. I can provide the usual application documents promptly if helpful. Is it still available? Thanks, [name] · [phone]</textarea>
+            <button class="compact-button" type="button" data-copy-outreach="outreach-{{ listing.id }}">Copy note</button>
+          </div>
+        </details>
+        <form method="post" action="/listings/{{ listing.id }}/status">
+          <input type="hidden" name="return_to" value="{{ return_to }}">
+          <input type="hidden" name="status" value="active">
+          <button type="submit">Unstar</button>
+        </form>
+        <form method="post" action="/listings/{{ listing.id }}/status">
+          <input type="hidden" name="return_to" value="{{ return_to }}">
+          <input type="hidden" name="status" value="dismissed">
+          <button class="quiet-button" type="submit">Pass</button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
   <div class="listing-table-scroll" tabindex="0" aria-label="Housing results table">
     <table class="listing-table">
       <thead>
@@ -289,6 +357,7 @@
       </tbody>
     </table>
   </div>
+  {% endif %}
   <script>
     document.addEventListener("click", function (event) {
       const link = event.target.closest("a[data-mark-opened]");

@@ -488,7 +488,11 @@ def test_dashboard_review_actions_persist(tmp_path: Path) -> None:
 
     assert starred.status_code == 200
     assert "Starred listings" in starred.text
-    assert "★ Starred" in starred.text
+    # Saved is a comparison view, not the scanning table: the note you wrote is
+    # visible without opening anything, and the star can be undone from here.
+    assert "Message tonight" in starred.text
+    assert "Unstar" in starred.text
+    assert "Why it fits" in starred.text
     assert "Room to save" in starred.text
 
 
