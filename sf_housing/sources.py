@@ -2296,6 +2296,11 @@ class CraigslistSource:
                 }
             )
             return replace(listing, metadata=metadata, original_url=str(response.url))
+        posted = soup.select_one("time.date[datetime], time[datetime]")
+        if posted is not None:
+            stamp = _clean_text(posted.get("datetime"), 40)
+            if stamp:
+                metadata["listing_timestamp"] = stamp
         description_meta = soup.select_one('meta[name="description"]')
         body = soup.select_one("#postingbody")
         body_text = _clean_text(body.get_text(" ", strip=True) if body else "")

@@ -180,7 +180,7 @@
           <th scope="col" class="cell-listing">Listing</th>
           <th scope="col" class="cell-fit">Best matches</th>
           <th scope="col" class="cell-check">Check</th>
-          <th scope="col" class="cell-found"{% if sort == 'newest' %} aria-sort="descending"{% endif %}><a href="{{ sort_urls.newest }}">Found <span aria-hidden="true">{% if sort == 'newest' %}↓{% endif %}</span></a></th>
+          <th scope="col" class="cell-found"{% if sort == 'newest' %} aria-sort="descending"{% endif %}><a href="{{ sort_urls.newest }}">Posted <span aria-hidden="true">{% if sort == 'newest' %}↓{% endif %}</span></a></th>
           <th scope="col" class="cell-actions"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
@@ -222,7 +222,7 @@
             <h3 title="{{ listing.title }}"><a class="listing-title-link" href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">{{ listing.title }} <span aria-hidden="true">↗</span></a></h3>
             <p class="listing-compact-meta">
               <span class="meta-source">{{ listing.platform }}</span>
-              <span class="meta-found">{{ listing.first_found|compact_pacific_date }}</span>
+              <span class="meta-found">{% if listing.published_at %}Posted {{ listing.published_at|compact_pacific_date }}{% else %}Found {{ listing.first_found|compact_pacific_date }}{% endif %}</span>
               <span class="meta-area">{{ listing.neighborhood or 'Area unknown' }}</span>
               <span class="meta-price">{% if listing.price is not none %}${{ "{:,}".format(listing.price) }}/mo{% if housing_mode == 'two_bedroom' and listing.per_person_monthly %}, ${{ "{:,}".format(listing.per_person_monthly) }}/person{% endif %}{% else %}Price unknown{% endif %}</span>
               {% if listing.sublease_months %}<span class="contact-signal">{{ listing.sublease_months }}-mo sublet</span>{% endif %}
@@ -252,7 +252,13 @@
             {% if listing.match_reasons %}<ul>{% for reason in listing.match_reasons[:3] %}<li>{{ reason }}</li>{% endfor %}</ul>{% else %}<span class="unknown">Not enough detail yet.</span>{% endif %}
           </td>
           <td class="cell-check"><span class="{% if listing.concern[:8] == 'Unknown:' %}unknown{% endif %}">{{ listing.concern }}</span></td>
-          <td class="cell-found"><span title="{{ listing.first_found|pacific_datetime }}">{{ listing.first_found|compact_pacific_date }}</span></td>
+          <td class="cell-found">
+            {% if listing.published_at %}
+              <span title="Posted {{ listing.published_at|pacific_datetime }}">{{ listing.published_at|compact_pacific_date }}</span>
+            {% else %}
+              <span class="found-only" title="The source does not publish a date. Found {{ listing.first_found|pacific_datetime }}">Found {{ listing.first_found|compact_pacific_date }}</span>
+            {% endif %}
+          </td>
           <td class="cell-actions">
             <div class="row-actions">
               <form method="post" action="/listings/{{ listing.id }}/status">

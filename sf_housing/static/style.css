@@ -1034,3 +1034,5 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-panel > h2 { margin: 0; font-size: 1.1875rem; font-weight: 700; letter-spacing: -0.016em; }
 .connect-panel > h2 + .connect-lede { margin-top: 8px; }
 .connect-note strong { color: var(--ink); font-weight: 650; }
+/* A found date is weaker evidence than a posting date; say which one it is. */
+.found-only { color: var(--muted); font-size: 0.94em; }

@@ -365,3 +365,39 @@ def test_craigslist_detail_rejects_conflicting_or_out_of_market_copy() -> None:
     assert enriched.metadata["craigslist_detail_checked"] is True
     assert enriched.metadata["craigslist_content_rejected"] is True
     assert "conflicts" in enriched.metadata["verification_concern"]
+
+
+def test_craigslist_detail_page_records_the_posting_time() -> None:
+    """The search cards carry no date, so a listing's real age comes from here."""
+    from sf_housing.sources import CraigslistSource
+    from sf_housing.models import ListingCandidate
+
+    class Response:
+        url = "https://www.craigslist.org/view/d/room/1.html"
+        text = (
+            '<html><body><section id="postingbody">A sunny room near the park.</section>'
+            '<time class="date timeago" datetime="2026-08-28T14:11:54-0700">Aug 28</time>'
+            "</body></html>"
+        )
+
+        def raise_for_status(self):
+            return None
+
+    class Client:
+        def get(self, url, **kwargs):
+            return Response()
+
+    listing = ListingCandidate(
+        platform="Craigslist",
+        source_id="1",
+        title="Sunny room",
+        original_url=Response.url,
+    )
+
+    enriched = CraigslistSource().enrich(Client(), listing)
+
+    assert enriched.metadata["listing_timestamp"] == "2026-08-28T14:11:54-0700"
+    # It must be readable by the first-run window and by the database writer.
+    from datetime import datetime
+
+    datetime.fromisoformat(enriched.metadata["listing_timestamp"])
