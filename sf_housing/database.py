@@ -21,6 +21,17 @@ def utc_now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
 
+class DatabaseUnreadableError(RuntimeError):
+    """The database file exists but SQLite cannot read it.
+
+    Raised instead of a bare sqlite3 error so the failure names the file and the
+    recovery. The file is never moved or replaced automatically: it holds every
+    star, note and first-found date the user has built up, and a corrupt file can
+    often still be recovered, so destroying it to get the app running would be
+    the worst possible trade.
+    """
+
+
 def canonicalize_url(url: str) -> str:
     parts = urlsplit(url.strip())
     ignored = {
@@ -152,6 +163,17 @@ class Repository:
             connection.close()
 
     def initialize(self) -> None:
+        try:
+            self._initialize()
+        except sqlite3.DatabaseError as exc:
+            raise DatabaseUnreadableError(
+                f"The housing database at {self.path} could not be opened ({exc}). "
+                "Your saved homes are not lost: double-click Repair SF Housing Monitor, "
+                "which restores the most recent backup from the app's backups folder. "
+                "Do not delete the file."
+            ) from exc
+
+    def _initialize(self) -> None:
         with self.connection() as connection:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.executescript(SCHEMA)

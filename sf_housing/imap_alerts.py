@@ -52,7 +52,16 @@ OAUTH_ONLY_DOMAINS = {"outlook.com", "hotmail.com", "live.com", "msn.com"}
 
 
 class ImapAlertError(RuntimeError):
-    pass
+    """A mail failure, optionally carrying the connector state it implies.
+
+    Classifying by message text alone cannot separate "your password was
+    refused" from "the server refused the search", and the two need opposite
+    advice, so the credential paths say which state they mean.
+    """
+
+    def __init__(self, message: str, *, connector_state: str | None = None):
+        super().__init__(message)
+        self.connector_state = connector_state
 
 
 def host_for_address(address: str) -> str | None:
@@ -247,7 +256,8 @@ class ImapAlertMailbox:
         except imaplib.IMAP4.error as exc:
             raise ImapAlertError(
                 "That address and app password were refused. Make sure two-step verification is on "
-                "and that you pasted an app password rather than your normal password."
+                "and that you pasted an app password rather than your normal password.",
+                connector_state="authorization_expired",
             ) from exc
         return connection
 

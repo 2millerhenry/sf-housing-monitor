@@ -24,7 +24,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .apify import ApifyTokenError, ApifyTokenStore
 from . import __version__
 from .connectors import GMAIL_PROVIDERS, ConnectorStatus
-from .database import Repository
+from .database import DatabaseUnreadableError, Repository
 from .deal_profile import (
     BEDROOM_PATHS,
     SPLIT_PATHS,
@@ -535,7 +535,17 @@ def create_app(
     configure_logging(active_settings.log_path)
     initial_preferences = ensure_preferences(active_settings.preferences_path)
     repository = Repository(active_settings.database_path)
-    repository.initialize()
+    try:
+        repository.initialize()
+    except DatabaseUnreadableError:
+        # The service log is what Repair and the install log surface, so the
+        # recovery has to be readable there rather than only in a traceback.
+        logging.getLogger(__name__).error(
+            "Startup stopped: the housing database could not be opened. "
+            "Run Repair SF Housing Monitor; the most recent backup is restored and "
+            "the existing file is left untouched."
+        )
+        raise
     gmail_mailbox = GmailAlertMailbox(
         active_settings.gmail_client_secret_path or active_settings.data_dir / "gmail-client-secret.json",
         active_settings.gmail_token_path or active_settings.data_dir / "gmail-token.json",

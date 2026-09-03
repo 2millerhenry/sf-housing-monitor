@@ -7,7 +7,16 @@ VERSION="0.3.9"
 PYTHON_VERSION="3.12.10"
 PORT="${SF_HOUSING_PORT:-8000}"
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
-LAUNCH_AGENTS_DIR="${SF_HOUSING_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+# Isolated validation must not touch the real account's login services. Writing
+# the plist to ~/Library/LaunchAgents regardless of this flag meant installing a
+# second copy repointed the first one's login service at a temporary directory,
+# and the damage only appeared at the next login.
+if [ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" = "1" ]; then
+  DEFAULT_LAUNCH_AGENTS_DIR="$APP_ROOT/LaunchAgents"
+else
+  DEFAULT_LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
+fi
+LAUNCH_AGENTS_DIR="${SF_HOUSING_LAUNCH_AGENTS_DIR:-$DEFAULT_LAUNCH_AGENTS_DIR}"
 LABEL="com.sfhousing.monitor"
 PLIST_PATH="$LAUNCH_AGENTS_DIR/$LABEL.plist"
 DATA_DIR="$APP_ROOT/data"
@@ -128,7 +137,8 @@ PLIST
 
 if [ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" = "1" ]; then
   say "LaunchAgent installation skipped for isolated validation."
-  SF_HOUSING_APP_ROOT="$APP_ROOT" SF_HOUSING_PORT="$PORT" "$TOOLS_DIR/open.sh" --no-browser
+  SF_HOUSING_APP_ROOT="$APP_ROOT" SF_HOUSING_PORT="$PORT" \
+    SF_HOUSING_LAUNCH_AGENTS_DIR="$LAUNCH_AGENTS_DIR" "$TOOLS_DIR/open.sh" --no-browser
 else
   /bin/launchctl bootout "gui/$(id -u)" "$PLIST_PATH" >/dev/null 2>&1 || true
   /bin/launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH" || fail "macOS could not start the login service. Run Repair and use the Desktop log if it repeats."

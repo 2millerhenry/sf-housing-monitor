@@ -667,7 +667,10 @@ class Scanner:
                         if connector_key and connector_state_key:
                             self.repository.set_connector_state(
                                 connector_state_key,
-                                connector_state_for_error(message),
+                                # A source that knows what went wrong outranks a
+                                # guess made from its message text.
+                                getattr(exc, "connector_state", None)
+                                or connector_state_for_error(message),
                                 message=message[:1000],
                                 observed_items=source_seen,
                                 attempted=True,
