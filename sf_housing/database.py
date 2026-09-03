@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -479,7 +480,9 @@ class Repository:
         order_by = {
             "score": "score DESC, confidence DESC, COALESCE(published_at, first_found) DESC",
             "price": "price IS NULL, price ASC, score DESC",
-            "newest": "first_found DESC, score DESC",
+            # The column reads "Posted", so newest must mean newest posted.
+            # Sources that publish no date fall back to when we found it.
+            "newest": "COALESCE(published_at, first_found) DESC, score DESC",
             "available": "score DESC, first_found DESC",
             # A click is recorded on every outbound listing link. Keep untouched
             # homes at the top, then preserve the normal recommendation order
@@ -546,6 +549,12 @@ class Repository:
             if isinstance(availability, dict) and isinstance(availability.get("available_on"), str)
             else None
         )
+        # Scoring already treats a bare city label as no neighbourhood at all.
+        # Printing it in the area column implied a precision that was never
+        # there, so the display agrees with the score.
+        area = str(item.get("neighborhood") or "").strip()
+        if re.fullmatch(r"(?:city\s+(?:and\s+county\s+)?of\s+)?san\s+francisco(?:,?\s*ca)?", area, re.IGNORECASE):
+            item["neighborhood"] = ""
         home_facts = score_details.get("home_facts")
         item["home_facts"] = home_facts if isinstance(home_facts, dict) else {}
         item["per_person_monthly"] = score_details.get("per_person_monthly")

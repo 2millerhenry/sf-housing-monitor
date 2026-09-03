@@ -16,8 +16,13 @@ from .classification import (
     classify_listing,
     unit_type_label,
 )
-from .location import declared_outside_sf_area_hint, declared_outside_sf_url_hint
+from .location import (
+    OUTSIDE_SF_CITIES,
+    declared_outside_sf_area_hint,
+    declared_outside_sf_url_hint,
+)
 from .models import ListingCandidate, ScoreResult
+from .deal_profile import SF_NEIGHBORHOODS
 from .preferences import Preferences
 
 
@@ -368,6 +373,14 @@ def _neighborhood(listing: ListingCandidate, preferences: Preferences) -> Criter
                 "neighborhood", 0.5, True, False, None,
                 "Unknown: confirm that the home is inside San Francisco.",
             )
+        if not _recognisably_san_francisco(location):
+            # Say what is actually known rather than asserting a city the
+            # listing never claimed.
+            return Criterion(
+                "neighborhood", 0.5, True, False, None,
+                f"Unknown: \u201c{str(declared_detail_area or listing.neighborhood)}\u201d "
+                "is not a recognized San Francisco area; confirm the home is in the city.",
+            )
         return Criterion(
             "neighborhood", 1.0, True, True,
             "The source places this home in San Francisco.", "",
@@ -671,6 +684,26 @@ def _availability(listing: ListingCandidate, preferences: Preferences) -> Criter
         "",
         f"Available {display}, after your {cutoff_display} near-term cutoff.",
     )
+
+
+def _recognisably_san_francisco(location: str) -> bool:
+    """Is this location string actually evidence of San Francisco?
+
+    "Anywhere in San Francisco" still means in San Francisco. Treating any
+    non-empty location as proof let Oakland, Berkeley, San Jose and Discovery
+    Bay score as full matches, because a bare city name carries none of the
+    grammar the outside-SF check needs.
+    """
+    text = _normal(location)
+    if not text:
+        return False
+    # South San Francisco and Daly City are their own cities; the first even
+    # contains the string this check would otherwise accept.
+    if any(re.search(rf"(?<!\w){re.escape(city)}(?!\w)", text) for city in OUTSIDE_SF_CITIES):
+        return False
+    if "san francisco" in text or re.search(r"(?<!\w)s\.?f\.?(?!\w)", text):
+        return True
+    return any(_contains_location(text, area) for area in SF_NEIGHBORHOODS)
 
 
 def _home_facts(text: str, criteria: list[Criterion]) -> dict[str, object]:

@@ -52,6 +52,10 @@ _OUTSIDE_SF_CITIES = (
 
 _UNAMBIGUOUS_OUTSIDE_SF_CITIES = tuple(city for city in _OUTSIDE_SF_CITIES if city != "richmond")
 
+# Shared with scoring: "south san francisco" contains the string a naive
+# San Francisco check would accept, and is a different city.
+OUTSIDE_SF_CITIES = _OUTSIDE_SF_CITIES
+
 
 def declared_outside_sf_area_hint(text: str | None) -> str | None:
     """Return a clearly declared city outside San Francisco."""

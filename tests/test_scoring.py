@@ -1126,3 +1126,54 @@ def test_scoring_flags_explicit_women_only_household_and_declared_cross_street(p
     assert result.concern == "Women-only or women-preferred household; confirm eligibility."
     assert result.details["household_restriction"] == result.concern
     assert result.details["location_hint"] == "23rd St & Bryant St"
+
+
+def test_anywhere_in_sf_still_means_inside_san_francisco() -> None:
+    """A bare out-of-city name carries none of the grammar the outside-SF check needs.
+
+    Treating any non-empty location as proof of San Francisco let a Discovery Bay
+    room rank above real Mission listings.
+    """
+    from sf_housing.deal_profile import deal_profile_from_form, legacy_view
+    from sf_housing.preferences import Preferences
+
+    class Form(dict):
+        def getlist(self, key):
+            value = self.get(key, [])
+            return value if isinstance(value, list) else [value]
+
+    profile = deal_profile_from_form(
+        Form({
+            "housing_paths": ["private_room"],
+            "private_room_maximum": "2500",
+            "anywhere_in_sf": "on",
+            "move_in_flexible": "on",
+        })
+    )
+    preferences = Preferences(data=legacy_view(profile), deal=profile)
+
+    def room(area: str) -> ListingCandidate:
+        return ListingCandidate(
+            platform="Craigslist",
+            source_id="1",
+            title="Sunny private room",
+            original_url="https://example.test/1",
+            price=1500,
+            neighborhood=area,
+            listing_type="Room/share",
+            summary="Private room in a shared home, flexible lease.",
+        )
+
+    for inside in ("Mission District", "potrero hill / dogpatch", "San Francisco"):
+        result = score_listing(room(inside), preferences)
+        assert result.eligibility == "eligible", inside
+        assert result.details["neighborhood"]["known"] is True
+
+    # South San Francisco is a different city and contains the very string a
+    # naive check would accept.
+    for outside in ("Discovery Bay", "oakland", "san jose", "berkeley", "south san francisco"):
+        result = score_listing(room(outside), preferences)
+        assert result.details["neighborhood"]["known"] is False, outside
+        assert "not a recognized San Francisco area" in result.details["neighborhood"]["missing"]
+        # It must not be able to outrank a confirmed San Francisco home.
+        assert result.score < score_listing(room("Mission District"), preferences).score
