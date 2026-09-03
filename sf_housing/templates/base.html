@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}SF Housing Monitor{% endblock %}</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ app_version }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ asset_version() }}">
 </head>
 <body>
   <header class="site-header">

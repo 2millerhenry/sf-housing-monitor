@@ -663,6 +663,22 @@ def create_app(
     application.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
     templates.env.globals["app_version"] = __version__
+
+    def asset_version() -> str:
+        """Bust the cache when a static file actually changes.
+
+        Versioning assets by the app version meant an edited stylesheet kept the
+        same URL, so browsers served the previous copy and the page rendered new
+        markup against old rules.
+        """
+        static_dir = PACKAGE_DIR / "static"
+        try:
+            newest = max(path.stat().st_mtime_ns for path in static_dir.glob("*.*"))
+        except (OSError, ValueError):
+            return __version__
+        return f"{__version__}-{newest:x}"
+
+    templates.env.globals["asset_version"] = asset_version
     templates.env.filters["pacific_datetime"] = _pacific_datetime
     templates.env.filters["compact_pacific_date"] = _compact_pacific_date
     templates.env.filters["compact_move_in_date"] = _compact_move_in_date
