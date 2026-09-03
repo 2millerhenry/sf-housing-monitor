@@ -108,8 +108,8 @@ launchctl print gui/$(id -u)/com.sfhousing.monitor
 | SF Housing Portal | Automatic | The city's own below-market-rate portal (DAHLIA) over its public JSON API. No key, no scraping — one entry per unit type, with real rents and application deadlines. |
 | Apartment List | Automatic | Published schema.org data for SF buildings. The search feed carries no bedroom count, so each building is completed from its own page for size, address, amenities and unit count. Where a building publishes no rent per home, its smallest home stands in and the building's starting rent is kept. |
 | Zumper | Automatic | Its published schema.org search feed: bedroom count, address, amenities and a real posting date. Most buildings publish no rent on the search page, so a bounded number are enriched from their building page and the rest stay marked unconfirmed. |
-| Zillow | After one-time setup | Your own saved-search emails, imported locally after a read-only Gmail connection in **Alerts**. |
-| HotPads | After one-time setup | Official saved-search emails through the same read-only Gmail connection. |
+| Zillow | After one-time setup | Your own saved-search emails. Connect an email account once in **Alerts** with an app password; Google sign-in remains as an advanced fallback. |
+| HotPads | After one-time setup | Official saved-search emails through the same email connection. |
 | Roomies | After one-time setup | Realtime or daily listing-alert emails through the same connection. |
 | Facebook Marketplace | After one-time setup | A capped Apify free-tier connector reads ten newest SF Property Rentals cards per scan. No Facebook credentials are used. |
 | Furnished Finder | After one-time Chrome setup | A local Chrome bridge reads cards already visible in your own browser session for up to three saved searches. Needs Chrome and the monitor running at check time. |
@@ -148,9 +148,12 @@ search. They are deliberately not presented as working integrations.
   at any time; when it does, the adapter fails visibly instead of silently reporting no listings.
 - Scans need the computer awake and logged in. Missed scheduled runs are caught up after wake or
   reboot; a machine that is asleep or off does no network work.
-- Gmail uses exactly `gmail.readonly`, searches only supported alert senders, never stores whole
-  mailboxes or displays message bodies, and applies 15-second timeouts. Connecting Gmail
-  requires whoever builds the release to supply their own Google OAuth client.
+- Email is read with an app password over IMAP: messages are opened without being marked as
+  read, only known alert senders are searched, message bodies are never stored, and the
+  password is written to this machine alone with owner-only permissions. Gmail's OAuth path
+  remains for accounts that cannot make app passwords, and needs a Google OAuth client from
+  whoever builds the release. Outlook.com is not supported: Microsoft no longer allows app
+  passwords for mail.
 - Apify and the Chrome bridge are optional, capped, and reported separately.
 
 ## Using this responsibly

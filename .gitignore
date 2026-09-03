@@ -13,3 +13,4 @@ dist/
 # Scaffolding for the open-source push; not part of the project.
 OPEN_SOURCE_SPEC.md
 .DS_Store
+IMAP_SPEC.md

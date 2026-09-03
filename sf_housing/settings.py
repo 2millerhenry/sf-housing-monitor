@@ -22,6 +22,7 @@ class Settings:
     gmail_token_path: Path | None = None
     gmail_pending_state_path: Path | None = None
     apify_token_path: Path | None = None
+    imap_credential_path: Path | None = None
 
     @classmethod
     def from_environment(cls) -> "Settings":
@@ -38,4 +39,5 @@ class Settings:
             gmail_token_path=data_dir / "gmail-token.json",
             gmail_pending_state_path=data_dir / "gmail-oauth-state.json",
             apify_token_path=data_dir / "apify-token.txt",
+            imap_credential_path=data_dir / "imap-credential.json",
         )

@@ -7,7 +7,57 @@
     <h1>Connect only what helps</h1>
     <p class="subtle">Public sources already work. Add email, Furnished Finder, or Facebook coverage when you want it. None of them blocks your shortlist.</p>
   </div>
-  <div class="connector-action"><a class="button" href="/support">Run ready check</a><a class="button" href="/">Back to listings</a></div>
+  <div class="connector-action">
+    {% if email_connected %}
+      <p class="connector-message">Reading alert email from <strong>{{ email_address }}</strong>.</p>
+      <form method="post" action="/alerts/gmail/test"><button class="primary" type="submit">Check for alerts now</button></form>
+      <span>Each site stays unverified until one of its real alerts is actually imported.</span>
+      <details class="quiet-action">
+        <summary>Disconnect</summary>
+        <p>This deletes the saved app password from this computer. The free public sources keep working.</p>
+        <form method="post" action="/alerts/email/disconnect"><button type="submit">Disconnect email</button></form>
+      </details>
+    {% elif gmail_connected %}
+      <p class="connector-message">Connected with Google sign-in.</p>
+      <form method="post" action="/alerts/gmail/test"><button class="primary" type="submit">Check for alerts now</button></form>
+      <details class="quiet-action">
+        <summary>Disconnect</summary>
+        <form method="post" action="/alerts/gmail/disconnect"><button type="submit">Disconnect Google</button></form>
+      </details>
+    {% else %}
+      <form class="email-connect" method="post" action="/alerts/email/connect">
+        <label>Email address
+          <input type="email" name="address" placeholder="you@gmail.com" required autocomplete="username">
+        </label>
+        <label>App password
+          <input type="password" name="password" placeholder="16 characters from your mail provider" required autocomplete="off">
+        </label>
+        <label class="advanced-host">Mail server <span>(only if your provider is not Gmail, iCloud, Fastmail, Yahoo or AOL)</span>
+          <input type="text" name="host" placeholder="imap.example.com" autocomplete="off">
+        </label>
+        <button class="primary" type="submit">Connect email</button>
+      </form>
+      <details class="quiet-action">
+        <summary>Where do I get an app password?</summary>
+        <p>An app password is a code your mail provider makes for one app. It only opens mail, you can revoke it on its own, and it is not your normal password.</p>
+        <ul>
+          <li><strong>Gmail</strong> Turn on 2-Step Verification, then create an app password in your Google Account security settings.</li>
+          <li><strong>iCloud</strong> Turn on two-factor authentication, then generate an app-specific password in your Apple Account settings.</li>
+          <li><strong>Fastmail, Yahoo, AOL</strong> Create an app password in the account security section.</li>
+          <li><strong>Outlook.com or Hotmail</strong> Not supported: Microsoft no longer allows app passwords for mail. Use Google sign-in below, or forward the alerts to another address.</li>
+        </ul>
+      </details>
+      <details class="quiet-action">
+        <summary>Advanced: sign in with Google instead</summary>
+        <p>Use this if your account cannot make app passwords, such as one on Google&rsquo;s Advanced Protection. It needs a Google Cloud OAuth client supplied by whoever prepared this copy.</p>
+        {% if has_client_secret %}
+          <a class="button" href="/alerts/gmail/connect">Connect Gmail read-only</a>
+        {% else %}
+          <p>{{ gmail_client_error or "No Google OAuth client is installed in this copy." }}</p>
+        {% endif %}
+      </details>
+    {% endif %}
+  </div>
 </section>
 
 {% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
@@ -32,11 +82,11 @@
     <div><p class="eyebrow">Saved-search alerts</p><h2 id="gmail-title">Email listings</h2></div>
     <span class="connector-state {{ gmail_state.state if gmail_state else 'not_configured' }}">{{ gmail_state.label if gmail_state else 'Optional' }}</span>
   </header>
-  <p>One read-only Gmail connection can collect supported Zillow, HotPads, Apartments.com, Zumper, Roomies, and Facebook Marketplace saved-search alerts.</p>
-  <div class="gmail-privacy" aria-label="Gmail privacy promise">
-    <span><strong>Read-only</strong> Google shows the exact permission before approval.</span>
-    <span><strong>Narrow searches</strong> Only known housing-alert senders and subjects are queried.</span>
-    <span><strong>Stays local</strong> Tokens remain on this Mac; email bodies are never stored.</span>
+  <p>Connecting one email account turns on {{ email_providers|join(', ') }} together. It reads only their alert messages, and never sends anything.</p>
+  <div class="gmail-privacy" aria-label="Email privacy promise">
+    <span><strong>Read-only</strong> Messages are opened without being marked as read.</span>
+    <span><strong>Narrow searches</strong> Only known housing-alert senders are queried.</span>
+    <span><strong>Stays local</strong> The password is stored on this computer only, readable by you alone.</span>
   </div>
   {% if gmail_state and gmail_state.message %}<p class="connector-message">{{ gmail_state.message }}</p>{% endif %}
   <div class="connector-action">

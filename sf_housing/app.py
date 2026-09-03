@@ -42,6 +42,7 @@ from .furnished_finder_bridge import (
     validated_search_url,
 )
 from .gmail_alerts import GmailAlertError, GmailAlertMailbox
+from .imap_alerts import AlertMailboxRouter, ImapAlertError, ImapAlertMailbox, host_for_address
 from .preferences import (
     PreferenceError,
     Preferences,
@@ -532,18 +533,26 @@ def create_app(
     initial_preferences = ensure_preferences(active_settings.preferences_path)
     repository = Repository(active_settings.database_path)
     repository.initialize()
-    mailbox = GmailAlertMailbox(
+    gmail_mailbox = GmailAlertMailbox(
         active_settings.gmail_client_secret_path or active_settings.data_dir / "gmail-client-secret.json",
         active_settings.gmail_token_path or active_settings.data_dir / "gmail-token.json",
         active_settings.gmail_pending_state_path or active_settings.data_dir / "gmail-oauth-state.json",
     )
+    imap_mailbox = ImapAlertMailbox(
+        active_settings.imap_credential_path or active_settings.data_dir / "imap-credential.json"
+    )
+    # An app password needs no cloud project, so when one is saved it is the
+    # mailbox the alert sources read. The Gmail OAuth path stays available for
+    # accounts app passwords cannot serve -- Advanced Protection, some managed
+    # Workspace accounts, and Outlook.com.
+    mailbox = AlertMailboxRouter(imap_mailbox, gmail_mailbox)
     apify_tokens = ApifyTokenStore(
         active_settings.apify_token_path or active_settings.data_dir / "apify-token.txt"
     )
     if repository.connector_state("gmail") is None:
         gmail_state = (
             "configured_unverified"
-            if mailbox.is_connected or mailbox.has_client_secret
+            if gmail_mailbox.is_connected or gmail_mailbox.has_client_secret
             else "not_configured"
         )
         repository.set_connector_state(
@@ -551,13 +560,13 @@ def create_app(
             gmail_state,
             message=(
                 "Gmail is authorized but has not completed a saved-search check yet."
-                if mailbox.is_connected
+                if gmail_mailbox.is_connected
                 else "Google OAuth is ready for authorization."
-                if mailbox.has_client_secret
-                else mailbox.client_configuration_error
+                if gmail_mailbox.has_client_secret
+                else gmail_mailbox.client_configuration_error
                 or "Add the owner-provided Google OAuth client to connect Gmail."
             ),
-            configured=mailbox.has_client_secret,
+            configured=gmail_mailbox.has_client_secret,
         )
     if repository.connector_state("apify") is None:
         repository.set_connector_state(
@@ -1243,14 +1252,20 @@ def create_app(
             context={
                 "message": message,
                 "error": error,
-                "has_client_secret": mailbox.has_client_secret,
-                "gmail_connected": mailbox.is_connected,
+                "has_client_secret": gmail_mailbox.has_client_secret,
+                "gmail_connected": gmail_mailbox.is_connected,
                 "apify_configured": apify_tokens.is_configured,
                 "connector_states": connector_states,
                 "gmail_state": connector_states.get("gmail"),
                 "gmail_providers": gmail_providers,
-                "gmail_client_error": mailbox.client_configuration_error,
-                "gmail_client_kind": mailbox.client_kind,
+                "gmail_client_error": gmail_mailbox.client_configuration_error,
+                "gmail_client_kind": gmail_mailbox.client_kind,
+                "email_connected": imap_mailbox.is_connected,
+                "email_address": (
+                    imap_mailbox.credential.address if imap_mailbox.is_connected else ""
+                ),
+                "email_backend": mailbox.backend,
+                "email_providers": [name for _, name in GMAIL_PROVIDERS],
                 "apify_state": connector_states.get("apify"),
                 "furnished_finder_state": connector_states.get("furnished_finder"),
                 "bridge_version": FURNISHED_FINDER_BRIDGE_VERSION,
@@ -1275,7 +1290,9 @@ def create_app(
             active_settings,
             repository,
             scanner,
-            mailbox,
+            # The Ready Check reports on the Gmail OAuth files specifically, so
+            # it needs that mailbox rather than whichever backend is live.
+            gmail_mailbox,
             apify_tokens,
             request_host=request.url.hostname or "unknown",
             request_port=request.url.port or 8000,
@@ -1581,7 +1598,7 @@ def create_app(
         if len(contents) > 1_000_000:
             return RedirectResponse("/alerts?error=OAuth+client+file+is+too+large", status_code=303)
         try:
-            mailbox.save_client_secret(contents)
+            gmail_mailbox.save_client_secret(contents)
         except GmailAlertError as exc:
             return RedirectResponse(f"/alerts?error={quote(str(exc))}", status_code=303)
         repository.set_connector_state(
@@ -1607,17 +1624,22 @@ def create_app(
 
     @application.post("/alerts/gmail/test")
     def test_gmail_connector():
+        # Either backend can be the live one, so the gate asks the router.
         if not mailbox.is_connected:
-            state = "authorization_expired" if mailbox.token_path.is_file() else "configured_unverified"
+            state = (
+                "authorization_expired"
+                if gmail_mailbox.token_path.is_file()
+                else "configured_unverified"
+            )
             repository.set_connector_state(
                 "gmail",
                 state,
-                message="Connect Gmail read-only before testing saved-search alerts.",
-                configured=mailbox.has_client_secret,
+                message="Connect an email account before testing saved-search alerts.",
+                configured=gmail_mailbox.has_client_secret,
                 attempted=True,
             )
             return RedirectResponse(
-                "/alerts?error=Connect+Gmail+read-only+before+testing+saved-search+alerts",
+                "/alerts?error=Connect+an+email+account+before+testing+saved-search+alerts",
                 status_code=303,
             )
         if scanner.is_running:
@@ -1654,7 +1676,7 @@ def create_app(
 
     @application.post("/alerts/gmail/disconnect")
     def disconnect_gmail():
-        revoked = mailbox.disconnect(revoke=True)
+        revoked = gmail_mailbox.disconnect(revoke=True)
         for key, name in GMAIL_PROVIDERS:
             repository.set_connector_state(
                 key,
@@ -1663,13 +1685,13 @@ def create_app(
             )
         repository.set_connector_state(
             "gmail",
-            "configured_unverified" if mailbox.has_client_secret else "not_configured",
+            "configured_unverified" if gmail_mailbox.has_client_secret else "not_configured",
             message=(
                 "Google access was revoked and the local token was removed. Connect again when wanted."
                 if revoked
                 else "The local Gmail token was removed. Google revocation could not be confirmed; reconnecting creates a fresh authorization."
             ),
-            configured=mailbox.has_client_secret,
+            configured=gmail_mailbox.has_client_secret,
             attempted=True,
         )
         return RedirectResponse(
@@ -1677,17 +1699,85 @@ def create_app(
             status_code=303,
         )
 
+    @application.post("/alerts/email/connect")
+    async def connect_email(request: Request):
+        """Save an app password, then prove it works before claiming success."""
+        form = await request.form()
+        address = str(form.get("address") or "")
+        password = str(form.get("password") or "")
+        host = str(form.get("host") or "").strip()
+        try:
+            imap_mailbox.save_credential(address, password, host or None)
+            # A saved credential is not a working one. Do one bounded, read-only
+            # search now so the user is told the truth immediately.
+            imap_mailbox.messages("newer_than:1d", max_results=1)
+        except ImapAlertError as exc:
+            # Never leave a credential behind that does not work.
+            imap_mailbox.disconnect()
+            repository.set_connector_state(
+                "gmail",
+                "not_configured",
+                message=str(exc),
+                attempted=True,
+            )
+            return RedirectResponse("/alerts?error=" + quote(str(exc)), status_code=303)
+
+        for key, name in GMAIL_PROVIDERS:
+            repository.set_connector_state(
+                key,
+                "configured_unverified",
+                message=f"{name} alerts will be imported from {imap_mailbox.credential.address}.",
+                configured=True,
+            )
+        repository.set_connector_state(
+            "gmail",
+            "configured_unverified",
+            message=f"Reading alert email from {imap_mailbox.credential.address} over IMAP.",
+            configured=True,
+            attempted=True,
+        )
+        return RedirectResponse(
+            "/alerts?message=" + quote(
+                "Email connected. Zillow, HotPads, Apartments.com and Roomies alerts will import on the next check."
+            ),
+            status_code=303,
+        )
+
+    @application.post("/alerts/email/disconnect")
+    def disconnect_email():
+        removed = imap_mailbox.disconnect()
+        for key, name in GMAIL_PROVIDERS:
+            repository.set_connector_state(
+                key,
+                "disabled",
+                message=f"{name} email coverage is paused until an account is connected again.",
+            )
+        repository.set_connector_state(
+            "gmail",
+            "not_configured",
+            message=(
+                "The saved app password was removed from this computer."
+                if removed
+                else "No saved app password was found."
+            ),
+            attempted=True,
+        )
+        return RedirectResponse(
+            "/alerts?message=" + quote("Email disconnected; the free public sources keep working."),
+            status_code=303,
+        )
+
     @application.get("/alerts/gmail/connect")
     def connect_gmail(request: Request):
         callback_url = str(request.url_for("gmail_callback"))
         try:
-            authorization_url = mailbox.begin_authorization(callback_url)
+            authorization_url = gmail_mailbox.begin_authorization(callback_url)
         except GmailAlertError as exc:
             repository.set_connector_state(
                 "gmail",
-                "configured_unverified" if mailbox.has_client_secret else "not_configured",
+                "configured_unverified" if gmail_mailbox.has_client_secret else "not_configured",
                 message=str(exc),
-                configured=mailbox.has_client_secret,
+                configured=gmail_mailbox.has_client_secret,
                 attempted=True,
             )
             return RedirectResponse(f"/alerts?error={quote(str(exc))}", status_code=303)
@@ -1703,7 +1793,7 @@ def create_app(
                 "gmail",
                 "configured_unverified",
                 message="Google did not grant read-only access. Connect again when ready.",
-                configured=mailbox.has_client_secret,
+                configured=gmail_mailbox.has_client_secret,
                 attempted=True,
             )
             return RedirectResponse(
@@ -1711,7 +1801,7 @@ def create_app(
                 status_code=303,
             )
         try:
-            mailbox.complete_authorization(str(request.url_for("gmail_callback")), state, code)
+            gmail_mailbox.complete_authorization(str(request.url_for("gmail_callback")), state, code)
         except GmailAlertError as exc:
             repository.set_connector_state(
                 "gmail",

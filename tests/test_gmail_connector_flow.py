@@ -152,7 +152,7 @@ def test_gmail_test_without_authorization_is_honestly_blocked(tmp_path: Path) ->
         response = client.post("/alerts/gmail/test", follow_redirects=False)
 
     assert response.status_code == 303
-    assert "Connect+Gmail" in response.headers["location"]
+    assert "Connect+an+email+account" in response.headers["location"]
     assert application.state.repository.connector_state("gmail").state == "configured_unverified"
 
 
