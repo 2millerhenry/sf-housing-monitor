@@ -1,5 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
+{% set mode_labels = {
+  'room': ('Private rooms', 'room', 'A room in a shared home'),
+  'studio': ('Studios', 'studio', 'An entire studio'),
+  'one_bedroom': ('1 bedroom', 'home', 'An entire one-bedroom'),
+  'two_bedroom': ('2 bedrooms', 'home', 'Split between 2'),
+  'three_bedroom': ('3 bedrooms', 'home', 'Split between 3'),
+  'four_bedroom': ('4 bedrooms', 'home', 'Split between 4')
+} %}
 <section class="hero dashboard-hero">
   <div>
     <p class="eyebrow">Twice daily · 10 AM and 6 PM</p>
@@ -16,9 +24,9 @@
       <h1>Near matches</h1>
       <p class="subtle">Homes that missed a hard limit or need more fit, kept separate so the shortlist stays honest.</p>
     {% else %}
-      <h1>{% if housing_mode == 'two_bedroom' %}2–3 bedrooms worth splitting{% elif housing_mode == 'whole_unit' %}Studios &amp; 1-bedrooms worth a look{% else %}Rooms worth a look{% endif %}</h1>
+      <h1>{{ mode_labels[housing_mode][0] }} worth a look</h1>
       <p class="subtle">
-        {% if housing_mode == 'two_bedroom' %}Entire homes in your target areas:{% if 'two_bedroom' in enabled_paths %} 2 bedrooms up to ${{ "{:,}".format(two_bedroom_max_per_person) }}/person{% endif %}{% if 'two_bedroom' in enabled_paths and 'three_bedroom' in enabled_paths %}, or{% endif %}{% if 'three_bedroom' in enabled_paths %} 3 bedrooms up to ${{ "{:,}".format(three_bedroom_max_per_person) }}/person{% endif %}.{% elif housing_mode == 'whole_unit' %}Entire places under ${{ "{:,}".format(whole_unit_max_monthly) }} in your target areas. Building size is never guessed.{% else %}Ranked against your actual housing deal. Unknown details stay neutral.{% endif %}
+        {% if housing_mode == 'room' %}Ranked against your actual housing deal. Unknown details stay neutral.{% elif housing_mode in ['studio', 'one_bedroom'] %}Entire places up to ${{ "{:,}".format(whole_unit_max_monthly) }} in your target areas. Building size is never guessed.{% else %}Entire homes in your target areas, {{ mode_labels[housing_mode][2]|lower }}{% if housing_mode == 'two_bedroom' %} at ${{ "{:,}".format(two_bedroom_max_per_person) }} each{% elif housing_mode == 'three_bedroom' %} at ${{ "{:,}".format(three_bedroom_max_per_person) }} each{% endif %}.{% endif %}
       </p>
     {% endif %}
   </div>
@@ -54,22 +62,12 @@
 </div>
 {% endif %}
 
-<nav class="housing-tabs" aria-label="Housing search">
-  {% if 'room' in enabled_housing_modes %}
-  <a href="/?housing=room&amp;view=active&amp;sort=score" {% if housing_mode == 'room' %}class="active" aria-current="page"{% endif %}>
-    <strong>Private rooms</strong><span>Your original shared-home search</span>
+<nav class="housing-tabs" aria-label="Home size">
+  {% for mode in enabled_housing_modes %}
+  <a href="/?housing={{ mode }}&amp;view={{ view }}&amp;sort=score" {% if housing_mode == mode %}class="active" aria-current="page"{% endif %}>
+    <strong>{{ mode_labels[mode][0] }}</strong><span>{{ mode_labels[mode][2] }}</span>
   </a>
-  {% endif %}
-  {% if 'whole_unit' in enabled_housing_modes %}
-  <a href="/?housing=whole_unit&amp;view=active&amp;sort=score" {% if housing_mode == 'whole_unit' %}class="active" aria-current="page"{% endif %}>
-    <strong>Studios &amp; 1-bedrooms</strong><span>Entire place · up to ${{ "{:,}".format(whole_unit_max_monthly) }} · 50 units max</span>
-  </a>
-  {% endif %}
-  {% if 'two_bedroom' in enabled_housing_modes %}
-  <a href="/?housing=two_bedroom&amp;view=active&amp;sort=score" {% if housing_mode == 'two_bedroom' %}class="active" aria-current="page"{% endif %}>
-    <strong>2–3 bedrooms to split</strong><span>{% if 'two_bedroom' in enabled_paths %}2BR ${{ "{:,}".format(two_bedroom_max_per_person) }} each{% endif %}{% if 'two_bedroom' in enabled_paths and 'three_bedroom' in enabled_paths %} · {% endif %}{% if 'three_bedroom' in enabled_paths %}3BR ${{ "{:,}".format(three_bedroom_max_per_person) }} each{% endif %}</span>
-  </a>
-  {% endif %}
+  {% endfor %}
 </nav>
 
 <section class="workflow-bar" aria-label="Listing controls">
@@ -115,21 +113,7 @@
         </select>
       </label>
     {% endif %}
-    {% if housing_mode in ['whole_unit', 'two_bedroom'] %}
-      <label>Unit type
-        <select name="unit_type"{% if selected_unit_type %} class="is-selected"{% endif %}>
-          {% if housing_mode == 'two_bedroom' %}
-            <option value="">Every enabled split</option>
-            {% if 'two_bedroom' in enabled_paths %}<option value="two_bedroom" {% if selected_unit_type == 'two_bedroom' %}selected{% endif %}>2 bedrooms</option>{% endif %}
-            {% if 'three_bedroom' in enabled_paths %}<option value="three_bedroom" {% if selected_unit_type == 'three_bedroom' %}selected{% endif %}>3 bedrooms</option>{% endif %}
-          {% else %}
-            <option value="">Every enabled whole home</option>
-            {% if 'studio' in enabled_paths %}<option value="studio" {% if selected_unit_type == 'studio' %}selected{% endif %}>Studio</option>{% endif %}
-            {% if 'one_bedroom' in enabled_paths %}<option value="one_bedroom" {% if selected_unit_type == 'one_bedroom' %}selected{% endif %}>1 bedroom</option>{% endif %}
-          {% endif %}
-        </select>
-      </label>
-    {% elif housing_mode == 'room' %}
+    {% if housing_mode == 'room' %}
       <label>Home
         <select name="home_style"{% if selected_home_style %} class="is-selected"{% endif %}>
           <option value="">Any home</option>
@@ -159,10 +143,10 @@
         {% if view == 'saved' %}Starred listings{% elif view == 'dismissed' %}Passed listings{% elif view == 'near_matches' %}Worth a second look{% elif view == 'all' %}Full archive{% else %}Recommended for you{% endif %}
       </h2>
       <p>
-        {% if view == 'active' and housing_mode == 'two_bedroom' %}Only confirmed entire 2- or 3-bedroom homes within the matching per-person cap{% elif view == 'active' and housing_mode == 'whole_unit' %}Only confirmed studios and 1-bedrooms; large known buildings stay out{% elif view == 'active' %}Showing matches at {{ minimum_score }} or higher{% else %}Your review history is always preserved{% endif %}{% if selected_area_priority == 'dream_strong' %} · Dream and strong target areas only{% elif selected_area_priority == 'secondary' %} · Secondary target areas only{% endif %}
+        {% if view == 'active' and housing_mode != 'room' %}Only confirmed {{ mode_labels[housing_mode][0]|lower }}; large known buildings stay out{% elif view == 'active' %}Showing matches at {{ minimum_score }} or higher{% else %}Your review history is always preserved{% endif %}{% if selected_area_priority == 'dream_strong' %} · Dream and strong target areas only{% elif selected_area_priority == 'secondary' %} · Secondary target areas only{% endif %}
       </p>
     </div>
-    <span class="result-count">{{ listings|length }} {% if housing_mode == 'two_bedroom' %}apartment{% elif housing_mode == 'whole_unit' %}unit{% else %}home{% endif %}{% if listings|length != 1 %}s{% endif %}</span>
+    <span class="result-count">{{ listings|length }} {{ mode_labels[housing_mode][1] }}{% if listings|length != 1 %}s{% endif %}</span>
   </header>
 
   {% if listings %}

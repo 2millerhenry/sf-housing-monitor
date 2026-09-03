@@ -21,6 +21,7 @@ STUDIO = "studio"
 ONE_BEDROOM = "one_bedroom"
 TWO_BEDROOM = "two_bedroom"
 THREE_BEDROOM = "three_bedroom"
+FOUR_BEDROOM = "four_bedroom"
 
 _ROOM_PATTERN = re.compile(
     r"\b(?:private|shared|single|own)\s+(?:(?:primary|master|large|bright|sunny|spacious|furnished)\s+)?(?:room|bedroom)\b|"
@@ -68,6 +69,16 @@ _TWO_BEDROOM_PATTERN = re.compile(
 _THREE_BEDROOM_PATTERN = re.compile(
     r"\b3\s*(?:bd|br|bed(?:room)?s?)\b|\bthree[- ]bed(?:room)?s?\b|\b3b[dr]\b|"
     r"\b3\s+habitaci(?:o|ó)nes\b",
+    re.IGNORECASE,
+)
+# Deliberately stricter than the smaller sizes: listing cards state a whole
+# property's bed count ("4 Beds 1.5 Baths") even when a single room in it is
+# what is for rent, so a bare "4 beds" is not evidence of renting the whole
+# home. A structured numberOfBedrooms of 4, which is what the portal, Zumper and
+# Apartment List publish, still classifies normally.
+_FOUR_BEDROOM_PATTERN = re.compile(
+    r"\b4\s*(?:bd|br|bedrooms?)\b|\bfour[- ]bedrooms?\b|\b4b[dr]\b|"
+    r"\b4\s+habitaci(?:o|ó)nes\b",
     re.IGNORECASE,
 )
 _NUMBER_WORDS = {
@@ -133,6 +144,8 @@ def _structured_unit_type(listing: ListingCandidate) -> str | None:
         return TWO_BEDROOM
     if raw_type in {"three_bedroom", "three bedroom", "3", "3 bedroom", "3 bedrooms"}:
         return THREE_BEDROOM
+    if raw_type in {"four_bedroom", "four bedroom", "4", "4 bedroom", "4 bedrooms", "4 br"}:
+        return FOUR_BEDROOM
     raw_bedrooms = listing.metadata.get("bedrooms")
     try:
         bedrooms = float(raw_bedrooms) if raw_bedrooms not in (None, "") else None
@@ -146,6 +159,8 @@ def _structured_unit_type(listing: ListingCandidate) -> str | None:
         return TWO_BEDROOM
     if bedrooms == 3:
         return THREE_BEDROOM
+    if bedrooms == 4:
+        return FOUR_BEDROOM
     return None
 
 
@@ -162,6 +177,8 @@ def unit_type_from_listing(listing: ListingCandidate) -> str | None:
         return TWO_BEDROOM
     if _THREE_BEDROOM_PATTERN.search(text):
         return THREE_BEDROOM
+    if _FOUR_BEDROOM_PATTERN.search(text):
+        return FOUR_BEDROOM
     return None
 
 
@@ -218,7 +235,7 @@ def classify_listing(listing: ListingCandidate) -> ListingCandidate:
         # A room can be inside a one-bedroom home; do not expose that as a
         # whole-unit match.
         unit_type = None
-    elif unit_type in {STUDIO, ONE_BEDROOM, TWO_BEDROOM, THREE_BEDROOM}:
+    elif unit_type in {STUDIO, ONE_BEDROOM, TWO_BEDROOM, THREE_BEDROOM, FOUR_BEDROOM}:
         housing_kind = WHOLE_UNIT
     else:
         # This monitor predates the second search mode, so ambiguous legacy

@@ -301,7 +301,7 @@ def test_dashboard_uses_the_whole_unit_budget_in_its_labels(tmp_path: Path) -> N
 
     assert response.status_code == 200
     assert "up to $3,000" in response.text
-    assert "Entire places under $3,000" in response.text
+    assert "Entire places up to $3,000" in response.text
 
 
 def test_dashboard_highlights_applied_filters_and_normalizes_an_invalid_order(tmp_path: Path) -> None:
@@ -517,14 +517,15 @@ def test_dashboard_keeps_whole_units_separate_and_labels_the_unit_type(tmp_path:
         unit_page = client.get("/?housing=whole_unit")
 
     assert "Studio apartment in Mission" not in room_page.text
-    assert "Studios &amp; 1-bedrooms worth a look" in unit_page.text
+    assert "Studios worth a look" in unit_page.text
     assert "Studio apartment in Mission" in unit_page.text
     assert ">Studio<" in unit_page.text
     assert "12-unit building" in unit_page.text
-    assert 'option value="studio"' in unit_page.text
+    # The tab is the size now, so a separate size dropdown would repeat it.
+    assert 'name="unit_type"' not in unit_page.text
 
 
-def test_dashboard_has_a_combined_two_to_three_bedroom_split_with_total_and_per_person_price(tmp_path: Path) -> None:
+def test_each_split_size_has_its_own_tab_with_total_and_per_person_price(tmp_path: Path) -> None:
     settings = app_settings(tmp_path)
     application = create_app(settings=settings, sources=[], enable_scheduler=False)
     repository = application.state.repository
@@ -556,19 +557,22 @@ def test_dashboard_has_a_combined_two_to_three_bedroom_split_with_total_and_per_
         room_page = client.get("/")
         small_unit_page = client.get("/?housing=whole_unit")
         two_bedroom_page = client.get("/?housing=two_bedroom")
-        only_two_bedrooms = client.get("/?housing=two_bedroom&unit_type=two_bedroom")
-        only_three_bedrooms = client.get("/?housing=two_bedroom&unit_type=three_bedroom")
+        only_two_bedrooms = client.get("/?housing=two_bedroom")
+        only_three_bedrooms = client.get("/?housing=three_bedroom")
 
     assert "2 bedroom apartment in NOPA" not in room_page.text
     assert "2 bedroom apartment in NOPA" not in small_unit_page.text
-    assert "2–3 bedrooms worth splitting" in two_bedroom_page.text
+    assert "2 bedrooms worth a look" in two_bedroom_page.text
     assert "2 bedroom apartment in NOPA" in two_bedroom_page.text
     assert "$5,200" in two_bedroom_page.text
     assert "$2,600/person" in two_bedroom_page.text
     assert "14-unit building" in two_bedroom_page.text
-    assert 'option value="three_bedroom"' in two_bedroom_page.text
-    assert "3 bedroom apartment in NOPA" in two_bedroom_page.text
-    assert "$2,450/person" in two_bedroom_page.text
+    # Each size has its own tab instead of hiding inside a combined dropdown.
+    assert 'housing=three_bedroom' in two_bedroom_page.text
+    # Each size keeps to its own tab, so a three-bedroom never pads the
+    # two-bedroom results the way the combined view used to.
+    assert "3 bedroom apartment in NOPA" not in two_bedroom_page.text
+    assert "$2,450/person" in only_three_bedrooms.text
     assert "3 bedroom apartment in NOPA" not in only_two_bedrooms.text
     assert "2 bedroom apartment in NOPA" in only_two_bedrooms.text
     assert "3 bedroom apartment in NOPA" in only_three_bedrooms.text

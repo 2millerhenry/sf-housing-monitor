@@ -42,11 +42,12 @@
         ('studio', 'Studio', 'An entire studio for yourself'),
         ('one_bedroom', '1-bedroom', 'An entire one-bedroom for yourself'),
         ('two_bedroom', '2-bedroom split', 'Split the total with your group'),
-        ('three_bedroom', '3-bedroom split', 'Split the total with your group')
+        ('three_bedroom', '3-bedroom split', 'Split the total with your group'),
+        ('four_bedroom', '4-bedroom split', 'Split the total with your group')
       ] %}
       {% for key, label, help in path_options %}
       {% set budget = deal_values.budgets.get(key, {}) %}
-      {% set split = key in ['two_bedroom', 'three_bedroom'] %}
+      {% set split = key in ['two_bedroom', 'three_bedroom', 'four_bedroom'] %}
       <article class="path-row" data-path-card="{{ key }}">
         <label class="path-row-choice">
           <input type="checkbox" name="housing_paths" value="{{ key }}" data-path-toggle="{{ key }}" {% if key in deal_values.enabled_paths %}checked{% endif %}>
@@ -73,7 +74,7 @@
             {% if split %}
             <span class="cell-label" aria-hidden="true">People</span>
             <select name="{{ key }}_occupants" data-path-required aria-label="People splitting the rent for a {{ label }}">
-              {% for count in range(1, 7) %}<option value="{{ count }}" {% if budget.get('occupants', 2 if key == 'two_bedroom' else 3) == count %}selected{% endif %}>{{ count }}</option>{% endfor %}
+              {% for count in range(1, 9) %}<option value="{{ count }}" {% if budget.get('occupants', {'two_bedroom': 2, 'three_bedroom': 3, 'four_bedroom': 4}[key]) == count %}selected{% endif %}>{{ count }}</option>{% endfor %}
             </select>
             {% else %}
             <span class="cell-empty" aria-hidden="true">Just you</span>

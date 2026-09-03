@@ -455,7 +455,7 @@ class Repository:
         if housing_kind in {"room", "whole_unit"}:
             clauses.append("housing_kind = ?")
             parameters.append(housing_kind)
-        valid_unit_types = {"studio", "one_bedroom", "two_bedroom", "three_bedroom"}
+        valid_unit_types = {"studio", "one_bedroom", "two_bedroom", "three_bedroom", "four_bedroom"}
         if unit_type in valid_unit_types:
             clauses.append("unit_type = ?")
             parameters.append(unit_type)
@@ -572,7 +572,7 @@ class Repository:
         selected_types = tuple(
             value
             for value in unit_types
-            if value in {"studio", "one_bedroom", "two_bedroom", "three_bedroom"}
+            if value in {"studio", "one_bedroom", "two_bedroom", "three_bedroom", "four_bedroom"}
         )
         if selected_types:
             type_clause = " AND unit_type IN (" + ", ".join("?" for _ in selected_types) + ")"

@@ -741,7 +741,7 @@ class AbacusSource:
 
     def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
         if not set(preferences.deal_profile.enabled_paths).intersection(
-            {"studio", "one_bedroom", "two_bedroom", "three_bedroom"}
+            {"studio", "one_bedroom", "two_bedroom", "three_bedroom", "four_bedroom"}
         ):
             self.empty_result_message = "Skipped because entire homes are not enabled in Your deal."
             return []
@@ -884,7 +884,7 @@ class SFHousingPortalSource:
         "1 br": ("1 bedroom", WHOLE_UNIT),
         "2 br": ("2 bedroom", WHOLE_UNIT),
         "3 br": ("3 bedroom", WHOLE_UNIT),
-        "4 br": (None, WHOLE_UNIT),
+        "4 br": ("4 bedroom", WHOLE_UNIT),
     }
 
     @staticmethod
@@ -2061,6 +2061,7 @@ class CraigslistSource:
     unit_search_url = "https://sfbay.craigslist.org/search/sfc/apa"
     two_bedroom_search_url = unit_search_url
     three_bedroom_search_url = unit_search_url
+    four_bedroom_search_url = unit_search_url
     base_search_url = room_search_url
     manual_reason = None
 
@@ -2122,6 +2123,18 @@ class CraigslistSource:
             "max_bedrooms": 2,
         }
         return f"{self.two_bedroom_search_url}?{urlencode(query)}"
+
+    def _four_bedroom_url(self, preferences: Preferences) -> str:
+        """Exact 4-bedroom inventory, which 2-3 bedroom volume would otherwise bury."""
+        settings = preferences.section("four_bedroom")
+        max_monthly = int(settings.get("occupants", 4)) * int(settings.get("max_per_person", 2300))
+        query: dict[str, str | int] = {
+            "sort": "date",
+            "max_price": max_monthly,
+            "min_bedrooms": 4,
+            "max_bedrooms": 4,
+        }
+        return f"{self.four_bedroom_search_url}?{urlencode(query)}"
 
     def _three_bedroom_url(self, preferences: Preferences) -> str:
         """Return exact 3-bedroom inventory so 2-bedroom volume cannot hide it."""
@@ -2192,32 +2205,46 @@ class CraigslistSource:
         unit_enabled = bool(enabled.intersection({"studio", "one_bedroom"}))
         two_enabled = "two_bedroom" in enabled
         three_enabled = "three_bedroom" in enabled
+        four_enabled = "four_bedroom" in enabled
         room_details = int(source_settings.get("craigslist_detail_pages_per_scan", 10))
         unit_details = int(source_settings.get("craigslist_unit_detail_pages_per_scan", 10))
         two_bedroom_details = int(source_settings.get("craigslist_two_bedroom_detail_pages_per_scan", 10))
         three_bedroom_details = int(
             source_settings.get("craigslist_three_bedroom_detail_pages_per_scan", 25)
         )
+        four_bedroom_details = int(
+            source_settings.get("craigslist_four_bedroom_detail_pages_per_scan", 15)
+        )
         sublet_details = int(source_settings.get("craigslist_sublet_detail_pages_per_scan", 15))
         room_details = max(0, min(room_details, 50))
         unit_details = max(0, min(unit_details, 50))
         two_bedroom_details = max(0, min(two_bedroom_details, 50))
         three_bedroom_details = max(0, min(three_bedroom_details, 50))
+        four_bedroom_details = max(0, min(four_bedroom_details, 50))
         sublet_details = max(0, min(sublet_details, 50))
         room_details = room_details if room_enabled else 0
         unit_details = unit_details if unit_enabled else 0
         two_bedroom_details = two_bedroom_details if two_enabled else 0
         three_bedroom_details = three_bedroom_details if three_enabled else 0
+        four_bedroom_details = four_bedroom_details if four_enabled else 0
         self.detail_budget = (
-            room_details + unit_details + two_bedroom_details + three_bedroom_details + sublet_details
+            room_details
+            + unit_details
+            + two_bedroom_details
+            + three_bedroom_details
+            + four_bedroom_details
+            + sublet_details
         )
         max_results = int(source_settings.get("max_results_per_source", 120))
         room_url = self._room_url(preferences)
         unit_url = self._unit_url(preferences)
         two_bedroom_url = self._two_bedroom_url(preferences)
         three_bedroom_url = self._three_bedroom_url(preferences)
+        four_bedroom_url = self._four_bedroom_url(preferences)
         sublet_url = self._sublet_url(preferences)
         search_requests = []
+        if four_enabled:
+            search_requests.append(("four_bedroom", four_bedroom_url))
         if three_enabled:
             search_requests.append(("three_bedroom", three_bedroom_url))
         if two_enabled:
@@ -2230,6 +2257,7 @@ class CraigslistSource:
             search_requests.append(("room", room_url))
         self.search_url = search_requests[0][1]
         parsed: dict[str, list[ListingCandidate]] = {
+            "four_bedroom": [],
             "three_bedroom": [],
             "two_bedroom": [],
             "whole_unit": [],

@@ -26,6 +26,8 @@ from . import __version__
 from .connectors import GMAIL_PROVIDERS, ConnectorStatus
 from .database import Repository
 from .deal_profile import (
+    BEDROOM_PATHS,
+    SPLIT_PATHS,
     SF_NEIGHBORHOODS,
     DealProfileError,
     canonical_document,
@@ -302,8 +304,8 @@ def _prepared_facebook_split_searches(preferences: Preferences) -> list[dict[str
                 + urlencode({"query": f"{bedrooms} bedroom apartment {area}"})
             ),
         }
-        for bedrooms in (2, 3)
-        if ("two_bedroom" if bedrooms == 2 else "three_bedroom") in enabled
+        for bedrooms in (2, 3, 4)
+        if BEDROOM_PATHS[bedrooms] in enabled
         for area in areas[:5]
     ]
 
@@ -704,39 +706,44 @@ def create_app(
         if not preferences.profile_active:
             return RedirectResponse("/preferences?welcome=1", status_code=303)
         enabled_paths = set(preferences.deal_profile.enabled_paths)
-        enabled_housing_modes: list[str] = []
-        if "private_room" in enabled_paths:
-            enabled_housing_modes.append("room")
-        if enabled_paths.intersection({"studio", "one_bedroom"}):
-            enabled_housing_modes.append("whole_unit")
-        if enabled_paths.intersection({"two_bedroom", "three_bedroom"}):
-            enabled_housing_modes.append("two_bedroom")
-        requested_mode = housing if housing in {"room", "whole_unit", "two_bedroom"} else "room"
+        # One tab per home size the user actually chose, in the order a person
+        # thinks about them. Lumping "studios & 1-bedrooms" and "2-3 bedrooms"
+        # hid which size a result was, and left a fourth bedroom nowhere to go.
+        enabled_housing_modes = [
+            mode
+            for mode, path in (
+                ("room", "private_room"),
+                ("studio", "studio"),
+                ("one_bedroom", "one_bedroom"),
+                ("two_bedroom", "two_bedroom"),
+                ("three_bedroom", "three_bedroom"),
+                ("four_bedroom", "four_bedroom"),
+            )
+            if path in enabled_paths
+        ]
+        if not enabled_housing_modes:
+            enabled_housing_modes = ["room"]
+        # Older links said whole_unit or lumped the splits together; send them to
+        # the first size they actually cover rather than 404ing a bookmark.
+        legacy_modes = {
+            "whole_unit": ("studio", "one_bedroom"),
+            "two_bedroom": ("two_bedroom", "three_bedroom", "four_bedroom"),
+        }
+        requested_mode = housing
+        if requested_mode in legacy_modes:
+            requested_mode = next(
+                (mode for mode in legacy_modes[requested_mode] if mode in enabled_housing_modes),
+                enabled_housing_modes[0],
+            )
         housing_mode = requested_mode if requested_mode in enabled_housing_modes else enabled_housing_modes[0]
         housing_kind = "room" if housing_mode == "room" else "whole_unit"
-        mode_unit_types = (
-            tuple(path for path in ("two_bedroom", "three_bedroom") if path in enabled_paths)
-            if housing_mode == "two_bedroom"
-            else tuple(path for path in ("studio", "one_bedroom") if path in enabled_paths)
-            if housing_mode == "whole_unit"
-            else ()
-        )
-        selected_unit_type = (
-            unit_type
-            if (
-                housing_mode == "whole_unit"
-                and unit_type in enabled_paths.intersection({"studio", "one_bedroom"})
-            )
-            or (
-                housing_mode == "two_bedroom"
-                and unit_type in enabled_paths.intersection({"two_bedroom", "three_bedroom"})
-            )
-            else ""
-        )
+        mode_unit_types = () if housing_mode == "room" else (housing_mode,)
+        # The tab is the size now, so a separate size dropdown would only be a
+        # second way to say the same thing.
+        selected_unit_type = ""
         selected_area_priority = (
             area_priority
-            if housing_mode in {"whole_unit", "two_bedroom"}
-            and area_priority in {"dream_strong", "secondary"}
+            if housing_mode != "room" and area_priority in {"dream_strong", "secondary"}
             else ""
         )
         query_unit_type = selected_unit_type

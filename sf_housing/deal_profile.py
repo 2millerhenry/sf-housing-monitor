@@ -13,7 +13,14 @@ HOUSING_PATHS = (
     "one_bedroom",
     "two_bedroom",
     "three_bedroom",
+    "four_bedroom",
 )
+# Paths where the rent is split, so the budget is stated per person.
+SPLIT_PATHS = ("two_bedroom", "three_bedroom", "four_bedroom")
+DEFAULT_OCCUPANTS = {"two_bedroom": 2, "three_bedroom": 3, "four_bedroom": 4}
+DEFAULT_PER_PERSON = {"two_bedroom": 2700, "three_bedroom": 2500, "four_bedroom": 2300}
+BEDROOM_PATHS = {2: "two_bedroom", 3: "three_bedroom", 4: "four_bedroom"}
+
 AREA_TIERS = ("dream", "strong", "okay", "avoid")
 IMPORTANCE_LEVELS = {"must_have", "important", "nice", "ignore", "avoid"}
 
@@ -252,13 +259,14 @@ class DealProfile:
             "one_bedroom": "1-bedrooms",
             "two_bedroom": "2-bedroom splits",
             "three_bedroom": "3-bedroom splits",
+            "four_bedroom": "4-bedroom splits",
         }
         parts: list[str] = []
         for path in self.enabled_paths:
             budget = self.budgets.get(path)
             if budget is None:
                 continue
-            if path in {"two_bedroom", "three_bedroom"}:
+            if path in SPLIT_PATHS:
                 parts.append(
                     f"{labels[path]} up to ${budget.total_maximum:,} total "
                     f"(${budget.maximum_monthly:,} each for {budget.occupants})"
@@ -375,13 +383,19 @@ class DealProfile:
                         maximum_monthly=int(whole.get("max_monthly", 3000)),
                         maximum_building_units=int(whole.get("max_building_units", 50)),
                     )
-        for path in ("two_bedroom", "three_bedroom"):
-            settings = data.get(path) if isinstance(data.get(path), dict) else {}
-            if settings.get("enabled", True) is True:
+        for path in SPLIT_PATHS:
+            section = data.get(path)
+            settings = section if isinstance(section, dict) else {}
+            # The two- and three-bedroom paths predate versioned profiles, so an
+            # omitted section still means enabled. Four-bedroom did not exist
+            # then, so a profile that never mentioned it must not silently gain
+            # a fourth search: it is enabled only when explicitly present.
+            default_enabled = path in ("two_bedroom", "three_bedroom")
+            if settings.get("enabled", default_enabled) is True:
                 enabled.append(path)
                 budgets[path] = PathBudget(
-                    maximum_monthly=int(settings.get("max_per_person", 2700 if path == "two_bedroom" else 2500)),
-                    occupants=int(settings.get("occupants", 2 if path == "two_bedroom" else 3)),
+                    maximum_monthly=int(settings.get("max_per_person", DEFAULT_PER_PERSON[path])),
+                    occupants=int(settings.get("occupants", DEFAULT_OCCUPANTS[path])),
                     maximum_building_units=int(settings.get("max_building_units", 50)),
                 )
         availability = data.get("availability") if isinstance(data.get("availability"), dict) else {}
@@ -424,6 +438,7 @@ def technical_settings(data: Mapping[str, Any]) -> dict[str, Any]:
         "whole_unit",
         "two_bedroom",
         "three_bedroom",
+        "four_bedroom",
         "ideal_neighborhoods",
         "preferred_neighborhoods",
         "acceptable_neighborhoods",
@@ -517,7 +532,7 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
             "max_building_units": 50,
         }
 
-    for path in ("two_bedroom", "three_bedroom"):
+    for path in SPLIT_PATHS:
         budget = profile.budgets.get(path)
         result[path] = (
             {
@@ -529,7 +544,7 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
             if budget and path in profile.enabled_paths
             else {
                 "enabled": False,
-                "occupants": 2 if path == "two_bedroom" else 3,
+                "occupants": DEFAULT_OCCUPANTS[path],
                 "max_per_person": 1,
                 "max_building_units": 50,
             }
@@ -586,8 +601,8 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
         maximum = int(_positive_int(raw_maximum, f"{path} maximum"))
         ideal = _positive_int(value(f"{path}_ideal"), f"{path} ideal", required=False)
         occupants = (
-            int(_positive_int(value(f"{path}_occupants", 2 if path == "two_bedroom" else 3), f"{path} occupants"))
-            if path in {"two_bedroom", "three_bedroom"}
+            int(_positive_int(value(f"{path}_occupants", DEFAULT_OCCUPANTS[path]), f"{path} occupants"))
+            if path in SPLIT_PATHS
             else 1
         )
         building_limit = (
