@@ -5,6 +5,7 @@ import json
 import threading
 import time
 from collections.abc import Callable
+from typing import Any
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
@@ -179,6 +180,28 @@ class Scanner:
         if published.tzinfo is None:
             published = published.replace(tzinfo=UTC)
         return published >= (now or datetime.now(UTC)) - INITIAL_DISCOVERY_WINDOW
+
+    @staticmethod
+    def _merge_stored(
+        listing: ListingCandidate, existing: Any, stored_metadata: dict[str, Any]
+    ) -> ListingCandidate:
+        """Keep richer stored fields when a thin search card would overwrite them.
+
+        Detail pages carry more than search cards, so a later scan must not erase
+        what an earlier enrichment learned.
+        """
+        return replace(
+            listing,
+            price=listing.price if listing.price is not None else existing["price"],
+            neighborhood=listing.neighborhood or existing["neighborhood"],
+            summary=existing["summary"] or listing.summary,
+            listing_type=(
+                existing["listing_type"]
+                if existing["listing_type"] not in (None, "", "Room/share")
+                else listing.listing_type
+            ),
+            metadata={**stored_metadata, **listing.metadata},
+        )
 
     def _begin_progress(self, trigger: str, sources: list[ListingSource] | None = None) -> None:
         with self._progress_lock:
@@ -487,6 +510,13 @@ class Scanner:
                                 listing for listing in listings if self._within_initial_window(listing)
                             ]
                         detail_budget = max(0, int(source.detail_budget))
+
+                        # Pass 1: resolve stored state and score provisionally,
+                        # without touching the network. Spending the detail budget
+                        # in arrival order meant the first ten results consumed it
+                        # regardless of quality, so most homes a user actually sees
+                        # never got the posting date that lives on a detail page.
+                        prepared: list[dict[str, Any]] = []
                         for listing in listings:
                             source_seen += 1
                             total_seen += 1
@@ -508,39 +538,63 @@ class Scanner:
                                     and stored_metadata.get("craigslist_detail_checked") is not True
                                 )
                             )
-                            if (
-                                needs_details
-                                and detail_budget > 0
-                                and time.monotonic() + self.timeout_seconds <= deadline
-                            ):
-                                try:
-                                    listing = source.enrich(client, listing)
-                                except Exception as exc:  # one expired/broken detail must not lose the search result
-                                    detail_failures += 1
-                                    LOGGER.warning(
-                                        "%s detail fetch failed for %s: %s",
-                                        source.platform,
-                                        listing.original_url,
-                                        exc,
-                                    )
-                                detail_budget -= 1
-                                if self.detail_delay_seconds:
-                                    time.sleep(self.detail_delay_seconds)
-                            elif existing is not None:
-                                # Search cards are often thinner than a detail page. Preserve richer
-                                # stored fields so later scans cannot erase earlier enrichment.
-                                listing = replace(
-                                    listing,
-                                    price=listing.price if listing.price is not None else existing["price"],
-                                    neighborhood=listing.neighborhood or existing["neighborhood"],
-                                    summary=existing["summary"] or listing.summary,
-                                    listing_type=(
-                                        existing["listing_type"]
-                                        if existing["listing_type"] not in (None, "", "Room/share")
-                                        else listing.listing_type
-                                    ),
-                                    metadata={**stored_metadata, **listing.metadata},
+                            # Scored against a merged copy so an already-enriched
+                            # listing is ranked on what is actually known about it.
+                            # The raw card is what gets enriched, exactly as before.
+                            preview = (
+                                self._merge_stored(listing, existing, stored_metadata)
+                                if existing is not None
+                                else listing
+                            )
+                            try:
+                                provisional = score_listing(classify_listing(preview), preferences).score
+                            except Exception:  # scoring a thin card must never lose the listing
+                                provisional = 0
+                            prepared.append(
+                                {
+                                    "listing": listing,
+                                    "existing": existing,
+                                    "stored_metadata": stored_metadata,
+                                    "needs_details": needs_details,
+                                    "provisional": provisional,
+                                    "enriched": False,
+                                }
+                            )
+                            # Keep the progress bar moving while results are being
+                            # read, rather than jumping only when a source ends.
+                            self._update_progress(listings_seen=total_seen)
+
+                        # Pass 2: spend the budget on the best candidates that still
+                        # need a detail page. Ties keep document order, which for a
+                        # date-sorted source means the newer listing wins.
+                        chosen = sorted(
+                            (index for index, item in enumerate(prepared) if item["needs_details"]),
+                            key=lambda index: (-prepared[index]["provisional"], index),
+                        )[:detail_budget]
+                        for index in sorted(chosen):
+                            if time.monotonic() + self.timeout_seconds > deadline:
+                                break
+                            item = prepared[index]
+                            try:
+                                item["listing"] = source.enrich(client, item["listing"])
+                                item["enriched"] = True
+                            except Exception as exc:  # one expired/broken detail must not lose the search result
+                                detail_failures += 1
+                                LOGGER.warning(
+                                    "%s detail fetch failed for %s: %s",
+                                    source.platform,
+                                    item["listing"].original_url,
+                                    exc,
                                 )
+                            if self.detail_delay_seconds:
+                                time.sleep(self.detail_delay_seconds)
+
+                        # Pass 3: classify, score and store every listing.
+                        for item in prepared:
+                            listing = item["listing"]
+                            existing = item["existing"]
+                            if not item["enriched"] and existing is not None:
+                                listing = self._merge_stored(listing, existing, item["stored_metadata"])
                             listing = classify_listing(listing)
                             source_classified += 1
                             result = score_listing(listing, preferences)
