@@ -1014,6 +1014,156 @@ class ApartmentListSource:
         return listing
 
 
+class ZumperSource:
+    """Read the schema.org search feed Zumper publishes for San Francisco.
+
+    Zumper was previously listed as blocked, but it answers ordinary requests
+    and publishes a full ``SearchResultsPage`` with a bedroom count, address,
+    amenities and — unusually among the free sources — a real ``datePosted``.
+
+    What it does not publish on the search page is rent: only individual-unit
+    listings carry an offer, while apartment buildings load their price after
+    the page renders. Those buildings are enriched one at a time within the
+    scanner's detail budget, and until that happens their rent stays unknown
+    rather than being guessed at.
+    """
+
+    platform = "Zumper"
+    mode = "automatic"
+    search_url = "https://www.zumper.com/apartments-for-rent/san-francisco-ca"
+    manual_reason = None
+    detail_budget = 10
+    empty_result_message = "Zumper published no San Francisco results in its structured data."
+
+    @staticmethod
+    def _offer_price(node: object) -> int | None:
+        if not isinstance(node, dict):
+            return None
+        for key in ("price", "lowPrice"):
+            value = node.get(key)
+            if isinstance(value, (int, float)) and value > 0:
+                return int(round(value))
+        return None
+
+    @staticmethod
+    def _structured_blocks(document: str) -> list[dict]:
+        soup = BeautifulSoup(document, "html.parser")
+        blocks: list[dict] = []
+        for node in soup.select('script[type="application/ld+json"]'):
+            try:
+                parsed = json.loads(node.string or node.get_text() or "")
+            except (ValueError, json.JSONDecodeError):
+                continue
+            for entry in parsed if isinstance(parsed, list) else [parsed]:
+                if isinstance(entry, dict):
+                    blocks.append(entry)
+        return blocks
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        response = client.get(self.search_url)
+        response.raise_for_status()
+        entries: list[dict] = []
+        for block in self._structured_blocks(response.text):
+            if block.get("@type") != "SearchResultsPage":
+                continue
+            main = block.get("mainEntity")
+            if isinstance(main, dict):
+                entries = [e for e in main.get("itemListElement") or [] if isinstance(e, dict)]
+            break
+        if not entries:
+            raise SourceError(
+                "Zumper returned no structured search results; its page format may have changed."
+            )
+
+        listings: list[ListingCandidate] = []
+        for entry in entries:
+            item = entry.get("item")
+            if not isinstance(item, dict) or item.get("@type") != "RealEstateListing":
+                continue
+            url = str(item.get("url") or item.get("@id") or "").strip()
+            name = _clean_text(item.get("name"), 180)
+            if not name or not url.startswith("https://www.zumper.com/"):
+                continue
+            about = item.get("about") if isinstance(item.get("about"), dict) else {}
+            address = about.get("address") if isinstance(about.get("address"), dict) else {}
+            locality = _normal_text(address.get("addressLocality"))
+            # The feed is city-scoped, but a neighbouring city slipping in would
+            # quietly break the whole point of the search.
+            if locality and locality != "san francisco":
+                continue
+
+            street = _clean_text(address.get("streetAddress"), 160)
+            amenities = [
+                _clean_text(feature.get("name"), 48)
+                for feature in about.get("amenityFeature") or []
+                if isinstance(feature, dict) and feature.get("value") and feature.get("name")
+            ]
+            bedrooms = about.get("numberOfBedrooms")
+            pets = _clean_text(about.get("petsAllowed"), 12)
+
+            detail = [f"{name} listed on Zumper."]
+            if street:
+                detail.append(f"Address: {street}.")
+            if amenities:
+                # Amenities are scored from the listing text, so they belong in
+                # the summary rather than in a metadata key nothing reads.
+                detail.append("Amenities: " + ", ".join(amenities[:12]) + ".")
+            if pets.casefold() == "yes":
+                detail.append("Pets allowed.")
+            elif pets.casefold() == "no":
+                detail.append("No pets.")
+
+            price = self._offer_price(item.get("offers"))
+            if price is None:
+                detail.append("Rent is not published in the search feed and is still unconfirmed.")
+
+            metadata: dict[str, object] = {"address": street, "zumper_amenities": amenities}
+            if isinstance(bedrooms, (int, float, str)) and str(bedrooms).strip() != "":
+                metadata["bedrooms"] = bedrooms
+            posted = _clean_text(item.get("datePosted"), 40)
+            if posted:
+                metadata["listing_timestamp"] = posted
+
+            listings.append(
+                ListingCandidate(
+                    platform=self.platform,
+                    source_id=_source_id(url),
+                    title=name,
+                    original_url=url,
+                    price=price,
+                    neighborhood=visible_sf_area_hint(f"{name} {street}"),
+                    listing_type="Apartment rental",
+                    summary=_clean_text(" ".join(detail), 1200),
+                    metadata=metadata,
+                    housing_kind=WHOLE_UNIT,
+                )
+            )
+        return listings
+
+    def enrich(self, client: httpx.Client, listing: ListingCandidate) -> ListingCandidate:
+        """Fetch the building page only to recover a rent the search feed omitted."""
+        if listing.price:
+            return listing
+        response = client.get(listing.original_url)
+        response.raise_for_status()
+        price = None
+        for block in self._structured_blocks(response.text):
+            price = price or self._offer_price(block.get("offers"))
+        if price is None:
+            return listing
+        metadata = dict(listing.metadata)
+        metadata["zumper_price_source"] = "building page"
+        summary = listing.summary.replace(
+            " Rent is not published in the search feed and is still unconfirmed.", ""
+        )
+        return replace(
+            listing,
+            price=price,
+            summary=_clean_text(f"{summary} Rents from ${price:,} a month.", 1200),
+            metadata=metadata,
+        )
+
+
 class ApifyFacebookMarketplaceSource:
     """Optional low-volume Facebook automation that does not use a FB login."""
 
@@ -2187,12 +2337,12 @@ def default_sources(
     abacus = AbacusSource()
     spareroom = SpareRoomSource()
     sf_portal = SFHousingPortalSource()
+    zumper = ZumperSource()
     apartment_list = ApartmentListSource()
     free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
     manual_sources: list[ListingSource] = [
         ManualSource("HotPads", "https://hotpads.com/san-francisco-ca/apartments-for-rent", blocked_reason),
         ManualSource("Apartments.com", "https://www.apartments.com/san-francisco-ca/", blocked_reason),
-        ManualSource("Zumper", "https://www.zumper.com/apartments-for-rent/san-francisco-ca", blocked_reason),
         ManualSource("Roomies", "https://www.roomies.com/rooms/san-francisco-ca", blocked_reason),
     ]
     if mailbox:
@@ -2218,10 +2368,10 @@ def default_sources(
             ZillowAlertSource(mailbox),
             HotPadsAlertSource(mailbox),
             ApartmentsComAlertSource(mailbox),
-            ZumperAlertSource(mailbox),
             spareroom,
             sf_portal,
             apartment_list,
+            zumper,
             RoomiesAlertSource(mailbox),
         ]
     return [
@@ -2246,5 +2396,6 @@ def default_sources(
         spareroom,
         sf_portal,
         apartment_list,
+        zumper,
         *manual_sources[1:],
     ]

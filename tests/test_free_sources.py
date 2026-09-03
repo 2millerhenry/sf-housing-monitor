@@ -325,3 +325,129 @@ def test_two_unit_types_in_one_building_survive_storage(tmp_path: Path) -> None:
         "SELECT price FROM listings ORDER BY price"
     ).fetchall()
     assert [row[0] for row in stored] == [1626, 1847], "both homes must survive the write"
+
+
+# --------------------------------------------------------------------------
+# Zumper
+# --------------------------------------------------------------------------
+
+
+def zumper_search() -> str:
+    return (FIXTURES / "zumper_search.html").read_text(encoding="utf-8")
+
+
+def zumper_building() -> str:
+    return (FIXTURES / "zumper_building.html").read_text(encoding="utf-8")
+
+
+def test_zumper_reads_the_published_search_feed(preferences: Preferences) -> None:
+    from sf_housing.sources import ZumperSource
+
+    listings = ZumperSource().search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+
+    assert listings
+    for listing in listings:
+        assert listing.platform == "Zumper"
+        assert listing.original_url.startswith("https://www.zumper.com/")
+        assert listing.housing_kind == WHOLE_UNIT
+
+
+def test_zumper_carries_the_posting_date(preferences: Preferences) -> None:
+    """Zumper is the only free non-government source that dates its listings."""
+    from datetime import date
+
+    from sf_housing.sources import ZumperSource
+
+    listings = ZumperSource().search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+
+    stamped = [l for l in listings if l.metadata.get("listing_timestamp")]
+    assert stamped, "datePosted must survive into metadata or the first-run window cannot use it"
+    for listing in stamped:
+        date.fromisoformat(str(listing.metadata["listing_timestamp"]))
+
+
+def test_zumper_bedroom_count_drives_the_home_size(preferences: Preferences) -> None:
+    from sf_housing.classification import STUDIO, classify_listing
+    from sf_housing.sources import ZumperSource
+
+    listings = ZumperSource().search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+    studios = [l for l in listings if str(l.metadata.get("bedrooms")) == "0"]
+
+    assert studios, "the fixture keeps a zero-bedroom entry"
+    assert classify_listing(studios[0]).unit_type == STUDIO
+
+
+def test_zumper_amenities_reach_the_text_the_scorer_reads(preferences: Preferences) -> None:
+    """Amenities are matched from listing text, not from a metadata key."""
+    from sf_housing.sources import ZumperSource
+
+    listings = ZumperSource().search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+    with_amenities = [l for l in listings if l.metadata.get("zumper_amenities")]
+
+    assert with_amenities
+    listing = with_amenities[0]
+    assert "Amenities:" in listing.summary
+    assert str(listing.metadata["zumper_amenities"][0]) in listing.summary
+
+
+def test_zumper_says_when_rent_is_unknown_instead_of_inventing_one(preferences: Preferences) -> None:
+    from sf_housing.sources import ZumperSource
+
+    listings = ZumperSource().search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+    unpriced = [l for l in listings if l.price is None]
+
+    assert unpriced, "most buildings publish no rent on the search page"
+    for listing in unpriced:
+        assert "unconfirmed" in listing.summary
+
+
+def test_zumper_enrich_recovers_the_rent_from_the_building_page(preferences: Preferences) -> None:
+    from sf_housing.sources import ZumperSource
+
+    source = ZumperSource()
+    listings = source.search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+    unpriced = next(l for l in listings if l.price is None)
+
+    client = FakeClient(FakeResponse(text=zumper_building()))
+    enriched = source.enrich(client, unpriced)
+
+    assert enriched.price and enriched.price > 0
+    assert "unconfirmed" not in enriched.summary
+    assert enriched.metadata["zumper_price_source"] == "building page"
+
+
+def test_zumper_enrich_does_not_refetch_an_already_priced_listing(preferences: Preferences) -> None:
+    from sf_housing.sources import ZumperSource
+
+    source = ZumperSource()
+    listings = source.search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+    priced = next(l for l in listings if l.price)
+
+    client = FakeClient(FakeResponse(text=zumper_building()))
+    assert source.enrich(client, priced) is priced
+    assert client.requested == [], "a listing that already has a rent must cost no request"
+
+
+def test_zumper_drops_results_outside_san_francisco(preferences: Preferences) -> None:
+    import json as _json
+
+    from sf_housing.sources import ZumperSource
+
+    from bs4 import BeautifulSoup
+
+    node = BeautifulSoup(zumper_search(), "html.parser").select_one('script[type="application/ld+json"]')
+    payload = _json.loads(node.string)
+    for entry in payload["mainEntity"]["itemListElement"]:
+        entry["item"]["about"]["address"]["addressLocality"] = "Oakland"
+    moved = f'<html><head><script type="application/ld+json">{_json.dumps(payload)}</script></head></html>'
+
+    assert ZumperSource().search(FakeClient(FakeResponse(text=moved)), preferences) == []
+
+
+def test_zumper_reports_a_format_change_rather_than_going_quiet(preferences: Preferences) -> None:
+    from sf_housing.sources import ZumperSource
+
+    with pytest.raises(SourceError, match="structured search results"):
+        ZumperSource().search(
+            FakeClient(FakeResponse(text="<html><body>redesigned</body></html>")), preferences
+        )
