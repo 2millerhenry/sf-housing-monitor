@@ -45,7 +45,9 @@ def test_whole_unit_studio_is_scored_in_a_separate_search_and_labeled_clearly() 
     assert result.score >= profile.minimum_score
     assert result.details["housing_kind"] == "whole_unit"
     assert result.details["home_facts"]["primary"] == "Studio"
-    assert result.details["home_facts"]["secondary"] == ["Building size not stated"]
+    # A bathroom count joins these facts, and says n/a when nothing states one.
+    assert "Building size not stated" in result.details["home_facts"]["secondary"]
+    assert "Baths n/a" in result.details["home_facts"]["secondary"]
     assert "verify it has 50 units or fewer" in result.concern
 
 
@@ -76,7 +78,7 @@ def test_whole_unit_one_bedroom_accepts_small_known_building_and_rejects_large_o
     assert small_result.score >= profile.minimum_score
     assert small_result.details["home_facts"] == {
         "primary": "1 bedroom",
-        "secondary": ["24-unit building"],
+        "secondary": ["1 bath", "24-unit building"],
     }
     assert large_result.score < profile.minimum_score
     assert "above your 50-unit maximum" in large_result.concern
@@ -221,7 +223,7 @@ def test_two_bedroom_uses_a_two_person_split_and_hard_total_cap() -> None:
     assert match_result.details["per_person_monthly"] == 2600
     assert match_result.details["home_facts"] == {
         "primary": "2 bedrooms",
-        "secondary": ["$2,600/person for 2", "12-unit building"],
+        "secondary": ["$2,600/person for 2", "Baths n/a", "12-unit building"],
     }
     assert over_result.score < profile.minimum_score
     assert "$2,700 per person" in over_result.concern
@@ -257,7 +259,7 @@ def test_three_bedroom_uses_three_people_and_its_own_exact_cap() -> None:
     assert match_result.details["occupants"] == 3
     assert match_result.details["home_facts"] == {
         "primary": "3 bedrooms",
-        "secondary": ["$2,500/person for 3", "10-unit building"],
+        "secondary": ["$2,500/person for 3", "Baths n/a", "10-unit building"],
     }
     assert over_result.score < profile.minimum_score
     assert "$2,500 per person" in over_result.concern

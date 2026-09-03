@@ -7,6 +7,7 @@ from math import ceil
 from typing import Callable
 
 from .classification import (
+    bathrooms_from_listing,
     ONE_BEDROOM,
     STUDIO,
     THREE_BEDROOM,
@@ -1023,7 +1024,16 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         if listing.building_units is not None
         else "Building size not stated"
     )
-    secondary_facts = [building_label]
+    # Most sources never state a bathroom count. Saying so is more useful than
+    # leaving a gap the reader has to interpret.
+    bathrooms = bathrooms_from_listing(listing)
+    if bathrooms is None:
+        bath_label = "Baths n/a"
+    elif float(bathrooms).is_integer():
+        bath_label = f"{int(bathrooms)} bath" if bathrooms == 1 else f"{int(bathrooms)} baths"
+    else:
+        bath_label = f"{bathrooms:g} baths"
+    secondary_facts = [bath_label, building_label]
     if is_sublet and sublet_months is not None and sublet_term_eligible:
         secondary_facts.insert(0, f"{sublet_months}-month sublet")
     if per_person_monthly is not None:

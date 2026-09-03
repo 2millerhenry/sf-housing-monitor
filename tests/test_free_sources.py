@@ -634,3 +634,22 @@ def test_apartment_list_takes_the_area_from_the_building_coordinates(preferences
     enriched = source.enrich(FakeClient(FakeResponse(text=page)), listing)
 
     assert enriched.neighborhood, "a published map pin inside a target area should resolve"
+
+
+@pytest.mark.parametrize(
+    "zip_code,expected",
+    [
+        ("94158", "Mission Bay"),
+        ("94123", "Marina"),
+        ("94104", "Financial District"),
+        ("94110", None),   # Mission and Bernal Heights both
+        ("94114", None),   # Castro and Noe Valley both
+        ("", None),
+        ("not a zip", None),
+    ],
+)
+def test_only_unambiguous_zips_name_a_neighbourhood(zip_code: str, expected: str | None) -> None:
+    """Area carries the most weight in the score, so a wrong one costs more than none."""
+    from sf_housing.sources import sf_area_from_zip
+
+    assert sf_area_from_zip(zip_code) == expected

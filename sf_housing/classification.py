@@ -210,6 +210,37 @@ def building_units_from_listing(listing: ListingCandidate) -> int | None:
     return None
 
 
+_BATHROOM_PATTERN = re.compile(
+    r"\b(\d+(?:\.\d)?)\s*(?:full\s+)?(?:ba|bath(?:room)?s?)\b",
+    re.IGNORECASE,
+)
+
+
+def bathrooms_from_listing(listing: ListingCandidate) -> float | None:
+    """Return a stated bathroom count, or None when nothing states one.
+
+    Most sources never publish this. A guess would be worse than a blank, so
+    anything unparseable, zero, or implausibly large stays unknown and the
+    dashboard shows it as not available.
+    """
+    raw = listing.metadata.get("bathrooms")
+    if isinstance(raw, bool):
+        raw = None
+    if isinstance(raw, (int, float)):
+        return float(raw) if 0 < float(raw) <= 12 else None
+    for candidate in (raw, listing.title, listing.listing_type, listing.summary):
+        match = _BATHROOM_PATTERN.search(str(candidate or ""))
+        if not match:
+            continue
+        try:
+            value = float(match.group(1))
+        except ValueError:
+            continue
+        if 0 < value <= 12:
+            return value
+    return None
+
+
 def classify_listing(listing: ListingCandidate) -> ListingCandidate:
     """Return a copy with conservative housing, unit-type, and size facts."""
     text = _text(listing)
@@ -243,8 +274,13 @@ def classify_listing(listing: ListingCandidate) -> ListingCandidate:
         # an explicit supported bedroom count.
         housing_kind = listing.housing_kind if listing.housing_kind in {ROOM, WHOLE_UNIT} else ROOM
     building_units = listing.building_units or building_units_from_listing(listing)
+    metadata = listing.metadata
+    bathrooms = bathrooms_from_listing(listing)
+    if bathrooms is not None and metadata.get("bathrooms") != bathrooms:
+        metadata = {**metadata, "bathrooms": bathrooms}
     return replace(
         listing,
+        metadata=metadata,
         housing_kind=housing_kind,
         unit_type=unit_type,
         building_units=building_units,

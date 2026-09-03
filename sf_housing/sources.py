@@ -186,6 +186,30 @@ def declared_sf_area_hint(text: str | None) -> str | None:
     return None
 
 
+# San Francisco ZIP codes that sit essentially inside one of the canonical
+# neighbourhoods. Deliberately partial: a ZIP that straddles two areas (94110
+# covers both the Mission and Bernal Heights, 94114 the Castro and Noe Valley)
+# is left out, because a wrong neighbourhood costs more than an unknown one in a
+# score where area carries the most weight.
+_UNAMBIGUOUS_SF_ZIPS = {
+    "94104": "Financial District",
+    "94108": "Chinatown",
+    "94111": "Embarcadero",
+    "94123": "Marina",
+    "94129": "Presidio Heights",
+    "94130": "Treasure Island",
+    "94132": "Park Merced",
+    "94158": "Mission Bay",
+}
+
+
+def sf_area_from_zip(value: object) -> str | None:
+    """Return a neighbourhood only where the ZIP does not straddle two."""
+    digits = re.sub(r"\D", "", str(value or ""))[:5]
+    area = _UNAMBIGUOUS_SF_ZIPS.get(digits)
+    return area if area in SF_NEIGHBORHOODS else None
+
+
 def sf_area_from_slug(url: str | None) -> str | None:
     """Recover a neighborhood that a listing URL names in its path.
 
@@ -991,7 +1015,12 @@ class SFHousingPortalSource:
                     price=int(round(rent)),
                     # A street address is not a neighborhood; only take one the
                     # portal actually names.
-                    neighborhood=visible_sf_area_hint(f"{name} {address}"),
+                    # The portal states a street address and a ZIP but never a
+                    # neighbourhood, so take whichever of those is unambiguous.
+                    neighborhood=(
+                        visible_sf_area_hint(f"{name} {address}")
+                        or sf_area_from_zip(record.get("Building_Zip_Code"))
+                    ),
                     listing_type=raw_type,
                     summary=_clean_text(" ".join(detail), 1000),
                     metadata=metadata,
@@ -1131,6 +1160,9 @@ class ApartmentListSource:
             if isinstance(bedrooms, (int, float)):
                 metadata["bedrooms"] = int(bedrooms)
                 unit_label = "studio" if int(bedrooms) == 0 else f"{int(bedrooms)}-bedroom"
+            baths = unit.get("numberOfBathroomsTotal")
+            if isinstance(baths, (int, float)) and not isinstance(baths, bool):
+                metadata["bathrooms"] = float(baths)
             floor = unit.get("floorSize")
             if isinstance(floor, dict) and isinstance(floor.get("value"), (int, float)):
                 metadata["floor_size_sqft"] = int(floor["value"])
@@ -1267,6 +1299,9 @@ class ZumperSource:
                 detail.append("Rent is not published in the search feed and is still unconfirmed.")
 
             metadata: dict[str, object] = {"address": street, "zumper_amenities": amenities}
+            baths = about.get("numberOfBathroomsTotal")
+            if isinstance(baths, (int, float)) and not isinstance(baths, bool):
+                metadata["bathrooms"] = float(baths)
             if isinstance(bedrooms, (int, float, str)) and str(bedrooms).strip() != "":
                 metadata["bedrooms"] = bedrooms
             posted = _clean_text(item.get("datePosted"), 40)
