@@ -984,9 +984,6 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-field input:focus-visible { border-color: var(--accent); outline: 0; box-shadow: 0 0 0 3px oklch(43% 0.09 162 / 0.12); }
 .connect-form button { min-height: 44px; white-space: nowrap; }
 .connect-note { margin: 10px 0 0; max-width: 62ch; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
-.connect-promises { margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 18px; list-style: none; }
-.connect-promises li { color: var(--muted); font-size: 0.75rem; line-height: 1.45; }
-.connect-promises strong { display: block; color: var(--ink); font-size: 0.72rem; font-weight: 650; }
 .connect-actions { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 
 .connect-more { margin-top: 18px; border-top: 1px solid var(--line); }
@@ -1026,3 +1023,14 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .connect-form, .connect-more .connect-form { grid-template-columns: 1fr; }
   .connect-head { flex-direction: column; gap: 8px; }
 }
+
+/* "You already have this" reads first, so it is a quiet statement of fact
+   rather than another panel competing with the one action on the page. */
+.already { margin-top: 14px; padding: 18px 22px; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 14px; align-items: start; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--accent-soft); }
+.already-mark { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; background: var(--accent); color: var(--surface); font-size: 0.8rem; font-weight: 700; }
+.already h2 { margin: 2px 0 0; font-size: 1rem; font-weight: 680; letter-spacing: -0.012em; }
+.already-list { margin: 7px 0 0; color: var(--ink); font-size: 0.83rem; font-weight: 620; line-height: 1.5; }
+.already p:last-child { margin: 5px 0 0; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+.connect-panel > h2 { margin: 0; font-size: 1.1875rem; font-weight: 700; letter-spacing: -0.016em; }
+.connect-panel > h2 + .connect-lede { margin-top: 8px; }
+.connect-note strong { color: var(--ink); font-weight: 650; }

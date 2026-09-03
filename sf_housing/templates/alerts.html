@@ -4,24 +4,28 @@
 <section class="hero compact">
   <div>
     <p class="eyebrow">Coverage</p>
-    <h1>{% if email_connected or gmail_connected %}Your coverage{% else %}Add more listings{% endif %}</h1>
-    <p class="subtle">Craigslist, the SF housing portal, Zumper, SpareRoom, Listings Project and Abacus are already running. Nothing on this page is required.</p>
+    <h1>{% if email_connected or gmail_connected %}Your coverage{% else %}What you get, and what you can add{% endif %}</h1>
   </div>
 </section>
 
 {% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
 {% if error %}<div class="notice error" role="alert" tabindex="-1">{{ error }}</div>{% endif %}
 
-<section class="connect-panel" aria-labelledby="gmail-title">
-  <header class="connect-head">
-    <div>
-      <p class="eyebrow">Saved-search alerts</p>
-      <h2 id="gmail-title">Email listings</h2>
-    </div>
-    <span class="connector-state {{ gmail_state.state if gmail_state else 'not_configured' }}">{{ gmail_state.label if gmail_state else 'Optional' }}</span>
-  </header>
+<section class="already" aria-labelledby="already-title">
+  <div class="already-mark" aria-hidden="true">✓</div>
+  <div>
+    <h2 id="already-title">Six sources already work</h2>
+    <p class="already-list">Craigslist · SF Housing Portal · Zumper · SpareRoom · Listings Project · Abacus</p>
+    <p>They run on their own twice a day. No account, no setup, nothing on this page is required.</p>
+  </div>
+</section>
 
+<section class="connect-panel" aria-labelledby="gmail-title">
   {% if email_connected or gmail_connected %}
+    <header class="connect-head">
+      <div><h2 id="gmail-title">Email listings</h2></div>
+      <span class="connector-state {{ gmail_state.state if gmail_state else 'not_configured' }}">{{ gmail_state.label if gmail_state else 'Optional' }}</span>
+    </header>
     <p class="connect-lede">
       {% if email_connected %}Reading alert email from <strong>{{ email_address }}</strong>.
       {% else %}Connected with Google sign-in.{% endif %}
@@ -48,7 +52,8 @@
       {% endfor %}
     </div>
   {% else %}
-    <p class="connect-lede">One account turns on {{ email_providers|join(', ') }}. It reads only their alert messages and never sends anything.</p>
+    <h2 id="gmail-title">Want more? Connect your email</h2>
+    <p class="connect-lede">{{ email_providers|join(', ') }} never let an app check them directly. They only send new listings to you by email, so connecting one account is the single way to get them, and it turns on all {{ email_providers|length }} at once.</p>
     <form class="connect-form" method="post" action="/alerts/email/connect">
       <label class="connect-field">
         <span>Email address</span>
@@ -60,25 +65,18 @@
       </label>
       <button class="primary" type="submit">Connect</button>
     </form>
-    <p class="connect-note">Not your normal password. Your mail provider generates it for one app, and you can revoke it on its own.</p>
-    <ul class="connect-promises">
-      <li><strong>Read-only</strong> Messages are opened without being marked as read.</li>
-      <li><strong>Narrow searches</strong> Only known housing-alert senders are queried.</li>
-      <li><strong>Stays local</strong> The password never leaves this computer.</li>
-    </ul>
+    <p class="connect-note"><strong>Read-only.</strong> Narrow searches: only known housing-alert senders are ever queried. Stays local: the password never leaves this computer, and it is not your normal password.</p>
     <div class="connect-more">
       <details>
-        <summary>How to get an app password</summary>
+        <summary>How do I get an app password?</summary>
+        <p>Your mail provider makes a 16-character code for one app. It only opens mail, and you can revoke it on its own.</p>
         <ul>
           <li><strong>Gmail</strong> Turn on 2-Step Verification, then create an app password under Google Account &rsaquo; Security.</li>
           <li><strong>iCloud</strong> Turn on two-factor authentication, then generate an app-specific password in your Apple Account.</li>
           <li><strong>Fastmail, Yahoo, AOL</strong> Create an app password in the account security section.</li>
           <li><strong>Outlook.com, Hotmail</strong> Not supported. Microsoft no longer allows app passwords for mail.</li>
         </ul>
-      </details>
-      <details>
-        <summary>Another mail provider</summary>
-        <p>Gmail, iCloud, Fastmail, Yahoo and AOL are recognised automatically. For anything else, give the server address too.</p>
+        <p>Gmail, iCloud, Fastmail, Yahoo and AOL are recognised automatically. For any other provider, add the mail server too:</p>
         <form class="connect-form" method="post" action="/alerts/email/connect">
           <label class="connect-field"><span>Email address</span><input type="email" name="address" required autocomplete="username"></label>
           <label class="connect-field"><span>App password</span><input type="password" name="password" required autocomplete="off"></label>
@@ -87,9 +85,23 @@
         </form>
       </details>
       <details>
-        <summary>Advanced: sign in with Google instead</summary>
+        <summary>After connecting: turn the alert emails on</summary>
+        <p>These sites only email you once you save a search with alerts enabled. Prepared searches, using the budgets from Your deal:</p>
+        <div class="provider-ledger">
+          <section><h3>Zillow</h3><p>Open each prepared search, save it, and choose Instant email.</p><ul>
+            {% for search in zillow_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open prepared {{ search.name }} search</a></li>{% endfor %}
+            {% for search in zillow_unit_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} studio and 1-bedroom search</a></li>{% endfor %}
+            {% for search in zillow_split_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} {{ search.bedrooms }}-bedroom split search</a></li>{% endfor %}
+          </ul></section>
+          <section><h3>HotPads and Apartments.com</h3><p>Save separate studio/1-bedroom, exact 2-bedroom, and exact 3-bedroom SF searches using the maximums from Your deal, then enable email alerts.</p></section>
+          <section><h3>Roomies</h3><p>Turn on Realtime or Daily Listing Alerts for your SF room search. Only stable individual listing links import.</p></section>
+          <section><h3>Facebook email fallback</h3><p>Use Facebook's own Notify Me action for the prepared searches. No Facebook password or cookies are stored.</p><p>{% for search in facebook_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} ({{ search.bedrooms }}BR)</a>{% if not loop.last %} · {% endif %}{% endfor %}</p></section>
+        </div>
+      </details>
+      <details>
+        <summary>My account can&rsquo;t make app passwords</summary>
         {% if has_client_secret %}
-          <p>Use this if your account cannot create app passwords, such as one on Google&rsquo;s Advanced Protection.</p>
+          <p>Sign in with Google instead. Use this if your account is on Google&rsquo;s Advanced Protection, or your workplace blocks app passwords.</p>
           <a class="button" href="/alerts/gmail/connect">Connect Gmail read-only</a>
         {% else %}
           <div class="gmail-owner-setup">
@@ -103,25 +115,12 @@
           </div>
         {% endif %}
       </details>
-      <details>
-        <summary>Turn on the alerts themselves</summary>
-        <div class="provider-ledger">
-          <section><h3>Zillow</h3><p>Open each prepared search, save it, and choose Instant email.</p><ul>
-            {% for search in zillow_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open prepared {{ search.name }} search</a></li>{% endfor %}
-            {% for search in zillow_unit_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} studio and 1-bedroom search</a></li>{% endfor %}
-            {% for search in zillow_split_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} {{ search.bedrooms }}-bedroom split search</a></li>{% endfor %}
-          </ul></section>
-          <section><h3>HotPads, Apartments.com, and Zumper</h3><p>Save separate studio/1-bedroom, exact 2-bedroom, and exact 3-bedroom SF searches using the maximums from Your deal, then enable email alerts.</p></section>
-          <section><h3>Roomies</h3><p>Turn on Realtime or Daily Listing Alerts for your SF room search. Only stable individual listing links import.</p></section>
-          <section><h3>Facebook email fallback</h3><p>Use Facebook's own Notify Me action for the prepared searches. No Facebook password or cookies are stored.</p><p>{% for search in facebook_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} ({{ search.bedrooms }}BR)</a>{% if not loop.last %} · {% endif %}{% endfor %}</p></section>
-        </div>
-      </details>
     </div>
   {% endif %}
 </section>
 
 <section class="extras" aria-labelledby="extras-title">
-  <h2 id="extras-title" class="extras-title">Also available</h2>
+  <h2 id="extras-title" class="extras-title">Two more, only if you want them</h2>
 
   <details class="extra">
     <summary>

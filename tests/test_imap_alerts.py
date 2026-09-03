@@ -462,8 +462,10 @@ def test_the_alerts_page_asks_for_a_password_not_a_cloud_project(tmp_path: Path,
     assert page.status_code == 200
     assert 'action="/alerts/email/connect"' in page.text
     assert "App password" in page.text
-    # Google Cloud must not be the first thing a stranger is asked for.
-    assert page.text.index("App password") < page.text.index("sign in with Google")
+    # Google Cloud must not be the first thing a stranger is asked for, and the
+    # page must lead with what already works rather than with a setup request.
+    assert page.text.index("Six sources already work") < page.text.index("App password")
+    assert page.text.index("App password") < page.text.index("can&rsquo;t make app passwords")
 
 
 def test_the_password_is_never_echoed_back_to_the_page(tmp_path: Path, monkeypatch) -> None:

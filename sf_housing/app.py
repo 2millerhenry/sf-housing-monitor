@@ -1281,7 +1281,18 @@ def create_app(
                     imap_mailbox.credential.address if imap_mailbox.is_connected else ""
                 ),
                 "email_backend": mailbox.backend,
-                "email_providers": [name for _, name in GMAIL_PROVIDERS],
+                # Zumper is checked directly now, so promising that email adds
+                # it would be a lie. Derive the list from what is actually still
+                # email-only rather than from the connector-key constant.
+                "email_providers": [
+                    name
+                    for _, name in GMAIL_PROVIDERS
+                    if name not in {
+                        source.platform
+                        for source in active_sources
+                        if getattr(source, "mode", "") == "automatic"
+                    }
+                ],
                 "apify_state": connector_states.get("apify"),
                 "furnished_finder_state": connector_states.get("furnished_finder"),
                 "bridge_version": FURNISHED_FINDER_BRIDGE_VERSION,
