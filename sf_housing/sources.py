@@ -62,8 +62,14 @@ def _craigslist_bedroom_count(text: str | None) -> int | None:
     return {"one": 1, "two": 2, "three": 3}.get(str(match.group("word")).casefold())
 
 
-def _clean_text(value: str | None, limit: int | None = None) -> str:
-    text = re.sub(r"\s+", " ", value or "").strip()
+def _clean_text(value: object, limit: int | None = None) -> str:
+    # Structured data legitimately publishes booleans and numbers where earlier
+    # pages published strings -- Apartment List sends petsAllowed as "Yes" on
+    # some buildings and as true on others. A source must not lose its whole
+    # detail fetch to that. Falsy values keep their long-standing empty result.
+    if not isinstance(value, str):
+        value = "" if not value else str(value)
+    text = re.sub(r"\s+", " ", value).strip()
     if limit and len(text) > limit:
         return text[: limit - 1].rstrip() + "…"
     return text
@@ -787,6 +793,48 @@ class AbacusSource:
         )
 
 
+def _pets_allowed(value: object) -> bool | None:
+    """schema.org petsAllowed arrives as a boolean or as Yes/No text."""
+    if isinstance(value, bool):
+        return value
+    text = str(value or "").strip().casefold()
+    if text in {"yes", "true"}:
+        return True
+    if text in {"no", "false"}:
+        return False
+    return None
+
+
+def _json_ld_blocks(document: str) -> list[dict]:
+    """Every schema.org object on a page, flattened out of its script tags."""
+    soup = BeautifulSoup(document, "html.parser")
+    blocks: list[dict] = []
+    for node in soup.select('script[type="application/ld+json"]'):
+        try:
+            parsed = json.loads(node.string or node.get_text() or "")
+        except (ValueError, json.JSONDecodeError):
+            continue
+        for entry in parsed if isinstance(parsed, list) else [parsed]:
+            if isinstance(entry, dict):
+                blocks.append(entry)
+    return blocks
+
+
+def _schema_types(node: dict) -> set[str]:
+    raw = node.get("@type")
+    return {str(value) for value in (raw if isinstance(raw, list) else [raw]) if value}
+
+
+def _offer_price(node: object, key: str = "lowPrice") -> int | None:
+    if not isinstance(node, dict):
+        return None
+    for candidate in (key, "price", "lowPrice"):
+        value = node.get(candidate)
+        if isinstance(value, (int, float)) and value > 0:
+            return int(round(value))
+    return None
+
+
 class SFHousingPortalSource:
     """Read the City of San Francisco's own below-market-rate rental portal.
 
@@ -936,37 +984,31 @@ class SFHousingPortalSource:
 class ApartmentListSource:
     """Read Apartment List's published schema.org data for San Francisco.
 
-    The search feed describes whole buildings rather than individual units, so
-    these candidates carry a starting rent and no unit mix. That is deliberately
-    left unknown instead of guessed: the dashboard labels an unknown unit type
-    for review rather than promoting it into a shortlist it may not belong in.
+    The search feed is deliberately thin: a name, a link, an image and a price
+    range, with no bedroom count and no address. On its own that is not enough
+    to place a building in any of the three shortlists, so each result is
+    completed from its own page, which publishes one ``Apartment`` block per
+    unit type along with the building's address, amenities, unit count and a
+    last-modified date.
+
+    A building is represented by its cheapest available unit, because that is
+    the one that decides whether the building is worth opening at all. The
+    other unit types are named in the summary so nothing is hidden.
     """
 
     platform = "Apartment List"
     mode = "automatic"
     search_url = "https://www.apartmentlist.com/ca/san-francisco"
     manual_reason = None
-    detail_budget = 0
+    # The search feed cannot classify a building on its own, so these are worth
+    # completing generously; the scanner still stops at its own deadline.
+    detail_budget = 20
     empty_result_message = "Apartment List published no San Francisco buildings in its structured data."
-
-    @staticmethod
-    def _products(document: str) -> list[dict]:
-        soup = BeautifulSoup(document, "html.parser")
-        products: list[dict] = []
-        for node in soup.select('script[type="application/ld+json"]'):
-            try:
-                parsed = json.loads(node.string or node.get_text() or "")
-            except (ValueError, json.JSONDecodeError):
-                continue
-            for entry in parsed if isinstance(parsed, list) else [parsed]:
-                if isinstance(entry, dict) and entry.get("@type") == "Product":
-                    products.append(entry)
-        return products
 
     def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
         response = client.get(self.search_url)
         response.raise_for_status()
-        products = self._products(response.text)
+        products = [block for block in _json_ld_blocks(response.text) if "Product" in _schema_types(block)]
         if not products:
             raise SourceError(
                 "Apartment List returned no structured building data; its page format may have changed."
@@ -974,20 +1016,18 @@ class ApartmentListSource:
         listings: list[ListingCandidate] = []
         for product in products:
             name = _clean_text(product.get("name"), 180)
-            url = str(product.get("url") or "").strip()
-            if not name or not url.startswith("https://"):
+            url = str(product.get("url") or product.get("@id") or "").strip()
+            if not name or not url.startswith("https://www.apartmentlist.com/"):
                 continue
-            offers = product.get("offers")
-            offers = offers if isinstance(offers, dict) else {}
-            low = offers.get("lowPrice")
-            high = offers.get("highPrice")
-            price = int(round(low)) if isinstance(low, (int, float)) and low > 0 else None
-            detail = [f"Apartment building listed by Apartment List."]
-            if price and isinstance(high, (int, float)) and high > price:
+            offers = product.get("offers") if isinstance(product.get("offers"), dict) else {}
+            price = _offer_price(offers)
+            high = offers.get("highPrice") if isinstance(offers.get("highPrice"), (int, float)) else None
+            detail = [f"{name} on Apartment List."]
+            if price and high and high > price:
                 detail.append(f"Published rents run from ${price:,} to ${int(round(high)):,} a month.")
             elif price:
                 detail.append(f"Published rent from ${price:,} a month.")
-            detail.append("The search feed does not publish the unit mix, so the home size is unconfirmed.")
+            detail.append("Home size is unconfirmed until this building's own page is read.")
             listings.append(
                 ListingCandidate(
                     platform=self.platform,
@@ -997,21 +1037,123 @@ class ApartmentListSource:
                     price=price,
                     neighborhood=visible_sf_area_hint(name),
                     listing_type="Apartment building",
-                    summary=_clean_text(" ".join(detail), 600),
+                    summary=_clean_text(" ".join(detail), 700),
                     metadata={
                         "building_listing": True,
                         "price_low": price,
-                        "price_high": int(round(high)) if isinstance(high, (int, float)) else None,
+                        "price_high": int(round(high)) if high else None,
                     },
-                    # The feed never says how many bedrooms, so the workflow this
-                    # belongs to stays genuinely unknown.
-                    housing_kind=UNKNOWN,
+                    # Apartment List rents whole apartments, never a room in
+                    # someone's home, so the workflow is known even when the
+                    # number of bedrooms is not.
+                    housing_kind=WHOLE_UNIT,
                 )
             )
         return listings
 
+    @staticmethod
+    def _representative_unit(blocks: list[dict]) -> tuple[dict, int | None] | None:
+        """The unit that decides whether this building is worth opening.
+
+        A priced home wins, cheapest first. Smaller buildings often publish
+        their unit mix with no rents at all; rather than leave those
+        unclassified and invisible, the smallest home stands in and the
+        building's own starting rent is kept.
+        """
+        units = [block for block in blocks if "Apartment" in _schema_types(block)]
+        priced = [
+            (unit, price)
+            for unit, price in ((unit, _offer_price(unit.get("offers"))) for unit in units)
+            if price is not None
+        ]
+        if priced:
+            return min(priced, key=lambda pair: pair[1])
+        sized = [unit for unit in units if isinstance(unit.get("numberOfBedrooms"), (int, float))]
+        if sized:
+            return min(sized, key=lambda unit: unit["numberOfBedrooms"]), None
+        return None
+
     def enrich(self, client: httpx.Client, listing: ListingCandidate) -> ListingCandidate:
-        return listing
+        """Complete a building from its own page: size, address, date, amenities."""
+        response = client.get(listing.original_url)
+        response.raise_for_status()
+        blocks = _json_ld_blocks(response.text)
+        complexes = [b for b in blocks if "ApartmentComplex" in _schema_types(b)]
+        building = complexes[0] if complexes else {}
+
+        metadata = dict(listing.metadata)
+        detail = [f"{listing.title} on Apartment List."]
+
+        address = building.get("address") if isinstance(building.get("address"), dict) else {}
+        street = _clean_text(address.get("streetAddress"), 160)
+        if street:
+            metadata["address"] = street
+            detail.append(f"Address: {street}.")
+
+        # The <=50-unit rule needs a real count; an unknown one stays unknown.
+        units = building.get("numberOfAvailableAccommodationUnits")
+        building_units = None
+        if isinstance(units, dict) and isinstance(units.get("value"), (int, float)):
+            building_units = int(units["value"])
+        elif isinstance(units, (int, float)):
+            building_units = int(units)
+
+        representative = self._representative_unit(blocks)
+        price = listing.price
+        unit_label = ""
+        if representative is not None:
+            unit, unit_price = representative
+            price = unit_price or listing.price
+            bedrooms = unit.get("numberOfBedrooms")
+            if isinstance(bedrooms, (int, float)):
+                metadata["bedrooms"] = int(bedrooms)
+                unit_label = "studio" if int(bedrooms) == 0 else f"{int(bedrooms)}-bedroom"
+            floor = unit.get("floorSize")
+            if isinstance(floor, dict) and isinstance(floor.get("value"), (int, float)):
+                metadata["floor_size_sqft"] = int(floor["value"])
+            if unit_price and unit_label:
+                detail.append(f"Cheapest available home is a {unit_label} from ${unit_price:,} a month.")
+            elif unit_price:
+                detail.append(f"Cheapest available home is from ${unit_price:,} a month.")
+            elif unit_label:
+                detail.append(
+                    f"Smallest home listed is a {unit_label}; this building publishes no rent per home."
+                )
+
+        other = sorted(
+            {
+                _clean_text(block.get("name"), 60).split(" - ")[-1]
+                for block in blocks
+                if "Apartment" in _schema_types(block) and block.get("name")
+            }
+        )
+        if len(other) > 1:
+            detail.append("This building also lists: " + ", ".join(other) + ".")
+
+        amenities = [
+            _clean_text(feature.get("name"), 48)
+            for feature in building.get("amenityFeature") or []
+            if isinstance(feature, dict) and feature.get("name")
+        ]
+        if amenities:
+            detail.append("Amenities: " + ", ".join(amenities[:12]) + ".")
+        if _pets_allowed(building.get("petsAllowed")) is True:
+            detail.append("Pets allowed.")
+
+        for block in blocks:
+            if block.get("@type") == "WebPage" and block.get("dateModified"):
+                metadata["listing_timestamp"] = _clean_text(block["dateModified"], 40)
+                break
+
+        return replace(
+            listing,
+            price=price or listing.price,
+            neighborhood=listing.neighborhood or visible_sf_area_hint(f"{listing.title} {street}"),
+            listing_type=f"{unit_label.capitalize()} apartment" if unit_label else listing.listing_type,
+            summary=_clean_text(" ".join(detail), 1200),
+            building_units=building_units,
+            metadata=metadata,
+        )
 
 
 class ZumperSource:
@@ -1035,35 +1177,11 @@ class ZumperSource:
     detail_budget = 10
     empty_result_message = "Zumper published no San Francisco results in its structured data."
 
-    @staticmethod
-    def _offer_price(node: object) -> int | None:
-        if not isinstance(node, dict):
-            return None
-        for key in ("price", "lowPrice"):
-            value = node.get(key)
-            if isinstance(value, (int, float)) and value > 0:
-                return int(round(value))
-        return None
-
-    @staticmethod
-    def _structured_blocks(document: str) -> list[dict]:
-        soup = BeautifulSoup(document, "html.parser")
-        blocks: list[dict] = []
-        for node in soup.select('script[type="application/ld+json"]'):
-            try:
-                parsed = json.loads(node.string or node.get_text() or "")
-            except (ValueError, json.JSONDecodeError):
-                continue
-            for entry in parsed if isinstance(parsed, list) else [parsed]:
-                if isinstance(entry, dict):
-                    blocks.append(entry)
-        return blocks
-
     def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
         response = client.get(self.search_url)
         response.raise_for_status()
         entries: list[dict] = []
-        for block in self._structured_blocks(response.text):
+        for block in _json_ld_blocks(response.text):
             if block.get("@type") != "SearchResultsPage":
                 continue
             main = block.get("mainEntity")
@@ -1099,7 +1217,7 @@ class ZumperSource:
                 if isinstance(feature, dict) and feature.get("value") and feature.get("name")
             ]
             bedrooms = about.get("numberOfBedrooms")
-            pets = _clean_text(about.get("petsAllowed"), 12)
+            pets = _pets_allowed(about.get("petsAllowed"))
 
             detail = [f"{name} listed on Zumper."]
             if street:
@@ -1108,12 +1226,12 @@ class ZumperSource:
                 # Amenities are scored from the listing text, so they belong in
                 # the summary rather than in a metadata key nothing reads.
                 detail.append("Amenities: " + ", ".join(amenities[:12]) + ".")
-            if pets.casefold() == "yes":
+            if pets is True:
                 detail.append("Pets allowed.")
-            elif pets.casefold() == "no":
+            elif pets is False:
                 detail.append("No pets.")
 
-            price = self._offer_price(item.get("offers"))
+            price = _offer_price(item.get("offers"))
             if price is None:
                 detail.append("Rent is not published in the search feed and is still unconfirmed.")
 
@@ -1147,8 +1265,8 @@ class ZumperSource:
         response = client.get(listing.original_url)
         response.raise_for_status()
         price = None
-        for block in self._structured_blocks(response.text):
-            price = price or self._offer_price(block.get("offers"))
+        for block in _json_ld_blocks(response.text):
+            price = price or _offer_price(block.get("offers"))
         if price is None:
             return listing
         metadata = dict(listing.metadata)

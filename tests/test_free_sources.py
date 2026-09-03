@@ -8,6 +8,7 @@ real schema.org block.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -208,16 +209,21 @@ def test_apartment_list_reads_buildings_and_starting_rent(preferences: Preferenc
         assert listing.metadata["building_listing"] is True
 
 
-def test_apartment_list_never_guesses_the_home_size(preferences: Preferences) -> None:
-    """The feed publishes no unit mix, so the workflow must stay unknown."""
+def test_apartment_list_knows_the_workflow_but_not_yet_the_size(preferences: Preferences) -> None:
+    """Apartment List rents whole apartments, never a room in someone's home.
+
+    So the workflow is known from the search feed, while the bedroom count -
+    which decides *which* shortlist a building belongs in - stays unknown until
+    the building's own page is read.
+    """
     listings = ApartmentListSource().search(
         FakeClient(FakeResponse(text=apartment_list_document())), preferences
     )
 
     assert listings
     for listing in listings:
-        assert listing.housing_kind == UNKNOWN
-        assert "unit_type" not in listing.metadata
+        assert listing.housing_kind == WHOLE_UNIT
+        assert "bedrooms" not in listing.metadata
         assert "unconfirmed" in listing.summary
 
 
@@ -451,3 +457,128 @@ def test_zumper_reports_a_format_change_rather_than_going_quiet(preferences: Pre
         ZumperSource().search(
             FakeClient(FakeResponse(text="<html><body>redesigned</body></html>")), preferences
         )
+
+
+def apartment_list_building() -> str:
+    return (FIXTURES / "apartment_list_building.html").read_text(encoding="utf-8")
+
+
+def test_apartment_list_enrich_completes_the_building(preferences: Preferences) -> None:
+    """The search feed alone cannot place a building in a shortlist; the page can."""
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+    assert "bedrooms" not in listing.metadata
+
+    enriched = source.enrich(FakeClient(FakeResponse(text=apartment_list_building())), listing)
+
+    assert "bedrooms" in enriched.metadata, "the bedroom count is what decides the shortlist"
+    assert enriched.building_units, "the 50-unit rule needs a real count"
+    assert enriched.metadata.get("address")
+    assert "unconfirmed" not in enriched.summary
+
+
+def test_apartment_list_enrich_picks_the_cheapest_available_home(preferences: Preferences) -> None:
+    """A building's cheapest unit decides whether it is worth opening at all."""
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+
+    enriched = source.enrich(FakeClient(FakeResponse(text=apartment_list_building())), listing)
+
+    document = apartment_list_building()
+    prices = [int(p) for p in re.findall(r'"lowPrice":\s*(\d+)', document)]
+    assert enriched.price == min(prices), "the cheapest published rent must win"
+    assert "Cheapest available home" in enriched.summary
+
+
+def test_apartment_list_enrich_names_the_other_unit_types(preferences: Preferences) -> None:
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+
+    enriched = source.enrich(FakeClient(FakeResponse(text=apartment_list_building())), listing)
+
+    assert "also lists" in enriched.summary, "a building's other sizes must not be hidden"
+
+
+def test_apartment_list_enriched_listing_reaches_a_real_shortlist(preferences: Preferences) -> None:
+    """The whole point: an enriched building must classify into a workflow."""
+    from sf_housing.classification import classify_listing
+
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+    enriched = source.enrich(FakeClient(FakeResponse(text=apartment_list_building())), listing)
+
+    classified = classify_listing(enriched)
+    assert classified.housing_kind == WHOLE_UNIT
+    assert classified.unit_type in {"studio", "one_bedroom", "two_bedroom", "three_bedroom"}
+
+
+def test_apartment_list_enrich_survives_a_page_with_nothing_useful(preferences: Preferences) -> None:
+    """A redesigned building page must degrade, not crash the whole scan."""
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+
+    enriched = source.enrich(FakeClient(FakeResponse(text="<html><body>nothing</body></html>")), listing)
+
+    assert enriched.price == listing.price
+    assert enriched.building_units is None
+    assert "bedrooms" not in enriched.metadata
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [("  spaced   out ", "spaced out"), (None, ""), (False, ""), (0, ""), (True, "True"), (48, "48")],
+)
+def test_clean_text_survives_non_string_structured_data(value: object, expected: str) -> None:
+    """A page publishing `true` where others publish "Yes" cost 16 of 20 detail fetches."""
+    from sf_housing.sources import _clean_text
+
+    assert _clean_text(value) == expected
+
+
+@pytest.mark.parametrize(
+    "value,expected",
+    [(True, True), (False, False), ("Yes", True), ("No", False), ("yes", True), (None, None), ("", None)],
+)
+def test_pets_allowed_reads_both_shapes(value: object, expected: bool | None) -> None:
+    from sf_housing.sources import _pets_allowed
+
+    assert _pets_allowed(value) is expected
+
+
+def test_apartment_list_enrich_handles_a_boolean_pets_flag(preferences: Preferences) -> None:
+    """Regression for the crash that lost most Apartment List detail fetches."""
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+    page = (
+        '<html><head><script type="application/ld+json">'
+        '{"@type":["RealEstateListing","ApartmentComplex"],"name":"B",'
+        '"petsAllowed":true,"address":{"streetAddress":"1 Test St"},'
+        '"numberOfAvailableAccommodationUnits":{"value":12}}'
+        "</script></head></html>"
+    )
+
+    enriched = source.enrich(FakeClient(FakeResponse(text=page)), listing)
+
+    assert enriched.building_units == 12
+    assert "Pets allowed." in enriched.summary
+
+
+def test_apartment_list_classifies_a_building_that_publishes_no_unit_rents(
+    preferences: Preferences,
+) -> None:
+    """Smaller buildings list their unit mix with no prices; still classify them."""
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+    page = (
+        '<html><head><script type="application/ld+json">'
+        '[{"@type":["RealEstateListing","ApartmentComplex"],"name":"Small Building"},'
+        '{"@type":["Apartment","Residence"],"name":"Junior 1 Bedroom","numberOfBedrooms":1},'
+        '{"@type":["Apartment","Residence"],"name":"Efficiency","numberOfBedrooms":0}]'
+        "</script></head></html>"
+    )
+
+    enriched = source.enrich(FakeClient(FakeResponse(text=page)), listing)
+
+    assert enriched.metadata["bedrooms"] == 0, "the smallest home should stand in"
+    assert enriched.price == listing.price, "the building's own starting rent must survive"
+    assert "publishes no rent per home" in enriched.summary

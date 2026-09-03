@@ -106,7 +106,7 @@ launchctl print gui/$(id -u)/com.sfhousing.monitor
 | Abacus (small buildings) | Automatic | The public San Francisco availability feed, preserving the manager's Apply Now route. Building size stays unknown unless stated. |
 | SpareRoom | Automatic | Public SF result cards: price, area, type, and short description. |
 | SF Housing Portal | Automatic | The city's own below-market-rate portal (DAHLIA) over its public JSON API. No key, no scraping — one entry per unit type, with real rents and application deadlines. |
-| Apartment List | Automatic | Published schema.org data for SF buildings. It gives a name, a link and a starting rent but no bedroom count, so these stay unclassified and appear only under **All stored**, not in the three shortlists. |
+| Apartment List | Automatic | Published schema.org data for SF buildings. The search feed carries no bedroom count, so each building is completed from its own page for size, address, amenities and unit count. Where a building publishes no rent per home, its smallest home stands in and the building's starting rent is kept. |
 | Zumper | Automatic | Its published schema.org search feed: bedroom count, address, amenities and a real posting date. Most buildings publish no rent on the search page, so a bounded number are enriched from their building page and the rest stay marked unconfirmed. |
 | Zillow | After one-time setup | Your own saved-search emails, imported locally after a read-only Gmail connection in **Alerts**. |
 | HotPads | After one-time setup | Official saved-search emails through the same read-only Gmail connection. |
