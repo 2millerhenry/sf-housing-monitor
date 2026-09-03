@@ -427,19 +427,28 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .terms-note { margin-top: 14px; }
 
 .deal-form { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-low); overflow: hidden; }
-.deal-section { display: grid; grid-template-columns: minmax(250px, 0.78fr) minmax(0, 1.22fr); gap: 42px; padding: 30px; border-bottom: 1px solid var(--line); }
-.deal-section-copy { display: flex; align-items: flex-start; gap: 13px; }
-.deal-section > :not(.deal-section-copy) { grid-column: 2; min-width: 0; }
+.deal-section { padding: 26px 30px 30px; border-bottom: 1px solid var(--line); }
+/* The copy rail used to take 40% of every section to hold three lines of text
+   beside a very tall control column. A full-width header returns that space to
+   the controls, which is where the work actually happens. */
+.deal-section-head { margin: 0 0 18px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 4px 13px; align-items: center; }
+.deal-section-head .step-number { grid-row: span 2; align-self: start; margin-top: 1px; }
+.deal-section-head p { grid-column: 2; margin: 0; max-width: 68ch; color: var(--muted); font-size: 0.84rem; line-height: 1.5; }
 .step-number { flex: 0 0 auto; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 9px; background: var(--surface-muted); color: var(--accent); font-size: 0.74rem; font-weight: 760; }
-.deal-section h2 { margin: 2px 0 7px; font-size: 1.03rem; letter-spacing: -0.012em; }
-.deal-section-copy p { margin: 0; color: var(--muted); line-height: 1.5; font-size: 0.86rem; }
+.deal-section h2 { grid-column: 2; margin: 0; font-size: 1.0625rem; font-weight: 680; letter-spacing: -0.014em; }
 .field-grid { display: grid; gap: 13px; }
+.field-row { display: grid; gap: 13px 14px; margin-top: 12px; }
+.field-row.two-up { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.field-row.three-up { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.field-row label { display: grid; gap: 6px; min-width: 0; color: var(--muted); font-size: 0.73rem; font-weight: 660; }
+.field-row select, .field-row input { min-height: 43px; width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 10px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 620; }
+.field-row select:focus-visible, .field-row input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .budget-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .field-grid label, .area-fields label, .threshold-control label { display: grid; gap: 6px; color: var(--muted); font-size: 0.73rem; font-weight: 660; }
 .money-field, .suffix-field { min-height: 43px; display: flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface); overflow: hidden; }
 .money-field > span, .suffix-field > span { color: var(--muted); font-weight: 550; }
 .money-field > span { padding-left: 11px; }
-.money-field input, .suffix-field input, .threshold-control input { min-width: 0; width: 100%; border: 0; outline: 0; padding: 9px 9px; background: transparent; color: var(--ink); font-weight: 620; }
+.money-field input, .suffix-field input, .threshold-control input { min-width: 0; width: 100%; border: 0; outline: 0; padding: 9px 9px; background: transparent; color: var(--ink); font-weight: 620; font-variant-numeric: tabular-nums; }
 .suffix-field > span { padding-right: 10px; font-size: 0.75rem; }
 .money-field:focus-within, .suffix-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px oklch(43% 0.09 162 / 0.12); }
 .area-fields { display: grid; gap: 13px; }
@@ -471,21 +480,35 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .onboarding-intro strong { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--accent-line); border-radius: 999px; background: var(--accent-soft); color: var(--accent-hover); font-size: 0.68rem; }
 .choice-fieldset, .preference-row { margin: 0; padding: 0; border: 0; }
 .choice-list { display: grid; gap: 8px; }
-.path-choice-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.path-choice { min-width: 0; padding: 14px; display: grid; gap: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); transition: border-color 180ms var(--ease-state), background-color 180ms var(--ease-state), box-shadow 180ms var(--ease-state); }
-.path-choice:last-child:nth-child(odd) { grid-column: 1 / -1; }
-.path-choice:hover { border-color: var(--line-strong); }
-.path-choice.is-selected { border-color: var(--accent-line); background: var(--accent-soft); box-shadow: inset 0 0 0 1px oklch(43% 0.09 162 / 0.08); }
-.path-choice-toggle { min-height: 39px; display: flex; align-items: flex-start; gap: 11px; cursor: pointer; }
-.path-choice-toggle input { width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
-.path-choice-toggle span { display: grid; gap: 2px; }
-.path-choice-toggle strong { color: var(--ink); font-size: 0.84rem; }
-.path-choice-toggle small { color: var(--muted); font-size: 0.7rem; line-height: 1.35; }
-.path-budget-inline { padding-top: 12px; display: grid; gap: 10px; border-top: 1px solid var(--line); transition: opacity 180ms var(--ease-state); }
-.path-choice:not(.is-selected) .path-budget-inline { opacity: 0.58; }
-.path-budget-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.path-budget-heading strong { font-size: 0.74rem; }
-.path-budget-heading span { color: var(--muted); font-size: 0.66rem; line-height: 1.3; text-align: right; }
+/* Five aligned rows, not a 2-2-1 card grid: the last card used to stretch full
+   width and read as a different component, and every card repeated the same
+   three field labels. Shared column headers carry them once. */
+.path-ledger { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.path-ledger-head, .path-row { display: grid; grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(96px, 0.62fr)); gap: 8px 14px; align-items: center; }
+.path-ledger-head { padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--surface-muted); color: var(--muted); font-size: 0.69rem; font-weight: 620; }
+.path-ledger-head span:not(:first-child) { text-align: left; }
+.path-row { padding: 12px 16px; transition: background-color 180ms var(--ease-state); }
+.path-row + .path-row { border-top: 1px solid var(--line); }
+.path-row:hover { background: var(--surface-muted); }
+.path-row.is-selected { background: var(--accent-soft); }
+.path-row-choice { min-width: 0; display: flex; align-items: flex-start; gap: 11px; cursor: pointer; }
+.path-row-choice input { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--accent); }
+.path-row-choice span { display: grid; gap: 2px; min-width: 0; }
+.path-row-choice strong { color: var(--ink); font-size: 0.86rem; font-weight: 650; }
+.path-row-choice small { color: var(--muted); font-size: 0.71rem; line-height: 1.35; }
+/* The fields keep the parent's column track so every dollar amount on the page
+   lines up, whichever row it belongs to. */
+.path-row-fields { display: grid; grid-column: 2 / -1; grid-template-columns: subgrid; gap: 8px 14px; transition: opacity 180ms var(--ease-state); }
+@supports not (grid-template-columns: subgrid) {
+  .path-row-fields { grid-template-columns: repeat(3, minmax(96px, 1fr)); }
+}
+.path-row:not(.is-selected) .path-row-fields { opacity: 0.5; }
+.money-cell { min-width: 0; display: grid; gap: 4px; }
+.cell-label { display: none; color: var(--muted); font-size: 0.65rem; font-weight: 620; }
+.cell-empty { align-self: center; padding-top: 15px; color: var(--faint); font-size: 0.73rem; }
+.path-row-total { grid-column: 1 / -1; margin: 2px 0 0; color: var(--accent-hover); font-size: 0.72rem; font-weight: 620; }
+.path-row select { min-height: 43px; width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 10px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 620; }
+.path-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .choice-row { min-height: 54px; padding: 10px 12px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; }
 .choice-row:hover { border-color: var(--line-strong); background: var(--surface-muted); }
 .choice-row:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); }
@@ -498,23 +521,33 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .calculated-total { margin: 9px 0 0; color: var(--accent-hover); font-size: 0.74rem; font-weight: 630; }
 .anywhere-choice { margin-bottom: 14px; }
 .area-picker { display: grid; gap: 13px; }
-.area-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.area-tier { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-muted); }
-.area-tier-heading { min-height: 38px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-.area-tier-heading h3 { margin: 0; color: var(--ink); font-size: 0.8rem; }
-.area-tier-heading p { margin: 3px 0 0; color: var(--muted); font-size: 0.68rem; line-height: 1.3; }
+/* Four tiers across one surface, divided by hairlines. The old 2x2 nested a
+   filled card inside a card inside a section, which DESIGN.md rules out. */
+.area-columns { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.area-tier { min-width: 0; padding: 14px 15px 15px; }
+.area-tier + .area-tier { border-left: 1px solid var(--line); }
+.area-tier-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.area-tier-heading h3 { margin: 0; color: var(--ink); font-size: 0.82rem; font-weight: 650; }
+.area-tier-help { margin: 2px 0 10px; min-height: 2.6em; color: var(--muted); font-size: 0.69rem; line-height: 1.3; }
 .area-tier-heading > span { flex: 0 0 auto; padding: 3px 6px; border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 0.64rem; font-weight: 700; }
 .area-selected { min-height: 4px; margin: 9px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; list-style: none; }
 .area-chip { min-height: 30px; padding: 3px 4px 3px 8px; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--accent-line); border-radius: 999px; background: var(--accent-soft); color: var(--accent-hover); font-size: 0.68rem; font-weight: 650; }
 .area-remove { min-height: 22px; padding: 2px 5px; border-color: transparent; border-radius: 999px; background: transparent; color: inherit; font-size: 0.62rem; }
 .area-remove:hover { border-color: var(--accent-line); background: var(--surface); }
 .preference-matrix { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.preference-row { min-height: 58px; padding: 10px 12px; display: grid; grid-template-columns: minmax(130px, 1fr) repeat(3, auto); align-items: center; gap: 13px; }
+/* Naming the three options once at the top removes eighteen repeated labels and
+   lets the controls sit in columns the eye can run down. */
+.preference-head, .preference-row { display: grid; grid-template-columns: minmax(150px, 1fr) repeat(3, minmax(88px, 0.44fr)); align-items: center; gap: 13px; }
+.preference-head { padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--surface-muted); color: var(--muted); font-size: 0.69rem; font-weight: 620; }
+.preference-head span:not(:first-child), .preference-option { justify-self: center; }
+.preference-row { min-height: 52px; padding: 8px 16px; }
 .preference-row + .preference-row { border-top: 1px solid var(--line); }
-.preference-row legend { display: grid; gap: 2px; }
-.preference-row legend strong { font-size: 0.78rem; }
-.preference-row label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 0.7rem; white-space: nowrap; }
-.preference-row input { accent-color: var(--accent); }
+.preference-row:hover { background: var(--surface-muted); }
+.preference-row legend { float: left; display: grid; gap: 1px; }
+.preference-row legend + * { clear: left; }
+.preference-row legend strong { color: var(--ink); font-size: 0.8rem; font-weight: 650; }
+.preference-option { min-width: 44px; min-height: 40px; display: grid; place-items: center; cursor: pointer; }
+.preference-option input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
 .review-section { background: oklch(98.6% 0.01 155); }
 .deal-summary { margin: 0; padding: 16px 18px; border: 1px solid var(--accent-line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 0.92rem; font-weight: 570; line-height: 1.6; }
 .deal-consequences { margin-top: 12px; color: var(--muted); font-size: 0.76rem; }
@@ -843,10 +876,18 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .deal-actions button { width: 100%; }
   .deal-submit-group { width: 100%; justify-items: stretch; }
   .submit-status { max-width: none; text-align: left; }
-  .path-choice-list, .area-columns { grid-template-columns: 1fr; }
+  .area-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .area-tier:nth-child(2n+1) { border-left: 0; }
+  .area-tier:nth-child(n+3) { border-top: 1px solid var(--line); }
+  .path-ledger-head { display: none; }
+  .cell-label { display: block; }
+  .path-row { grid-template-columns: 1fr; }
+  .path-row-fields { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .field-row.three-up, .field-row.two-up { grid-template-columns: 1fr; }
   .path-choice:last-child:nth-child(odd) { grid-column: auto; }
-  .preference-row { grid-template-columns: 1fr; gap: 8px; }
-  .preference-row legend { margin-bottom: 2px; }
+  .preference-head { display: none; }
+  .preference-row { grid-template-columns: 1fr repeat(3, auto); gap: 10px; }
+  .preference-row legend { float: none; }
   .provider-ledger { grid-template-columns: 1fr; }
   .provider-ledger section:nth-child(even) { border-left: 0; }
   .provider-ledger section + section { border-top: 1px solid var(--line); }
@@ -916,4 +957,62 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+
+/* ---- Sources page: one visible action, everything else one click away ---- */
+.connect-panel { margin-top: 14px; padding: 22px 24px 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); }
+.connect-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.connect-head h2 { margin: 2px 0 0; font-size: 1.0625rem; font-weight: 680; letter-spacing: -0.014em; }
+.connect-lede { margin: 10px 0 0; max-width: 62ch; color: var(--muted); font-size: 0.86rem; line-height: 1.5; }
+.connect-lede strong { color: var(--ink); font-weight: 640; }
+
+/* The form is the point of the page, so it gets the width and the alignment. */
+.connect-form { margin: 18px 0 0; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+.connect-field { display: grid; gap: 6px; min-width: 0; }
+.connect-field > span { color: var(--muted); font-size: 0.72rem; font-weight: 660; }
+.connect-field input { min-height: 44px; width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 12px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 560; }
+.connect-field input:focus-visible { border-color: var(--accent); outline: 0; box-shadow: 0 0 0 3px oklch(43% 0.09 162 / 0.12); }
+.connect-form button { min-height: 44px; white-space: nowrap; }
+.connect-note { margin: 10px 0 0; max-width: 62ch; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
+.connect-promises { margin: 14px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 18px; list-style: none; }
+.connect-promises li { color: var(--muted); font-size: 0.75rem; line-height: 1.45; }
+.connect-promises strong { display: block; color: var(--ink); font-size: 0.72rem; font-weight: 650; }
+.connect-actions { margin-top: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+.connect-more { margin-top: 18px; border-top: 1px solid var(--line); }
+.connect-more > details { border-bottom: 1px solid var(--line); }
+.connect-more > details > summary { padding: 11px 2px; cursor: pointer; color: var(--accent-hover); font-size: 0.8rem; font-weight: 650; list-style: none; }
+.connect-more > details > summary::-webkit-details-marker { display: none; }
+.connect-more > details > summary::before { content: "＋"; margin-right: 8px; color: var(--faint); font-weight: 600; }
+.connect-more > details[open] > summary::before { content: "－"; }
+.connect-more > details > *:not(summary) { margin-bottom: 12px; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+.connect-more ul { margin: 0 0 12px; padding-left: 20px; line-height: 1.6; }
+.connect-more ul strong, .extra-steps strong { color: var(--ink); }
+.connect-more .connect-form { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
+
+.provider-status { margin-top: 18px; padding-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; border-top: 1px solid var(--line); }
+.provider-status > div { display: grid; gap: 4px; align-content: start; }
+.provider-status strong { color: var(--ink); font-size: 0.82rem; font-weight: 650; }
+.provider-status small { color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
+.provider-status .connector-state { justify-self: start; }
+
+.extras { margin-top: 22px; }
+.extras-title { margin: 0 0 10px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.015em; }
+.extra { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.extra + .extra { margin-top: 10px; }
+.extra > summary { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; list-style: none; }
+.extra > summary::-webkit-details-marker { display: none; }
+.extra > summary > span:first-child { display: grid; gap: 2px; }
+.extra > summary strong { color: var(--ink); font-size: 0.88rem; font-weight: 650; }
+.extra > summary small { color: var(--muted); font-size: 0.73rem; }
+.extra > *:not(summary) { margin-left: 18px; margin-right: 18px; }
+.extra > *:last-child { margin-bottom: 18px; }
+.extra p { max-width: 66ch; color: var(--muted); font-size: 0.83rem; line-height: 1.5; }
+.extra-steps { margin: 12px 18px 18px; padding-left: 20px; color: var(--muted); font-size: 0.82rem; line-height: 1.7; }
+.nested-detail { margin-top: 12px; }
+.nested-detail > summary { cursor: pointer; color: var(--accent-hover); font-size: 0.79rem; font-weight: 650; }
+
+@media (max-width: 760px) {
+  .connect-form, .connect-more .connect-form { grid-template-columns: 1fr; }
+  .connect-head { flex-direction: column; gap: 8px; }
 }

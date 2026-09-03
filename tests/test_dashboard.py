@@ -619,7 +619,7 @@ def test_alert_setup_page_explains_local_connection(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert "Saved-search alerts" in response.text
-    assert "Start with the sources that need nothing from you" in response.text
+    assert "Nothing on this page is required" in response.text
     assert "Before you can connect Gmail" in response.text
     assert "Google OAuth Web client JSON" in response.text
     assert "Automate Facebook without your Facebook login" in response.text

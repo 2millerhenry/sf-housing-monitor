@@ -131,10 +131,13 @@ def test_blank_onboarding_uses_bounded_neighborhood_dropdowns(tmp_path: Path) ->
     assert "Hold Command" not in onboarding.text
     assert "Outer Sunset" in onboarding.text
     assert "Visitacion Valley" in onboarding.text
-    assert onboarding.text.count('class="path-choice"') == 5
-    assert onboarding.text.count("Monthly budget") == 3
-    assert onboarding.text.count("Budget per person") == 2
-    assert "Choose this home type to use it" in onboarding.text
+    assert onboarding.text.count('class="path-row"') == 5
+    # The five home types share one set of column headers instead of repeating
+    # a budget label inside every card.
+    assert onboarding.text.count("Monthly maximum") == 1
+    assert onboarding.text.count("Sharing with") == 1
+    assert onboarding.text.count('data-path-card=') == 5
+    assert "Tick a home type to use its budget" in onboarding.text
     script = (Path(__file__).resolve().parent.parent / "sf_housing" / "static" / "deal-form.js").read_text()
     assert "Saving deal and starting your first check" in script
     assert 'classList.toggle("is-selected", toggle.checked)' in script
