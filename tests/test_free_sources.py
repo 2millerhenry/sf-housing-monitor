@@ -582,3 +582,55 @@ def test_apartment_list_classifies_a_building_that_publishes_no_unit_rents(
     assert enriched.metadata["bedrooms"] == 0, "the smallest home should stand in"
     assert enriched.price == listing.price, "the building's own starting rent must survive"
     assert "publishes no rent per home" in enriched.summary
+
+
+# --------------------------------------------------------------------------
+# neighbourhood recovery
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "url,expected",
+    [
+        ("https://www.zumper.com/apartment-buildings/1/blueground-san-francisco-soma-san-francisco-ca", "SoMa"),
+        ("https://www.zumper.com/apartment-buildings/2/potrero-1010-potrero-hill-san-francisco-ca", "Potrero Hill"),
+        ("https://www.zumper.com/apartment-buildings/4/x-bernal-heights-san-francisco-ca", "Bernal Heights"),
+        ("https://www.zumper.com/apartment-buildings/5/plain-building-san-francisco-ca", None),
+    ],
+)
+def test_a_listing_url_can_name_its_neighbourhood(url: str, expected: str | None) -> None:
+    """Zumper's structured data only ever says "San Francisco"; the slug says more."""
+    from sf_housing.sources import sf_area_from_slug
+
+    assert sf_area_from_slug(url) == expected
+
+
+def test_the_longest_matching_area_wins() -> None:
+    """"Mission Bay" must never be filed as "Mission"; they are different searches."""
+    from sf_housing.sources import sf_area_from_slug
+
+    assert sf_area_from_slug("https://www.zumper.com/x/azure-mission-bay-san-francisco-ca") == "Mission Bay"
+
+
+def test_zumper_listings_carry_the_area_from_their_url(preferences: Preferences) -> None:
+    from sf_housing.sources import ZumperSource
+
+    listings = ZumperSource().search(FakeClient(FakeResponse(text=zumper_search())), preferences)
+
+    assert any(l.neighborhood for l in listings), "the fixture URLs name real neighbourhoods"
+
+
+def test_apartment_list_takes_the_area_from_the_building_coordinates(preferences: Preferences) -> None:
+    source = ApartmentListSource()
+    listing = source.search(FakeClient(FakeResponse(text=apartment_list_document())), preferences)[0]
+    page = (
+        '<html><head><script type="application/ld+json">'
+        '{"@type":["RealEstateListing","ApartmentComplex"],"name":"B",'
+        '"geo":{"@type":"GeoCoordinates","latitude":37.7625,"longitude":-122.3985},'
+        '"address":{"streetAddress":"1 Test St"}}'
+        "</script></head></html>"
+    )
+
+    enriched = source.enrich(FakeClient(FakeResponse(text=page)), listing)
+
+    assert enriched.neighborhood, "a published map pin inside a target area should resolve"

@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 
 from .apify import ApifyTokenStore
 from .classification import ROOM, UNKNOWN, WHOLE_UNIT
+from .deal_profile import SF_NEIGHBORHOODS
 from .connectors import gmail_provider_key
 from .gmail_alerts import AlertEmail, GmailAlertMailbox
 from .location import declared_outside_sf_area_hint
@@ -183,6 +184,28 @@ def declared_sf_area_hint(text: str | None) -> str | None:
             if re.search(rf"(?<!\w){value}(?!\w)(?:\s*/\s*[a-z ]+)?\s+(?:district|neighbou?rhood)\b", normalized):
                 return area
     return None
+
+
+def sf_area_from_slug(url: str | None) -> str | None:
+    """Recover a neighborhood that a listing URL names in its path.
+
+    Zumper builds its slugs as building-name, neighborhood, city, state, so the
+    area is right there even though the structured data only ever says "San
+    Francisco". Matching against the canonical list rather than guessing which
+    trailing words are the neighborhood keeps one-word areas (SoMa) and
+    multi-word ones (Potrero Hill) equally correct, and the longest match wins
+    so "Mission Bay" is never read as "Mission".
+    """
+    path = _normal_text(str(url or "").replace("-", " ").replace("/", " "))
+    if not path:
+        return None
+    best: str | None = None
+    for area in SF_NEIGHBORHOODS:
+        needle = _normal_text(area)
+        if re.search(rf"(?<!\w){re.escape(needle)}(?!\w)", path):
+            if best is None or len(needle) > len(_normal_text(best)):
+                best = area
+    return best
 
 
 def sf_target_coordinate_neighborhood(latitude: object, longitude: object) -> str | None:
@@ -1148,7 +1171,15 @@ class ApartmentListSource:
         return replace(
             listing,
             price=price or listing.price,
-            neighborhood=listing.neighborhood or visible_sf_area_hint(f"{listing.title} {street}"),
+            neighborhood=(
+                listing.neighborhood
+                or sf_target_coordinate_neighborhood(
+                    (building.get("geo") or {}).get("latitude"),
+                    (building.get("geo") or {}).get("longitude"),
+                )
+                or sf_area_from_slug(listing.original_url)
+                or visible_sf_area_hint(f"{listing.title} {street}")
+            ),
             listing_type=f"{unit_label.capitalize()} apartment" if unit_label else listing.listing_type,
             summary=_clean_text(" ".join(detail), 1200),
             building_units=building_units,
@@ -1249,7 +1280,7 @@ class ZumperSource:
                     title=name,
                     original_url=url,
                     price=price,
-                    neighborhood=visible_sf_area_hint(f"{name} {street}"),
+                    neighborhood=sf_area_from_slug(url) or visible_sf_area_hint(f"{name} {street}"),
                     listing_type="Apartment rental",
                     summary=_clean_text(" ".join(detail), 1200),
                     metadata=metadata,
