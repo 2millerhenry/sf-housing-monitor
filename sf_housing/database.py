@@ -538,6 +538,18 @@ class Repository:
             )
         return items
 
+    def listing(self, listing_id: int) -> dict[str, Any] | None:
+        """One listing, shaped exactly as a dashboard row.
+
+        The detail page has to agree with the row the reader clicked from, so it
+        goes through the same shaping rather than reading the columns again.
+        """
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM listings WHERE id = ?", (listing_id,)
+            ).fetchone()
+        return self._dashboard_row(row) if row is not None else None
+
     @staticmethod
     def _dashboard_row(row: sqlite3.Row) -> dict[str, Any]:
         item = dict(row)

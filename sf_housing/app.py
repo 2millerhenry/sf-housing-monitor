@@ -474,9 +474,21 @@ def _typical_scan_seconds(scans: list[dict[str, object]], trigger: str | None = 
 
 
 def _safe_return(value: str | None) -> str:
-    if value and value.startswith("/") and not value.startswith("//"):
-        return value
-    return "/"
+    """A redirect target that can only be a page of this app.
+
+    Rejecting a leading "//" is not enough on its own. A browser normalises a
+    backslash to a forward slash before resolving a URL, so "/\\evil.test"
+    leaves as "//evil.test" and points off this machine entirely; it also strips
+    control characters first, so those can reconstruct the same thing. Every
+    caller of this either redirects a form post or renders a back link, so
+    anything that is not a plain local path goes to the dashboard instead.
+    """
+    candidate = str(value or "")
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return "/"
+    if "\\" in candidate or any(character <= "\x1f" or character == "\x7f" for character in candidate):
+        return "/"
+    return candidate
 
 
 def _preference_form_values(preferences: Preferences) -> dict[str, object]:
@@ -978,6 +990,43 @@ def create_app(
         if not repository.mark_listing_opened(listing_id):
             raise HTTPException(status_code=404, detail="Listing not found")
         return Response(status_code=204)
+
+    @application.get("/listings/{listing_id}", response_class=HTMLResponse)
+    def listing_detail(request: Request, listing_id: int):
+        """One home on its own page.
+
+        A listing worth acting on had nowhere to be read in full: the table
+        truncates, the source's own description was never shown at all, and the
+        only link out of a row went straight to the source. The starred card is
+        the same job, so this reuses it rather than growing a second layout.
+        """
+        listing = repository.listing(listing_id)
+        if listing is None:
+            raise HTTPException(status_code=404, detail="Listing not found")
+        origin = _safe_return(request.query_params.get("from"))
+        # Acting on the home keeps the reader on the home; leaving is what the
+        # one back link is for.
+        own_url = f"/listings/{listing_id}"
+        if origin != "/":
+            own_url += "?from=" + quote(origin, safe="")
+        back_labels = {
+            "saved": "Back to starred listings",
+            "dismissed": "Back to passed listings",
+            "near_matches": "Back to near matches",
+            "all": "Back to the archive",
+        }
+        origin_view = dict(parse_qsl(urlparse(origin).query)).get("view", "")
+        return templates.TemplateResponse(
+            request=request,
+            name="listing.html",
+            context={
+                "listing": listing,
+                "return_to": own_url,
+                "back_to": origin,
+                "back_label": back_labels.get(origin_view, "Back to the shortlist"),
+                "view": origin_view,
+            },
+        )
 
     @application.get("/listings/{listing_id}/open")
     def open_listing(listing_id: int):

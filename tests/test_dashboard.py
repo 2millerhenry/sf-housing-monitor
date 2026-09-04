@@ -155,7 +155,11 @@ def test_dashboard_keeps_each_listing_link_in_the_left_side_of_the_table(tmp_pat
     assert 'class="cell-quick-open"' in response.text
     assert 'aria-label="Open Direct link room"' in response.text
     assert 'data-mark-opened="/listings/' in response.text
-    assert response.text.count(f'href="/listings/{repository.query_listings(0, view="all")[0]["id"]}/open"') == 2
+    listing_id = repository.query_listings(0, view="all")[0]["id"]
+    # Two different destinations, not the same one twice: the button leaves for
+    # the source, the title opens the home's own page.
+    assert response.text.count(f'href="/listings/{listing_id}/open"') == 1
+    assert f'href="/listings/{listing_id}?from=' in response.text
 
 
 def test_dashboard_prioritizes_direct_application_and_direct_lister_routes(tmp_path: Path) -> None:
@@ -491,7 +495,9 @@ def test_dashboard_review_actions_persist(tmp_path: Path) -> None:
     # Saved is a comparison view, not the scanning table: the note you wrote is
     # visible without opening anything, and the star can be undone from here.
     assert "Message tonight" in starred.text
-    assert "Unstar" in starred.text
+    # The same control the table uses, so the star reads the same either place.
+    assert 'aria-label="Remove from starred listings"' in starred.text
+    assert "★ Starred" in starred.text
     assert "Why it fits" in starred.text
     assert "Room to save" in starred.text
 

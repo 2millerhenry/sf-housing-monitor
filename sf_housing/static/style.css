@@ -1047,7 +1047,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 /* ---- Saved: a few homes you already chose, not a scanning grid ---- */
 .saved-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
-.saved-item { padding: 20px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.listing-card { padding: 20px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.listing-card.opened-listing .saved-title a { color: var(--muted); }
 .saved-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px 20px; }
 .saved-facts { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; color: var(--muted); font-size: 0.86rem; }
 .saved-facts strong { color: var(--ink); font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
@@ -1082,6 +1083,38 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .saved-outreach > div { margin-top: 10px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-muted); }
 .saved-outreach p { margin: 0 0 8px; color: var(--muted); font-size: 0.76rem; }
 .saved-outreach textarea { width: 100%; min-height: 92px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.79rem; line-height: 1.5; }
+
+/* ---- One home on its own page ---- */
+
+/* The way back is the only navigation this page needs, so it sits above the
+   title rather than competing with it. */
+.detail-back { margin-bottom: 14px; font-size: 0.82rem; }
+.detail-back a { color: var(--muted); text-decoration: none; font-weight: 600; }
+.detail-back a:hover { color: var(--accent-hover); text-decoration: underline; }
+.detail-hero { margin-bottom: 18px; }
+.detail-hero h1 { font-size: 1.85rem; letter-spacing: -0.03em; }
+.listing-coverage { margin-top: 9px; color: var(--muted); font-size: 0.78rem; line-height: 1.5; }
+
+.detail-panel { margin-top: 14px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.detail-panel h2 { margin: 0 0 10px; font-size: 0.98rem; font-weight: 660; letter-spacing: -0.008em; }
+
+/* The source's own words. Long, unbroken scraped text has to wrap rather than
+   stretch the panel, and 74ch keeps it readable. */
+.detail-description { max-width: 74ch; margin: 0; color: var(--ink); font-size: 0.9rem; line-height: 1.62; white-space: pre-line; overflow-wrap: anywhere; }
+.detail-note { max-width: 74ch; margin: 12px 0 0; color: var(--faint); font-size: 0.74rem; line-height: 1.5; }
+
+.detail-facts { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.detail-facts > div { padding: 11px 14px; background: var(--surface); }
+.detail-facts dt { color: var(--muted); font-size: 0.68rem; font-weight: 650; letter-spacing: 0.015em; }
+.detail-facts dd { margin: 3px 0 0; color: var(--ink); font-size: 0.85rem; line-height: 1.45; }
+/* A scraped URL has no spaces to break on and would otherwise widen the grid. */
+.detail-url { font-size: 0.76rem !important; color: var(--muted) !important; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  .detail-facts { grid-template-columns: 1fr; }
+  .detail-panel { padding: 16px; }
+  .listing-card { padding: 16px; }
+}
 
 @media (max-width: 760px) {
   .saved-evidence { grid-template-columns: 1fr; gap: 12px; }

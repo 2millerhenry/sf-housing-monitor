@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% from "_listing.html" import listing_card %}
+{% block title %}{{ listing.title }} · SF Housing Monitor{% endblock %}
+{% block content %}
+<script src="{{ url_for('static', path='listing-actions.js') }}?v={{ asset_version() }}" defer></script>
+
+<nav class="detail-back" aria-label="Breadcrumb">
+  <a href="{{ back_to }}">← {{ back_label }}</a>
+</nav>
+
+<section class="hero detail-hero">
+  <div>
+    <p class="eyebrow">{{ listing.platform }}{% if listing.status == 'saved' %} · Starred{% elif listing.status == 'dismissed' %} · Passed{% endif %}</p>
+    <h1>{{ listing.title }}</h1>
+    <p class="subtle">{% if listing.opened_at %}You opened this listing on {{ listing.opened_at|pacific_datetime }}.{% else %}You have not opened this listing yet.{% endif %}</p>
+  </div>
+</section>
+
+{{ listing_card(listing, return_to, expanded=true) }}
+
+{# The source's own words. The app has always collected and scored against this
+   text but never showed it, so the only way to read what a listing actually
+   said was to leave for the source. #}
+<section class="detail-panel" aria-labelledby="detail-description">
+  <h2 id="detail-description">What the listing says</h2>
+  {% if listing.summary %}
+  <p class="detail-description">{{ listing.summary }}</p>
+  <p class="detail-note">Collected from {{ listing.platform }}. The source page is the only authority; this copy can be out of date.</p>
+  {% else %}
+  <p class="unknown">{{ listing.platform }} published no description with this listing.</p>
+  {% endif %}
+</section>
+
+<section class="detail-panel" aria-labelledby="detail-facts">
+  <h2 id="detail-facts">Everything known</h2>
+  <dl class="detail-facts">
+    <div><dt>Rent</dt><dd>{% if listing.price is not none %}${{ "{:,}".format(listing.price) }}/month{% if listing.per_person_monthly %} · ${{ "{:,}".format(listing.per_person_monthly) }} each between {{ listing.occupants }}{% endif %}{% else %}<span class="unknown">Not stated</span>{% endif %}</dd></div>
+    <div><dt>Home</dt><dd>{{ listing.home_facts.primary or listing.listing_type or 'Not stated' }}{% if listing.home_facts.secondary %} · {{ listing.home_facts.secondary|join(' · ') }}{% endif %}</dd></div>
+    <div><dt>Area</dt><dd>{{ listing.neighborhood or 'Not stated' }}{% if listing.location_hint %} · near {{ listing.location_hint }}{% endif %}</dd></div>
+    <div><dt>Available</dt><dd>{% if listing.available_on %}{{ listing.available_on|compact_move_in_date }}{% else %}<span class="unknown">Not stated</span>{% endif %}</dd></div>
+    <div><dt>Posted</dt><dd>{% if listing.published_at %}{{ listing.published_at|pacific_datetime }}{% else %}<span class="unknown">{{ listing.platform }} publishes no date</span>{% endif %}</dd></div>
+    <div><dt>First found</dt><dd>{{ listing.first_found|pacific_datetime }}</dd></div>
+    <div><dt>Still listed</dt><dd>Last seen {{ listing.last_seen|pacific_datetime }}</dd></div>
+    <div><dt>Goes to</dt><dd class="detail-url">{{ listing.original_url }}</dd></div>
+  </dl>
+</section>
+{% endblock %}

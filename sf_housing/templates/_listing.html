@@ -1,0 +1,79 @@
+{# One home, presented the same way wherever it is shown.
+
+   The starred list and a single listing's own page are the same job -- a home
+   you have already decided is worth attention, where the next step is
+   contacting someone -- so they share this markup rather than drifting apart.
+   `expanded` is the difference between the two: a page devoted to one home has
+   room for every reason and every question, a list of several does not. #}
+
+{% macro listing_card(listing, return_to, expanded=false) %}
+<div class="listing-card{% if listing.opened_at %} opened-listing{% endif %}">
+  <div class="saved-head">
+    <p class="saved-facts">
+      {% if listing.price is not none %}<strong>${{ "{:,}".format(listing.price) }}<span>/mo</span></strong>{% else %}<strong>Price unknown</strong>{% endif %}
+      <span>{{ listing.home_facts.primary or listing.listing_type or 'Type not stated' }}</span>
+      <span>{{ listing.neighborhood or 'Area unknown' }}</span>
+    </p>
+    <p class="saved-score"><strong>{{ listing.score }}</strong> match{% if listing.eligibility == 'needs_verification' %} · <span class="saved-caution">{% if listing.lead_check %}check {{ listing.lead_check }}{% else %}needs verification{% endif %}</span>{% elif listing.eligibility == 'ineligible' %} · <span class="saved-caution">outside deal</span>{% endif %}</p>
+  </div>
+  {% if not expanded %}
+  <h3 class="saved-title"><a href="/listings/{{ listing.id }}">{{ listing.title }}</a></h3>
+  {% endif %}
+  {# On a page devoted to one home the fact table below states all of this
+     precisely, so repeating it here would be the same line twice. #}
+  {% if not expanded %}
+  <p class="saved-origin">
+    {{ listing.platform }}
+    {% if listing.published_at %}· Posted {{ listing.published_at|compact_pacific_date }}{% else %}· Found {{ listing.first_found|compact_pacific_date }}{% endif %}
+    {% if listing.available_on %}· Available {{ listing.available_on|compact_move_in_date }}{% endif %}
+    {% if listing.home_facts.secondary %}· {{ listing.home_facts.secondary|join(' · ') }}{% endif %}
+  </p>
+  {% endif %}
+  <div class="saved-evidence">
+    <div>
+      <h4>Why it fits</h4>
+      {% set reasons = listing.match_reasons if expanded else listing.match_reasons[:3] %}
+      {% if reasons %}<ul>{% for reason in reasons %}<li>{{ reason }}</li>{% endfor %}</ul>{% else %}<p class="unknown">Not enough listing detail yet.</p>{% endif %}
+    </div>
+    <div>
+      <h4>Worth checking</h4>
+      {%- set open_items = listing.blockers or listing.checks %}
+      {% if open_items %}<ul>{% for item in open_items %}<li>{{ item.reason }}</li>{% endfor %}</ul>{% else %}<p>{{ listing.concern }}</p>{% endif %}
+      {% if expanded and listing.other_unknowns %}<p class="listing-coverage">{{ listing.confidence }}% of what this deal scores on is stated. {{ listing.other_unknowns|join(' ') }}</p>{% endif %}
+    </div>
+  </div>
+  <form class="saved-note" method="post" action="/listings/{{ listing.id }}/note">
+    <input type="hidden" name="return_to" value="{{ return_to }}">
+    <label for="saved-note-{{ listing.id }}">Your note</label>
+    <textarea id="saved-note-{{ listing.id }}" name="note" maxlength="4000" rows="{% if expanded %}3{% else %}2{% endif %}" placeholder="Tour time, who you spoke to, questions to ask…">{{ listing.note }}</textarea>
+    <button type="submit">Save note</button>
+  </form>
+  <div class="saved-actions">
+    {% if listing.application_url %}
+      <a class="button primary" href="{{ listing.application_url }}" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">Apply <span aria-hidden="true">↗</span></a>
+    {% else %}
+      <a class="button primary" href="/listings/{{ listing.id }}/open" target="_blank" rel="noopener noreferrer" data-mark-opened="/listings/{{ listing.id }}/opened">{% if listing.direct_lister %}Contact lister{% else %}Open listing{% endif %} <span aria-hidden="true">↗</span></a>
+    {% endif %}
+    <details class="saved-outreach">
+      <summary>Copy contact note</summary>
+      <div>
+        <p>Personalize the brackets before sending; only claim what is true for you.</p>
+        <textarea id="outreach-{{ listing.id }}" readonly aria-label="Contact note for {{ listing.title }}">Hi — I’m interested in {{ listing.title }}. I’m looking to move around [move-in date] and can tour [two specific time windows]. I can provide the usual application documents promptly if helpful. Is it still available? Thanks, [name] · [phone]</textarea>
+        <button class="compact-button" type="button" data-copy-outreach="outreach-{{ listing.id }}">Copy note</button>
+      </div>
+    </details>
+    {# The same two controls the results table uses, so a home reads the same
+       way whichever surface someone acts on it from. #}
+    <form method="post" action="/listings/{{ listing.id }}/status">
+      <input type="hidden" name="return_to" value="{{ return_to }}">
+      <input type="hidden" name="status" value="{% if listing.status == 'saved' %}active{% else %}saved{% endif %}">
+      <button class="save-button{% if listing.status == 'saved' %} saved{% endif %}" type="submit" aria-label="{% if listing.status == 'saved' %}Remove from starred listings{% else %}Add to starred listings{% endif %}">{% if listing.status == 'saved' %}★ Starred{% else %}☆ Star{% endif %}</button>
+    </form>
+    <form method="post" action="/listings/{{ listing.id }}/status">
+      <input type="hidden" name="return_to" value="{{ return_to }}">
+      <input type="hidden" name="status" value="{% if listing.status == 'dismissed' %}active{% else %}dismissed{% endif %}">
+      <button class="quiet-button" type="submit">{% if listing.status == 'dismissed' %}Restore{% else %}Pass{% endif %}</button>
+    </form>
+  </div>
+</div>
+{% endmacro %}
