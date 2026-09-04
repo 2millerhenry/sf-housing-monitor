@@ -448,7 +448,17 @@ def technical_settings(data: Mapping[str, Any]) -> dict[str, Any]:
         "household",
         "features",
     }
-    return {key: value for key, value in data.items() if key not in profile_keys}
+    # The canonical keys are the profile itself, never technical settings.
+    # Carrying them through put "profile_version" into the legacy view, and
+    # parse_preferences takes the profile branch whenever it sees that key, so a
+    # document with no "technical" section recursed until the interpreter gave
+    # up. Anything written by this app has the section; a hand-edited file or
+    # one from an older tool did not.
+    return {
+        key: value
+        for key, value in data.items()
+        if key not in profile_keys and key not in {"profile", "profile_version"}
+    }
 
 
 def canonical_document(profile: DealProfile, previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -502,7 +512,12 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
     if room:
         ideal = room.ideal_monthly or room.maximum_monthly
         result["budget"] = {
-            "min_monthly": room.minimum_monthly or max(1, round(room.maximum_monthly * 0.35)),
+            # Only a minimum the user actually stated. Deriving one from the
+            # ceiling meant raising your budget hid cheap homes: a $5,000 cap
+            # invented a $1,750 floor, which went to Craigslist as min_price and
+            # cut its room search from 241 results to 49. The deal form has no
+            # minimum field at all, so nobody could see or undo it.
+            "min_monthly": room.minimum_monthly,
             "ideal_monthly": ideal,
             "max_monthly": room.maximum_monthly,
             "sweet_spot_min": room.preferred_minimum or ideal,

@@ -247,3 +247,126 @@ def test_anywhere_in_sf_is_a_real_area_rule_and_disabled_paths_fail() -> None:
     assert studio_result.eligibility != "ineligible"
     assert room_result.eligibility == "ineligible"
     assert "not enabled" in room_result.concern
+
+
+# --------------------------------------------------------------------------
+# a price floor nobody asked for
+# --------------------------------------------------------------------------
+
+
+def profile_with_room_budget(maximum: int, minimum: int | None = None) -> str:
+    budget = {"maximum_monthly": maximum, "ideal_monthly": 1500}
+    if minimum is not None:
+        budget["minimum_monthly"] = minimum
+    return yaml.safe_dump(
+        {
+            "profile_version": 1,
+            "profile": {
+                "state": "active",
+                "enabled_paths": ["private_room"],
+                "budgets": {"private_room": budget},
+                "geography": {"anywhere_in_sf": True},
+                "room_household": {"private_room_required": True},
+            },
+        }
+    )
+
+
+def test_a_budget_ceiling_does_not_invent_a_floor_underneath_it() -> None:
+    """Raising the most you would pay must never hide cheaper homes.
+
+    The floor was derived as 35% of the ceiling, so a $5,000 cap invented a
+    $1,750 minimum. That went to Craigslist as min_price and cut its room search
+    from 241 results to 49, and the deal form has no minimum field, so nobody
+    could see the number or undo it.
+    """
+    preferences = parse_preferences(profile_with_room_budget(5000))
+
+    assert preferences.section("budget")["min_monthly"] is None
+    assert preferences.section("budget")["max_monthly"] == 5000
+
+
+def test_a_minimum_the_user_actually_stated_is_still_honoured() -> None:
+    preferences = parse_preferences(profile_with_room_budget(5000, minimum=1200))
+
+    assert preferences.section("budget")["min_monthly"] == 1200
+
+
+def test_raising_the_ceiling_never_narrows_the_search() -> None:
+    """The property the old derivation broke: a bigger budget searched less."""
+    from sf_housing.sources import CraigslistSource
+
+    source = CraigslistSource()
+    urls = {
+        cap: source._room_url(parse_preferences(profile_with_room_budget(cap)))
+        for cap in (2000, 3000, 5000)
+    }
+    for cap, url in urls.items():
+        assert "min_price" not in url, f"a ${cap} ceiling still imposed a floor: {url}"
+        assert f"max_price={cap}" in url
+
+
+def test_a_stated_minimum_reaches_the_search(tmp_path: Path) -> None:
+    from sf_housing.sources import CraigslistSource
+
+    url = CraigslistSource()._room_url(parse_preferences(profile_with_room_budget(5000, minimum=1200)))
+
+    assert "min_price=1200" in url
+
+
+def test_a_cheap_room_is_no_longer_scored_as_out_of_budget() -> None:
+    """The floor also reached scoring, so an affordable room was marked as
+    failing a limit the user never set."""
+    preferences = parse_preferences(profile_with_room_budget(5000))
+    listing = ListingCandidate(
+        platform="Craigslist",
+        source_id="cheap",
+        title="Private room in a shared flat",
+        original_url="https://sfbay.craigslist.org/roo/d/x/1.html",
+        price=900,
+        neighborhood="Potrero Hill",
+        listing_type="Room/share",
+        summary="A private room in a shared home, available now.",
+    )
+
+    result = score_listing(listing, preferences)
+    price = result.details["price"]
+
+    assert price["value"] > 0, "a $900 room is inside a $5,000 budget"
+    assert "below" not in (price.get("mismatch") or "").lower()
+
+
+def test_a_profile_with_no_technical_section_loads_instead_of_recursing() -> None:
+    """parse_preferences converts a profile to a legacy view and re-parses it,
+    and takes the profile branch whenever it sees "profile_version". The
+    fallback that guessed which keys were technical carried that key through, so
+    a document without a "technical" section recursed until the interpreter gave
+    up. Anything this app writes has the section; a hand-edited file does not.
+    """
+    document = yaml.safe_dump(
+        {
+            "profile_version": 1,
+            "profile": {
+                "state": "active",
+                "enabled_paths": ["private_room"],
+                "budgets": {"private_room": {"maximum_monthly": 2500}},
+                "geography": {"anywhere_in_sf": True},
+                "room_household": {"private_room_required": True},
+            },
+        }
+    )
+
+    preferences = parse_preferences(document)
+
+    assert preferences.profile_active
+    assert preferences.section("budget")["max_monthly"] == 2500
+
+
+def test_technical_settings_never_reports_the_profile_as_a_technical_setting() -> None:
+    from sf_housing.deal_profile import technical_settings
+
+    carried = technical_settings({"profile_version": 1, "profile": {"state": "active"}, "minimum_score": 70})
+
+    assert "profile_version" not in carried
+    assert "profile" not in carried
+    assert carried["minimum_score"] == 70, "genuine technical settings still come through"

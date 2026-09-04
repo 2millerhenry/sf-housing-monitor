@@ -226,7 +226,7 @@
             <h3 title="{{ listing.title }}"><a class="listing-title-link" href="/listings/{{ listing.id }}?from={{ return_to|urlencode }}">{{ listing.title }}</a></h3>
             <p class="listing-compact-meta">
               <span class="meta-source">{{ listing.platform }}</span>
-              <span class="meta-found">{% if listing.published_at %}Posted {{ listing.published_at|compact_pacific_date }}{% else %}Found {{ listing.first_found|compact_pacific_date }}{% endif %}</span>
+              {% if listing.published_at %}<span class="meta-found" title="Posted {{ listing.published_at|pacific_datetime }}">Posted {{ listing.published_at|compact_pacific_date }}</span>{% else %}<span class="meta-found is-found-date" title="{{ listing.platform }} publishes no posting date. First seen {{ listing.first_found|pacific_datetime }}">First seen {{ listing.first_found|compact_pacific_date }}</span>{% endif %}
               <span class="meta-area">{{ listing.neighborhood or 'Area unknown' }}</span>
               <span class="meta-price">{% if listing.price is not none %}${{ "{:,}".format(listing.price) }}/mo{% if housing_mode == 'two_bedroom' and listing.per_person_monthly %}, ${{ "{:,}".format(listing.per_person_monthly) }}/person{% endif %}{% else %}Price unknown{% endif %}</span>
               {% if listing.sublease_months %}<span class="contact-signal">{{ listing.sublease_months }}-mo sublet</span>{% endif %}
