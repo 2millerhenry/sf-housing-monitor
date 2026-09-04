@@ -513,12 +513,11 @@ def test_a_home_nobody_has_confirmed_for_a_day_says_so_on_the_row(
     application = create_app(settings=settings, sources=[], enable_scheduler=False)
     with TestClient(application) as client:
         fresh = client.get("/?view=all&housing=room").text
-        assert "Check confirmation" not in fresh, "a home just seen raises no question"
+        assert "Not confirmed as still listed" not in fresh, "a home just seen raises no question"
         age_everything(repository, 30)
         aged = client.get("/?view=all&housing=room").text
 
-    assert "Check confirmation" in aged
-    assert "Not confirmed as still listed" in aged
+    assert "Not confirmed as still listed" in aged, "the sentence reaches the row"
 
 
 def test_the_detail_page_states_when_it_was_last_confirmed(tmp_path: pathlib.Path) -> None:
@@ -555,7 +554,7 @@ def test_an_excluded_home_still_leads_with_why_it_was_excluded(
         page = client.get("/?view=all&housing=room").text
 
     assert "Outside deal" in page
-    assert "Check confirmation" not in page
+    assert "Not confirmed as still listed" not in page
 
 
 def test_an_upgraded_install_does_not_flag_every_stored_home(
@@ -580,7 +579,7 @@ def test_an_upgraded_install_does_not_flag_every_stored_home(
     with TestClient(application) as client:
         page = client.get("/?view=all&housing=room").text
 
-    assert "Check confirmation" not in page, "last_seen is the same confirmation by another name"
+    assert "Not confirmed as still listed" not in page, "last_seen is the same confirmation by another name"
 
 
 def test_a_home_whose_source_did_not_run_keeps_its_old_date(tmp_path: pathlib.Path) -> None:

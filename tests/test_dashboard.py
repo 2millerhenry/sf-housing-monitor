@@ -918,3 +918,90 @@ def test_a_shortlist_holding_everything_collected_says_nothing(tmp_path: Path) -
         page = client.get("/").text
 
     assert "held back by your deal" not in page
+
+
+# --------------------------------------------------------------------------
+# the Posted column
+# --------------------------------------------------------------------------
+
+
+def test_the_posted_column_shows_the_date_the_source_published(tmp_path: Path) -> None:
+    """The column people scan for. It has to be the source's own date, not the
+    day this app happened to notice the home."""
+    import re
+
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    repository.upsert_listing(
+        ListingCandidate(
+            platform="Craigslist",
+            source_id="dated",
+            title="Sunny room in NOPA",
+            original_url="https://sfbay.craigslist.org/roo/d/x/dated.html",
+            price=1500,
+            neighborhood="NOPA",
+            listing_type="Room/share",
+            summary="A private room in a shared home.",
+            metadata={"listing_timestamp": "2026-08-28T14:11:54-07:00"},
+        ),
+        ScoreResult(88, ["fits"], "", {}),
+    )
+
+    with TestClient(application) as client:
+        page = client.get("/?view=all&housing=room").text
+
+    assert '<th scope="col" class="cell-found"' in page, "the column exists"
+    cell = re.search(r'<td class="cell-found">(.*?)</td>', page, re.S).group(1)
+    assert "Aug 28" in cell, cell
+    assert "Found" not in cell, "a real posted date is not a found date"
+
+
+def test_a_home_whose_source_never_states_a_date_says_so(tmp_path: Path) -> None:
+    """SpareRoom publishes no dates at all. Showing the day we noticed it as if
+    it were the posting date would be inventing a fact."""
+    import re
+
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    add_listing(application.state.repository, "SpareRoom", "undated", "Room in NOPA", 1500, "NOPA")
+
+    with TestClient(application) as client:
+        page = client.get("/?view=all&housing=room").text
+
+    cell = re.search(r'<td class="cell-found">(.*?)</td>', page, re.S).group(1)
+    assert "Found" in cell, "say it is a found date, not a posted one"
+    assert "does not publish a date" in cell, "and why"
+
+
+def test_the_posted_column_survives_a_narrow_window(tmp_path: Path) -> None:
+    """It used to be one of the first two columns hidden below 1560px, which is
+    most laptops, so the date people were looking for was never on screen."""
+    import re
+
+    css = (Path("sf_housing/static/style.css")).read_text(encoding="utf-8")
+    start = css.index("@media (max-width: 1560px)")
+    narrow = css[start : css.index("\n}", start)]
+
+    assert "cell-found" not in narrow, "the Posted column must not hide at laptop width"
+    assert "cell-source" in narrow, "the source is already named on the listing line"
+
+
+def test_the_score_cell_no_longer_repeats_the_check_column(tmp_path: Path) -> None:
+    import re
+
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(narrow_profile(), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    seed_rooms(application.state.repository, count=3)
+
+    with TestClient(application) as client:
+        page = client.get("/?view=all&housing=room").text
+
+    score_cell = re.search(r'<td class="cell-score">(.*?)</td>', page, re.S).group(1)
+    assert "verification-label" not in score_cell
+    assert "Check " not in score_cell
+    assert "% evidence" in score_cell, "what the cell does keep"

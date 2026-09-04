@@ -972,8 +972,12 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .support-shortcuts span { color: var(--muted); font-size: 0.7rem; line-height: 1.4; }
 
 @media (max-width: 1560px) {
-  .listing-table { min-width: 1370px; }
-  .listing-table .cell-source, .listing-table .cell-found { display: none; }
+  /* Posted is the column people scan for; it stays. The source is already
+     named on the listing line right next to the date, and Best matches is the
+     widest column on the table, so those two give way first. Dropping both
+     takes about 300px off, which is what the narrower table is set to. */
+  .listing-table .cell-source, .listing-table .cell-fit { display: none; }
+  .listing-table { min-width: 1250px; }
   .listing-compact-meta .meta-source, .listing-compact-meta .meta-found { display: inline; }
 }
 

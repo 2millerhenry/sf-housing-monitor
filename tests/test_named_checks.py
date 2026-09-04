@@ -241,14 +241,18 @@ def row_for(page: str, listing_id: int) -> str:
     return matching[0]
 
 
-def test_the_shortlist_badge_says_what_to_check(tmp_path: pathlib.Path) -> None:
+def test_the_row_states_the_question_rather_than_a_label(tmp_path: pathlib.Path) -> None:
+    """The Check column carries the sentence. The score cell used to repeat a
+    truncated version of it, which made the cell four lines tall and said less,
+    so the sentence is now the only place it appears."""
     page, ids = render(
         tmp_path, [("low", scored(price=300), listing(price=300))], view="near_matches"
     )
     row = row_for(page, ids["low"])
 
-    assert "Check rent" in row
+    assert "Confirm that this unusually low amount is the full monthly rent." in row
     assert "Needs verification" not in row
+    assert "Check rent" not in row, "the score cell no longer repeats the check column"
 
 
 def test_the_check_column_shows_every_open_question_not_one_of_them(
@@ -366,8 +370,9 @@ def test_a_listing_scored_before_this_change_still_shows_its_sentences(
     )
     row = row_for(page, listing_id)
 
-    assert "Needs verification" in row, "no name is available, so say what was said before"
-    assert "Confirm that this unusually low amount is the full monthly rent." in row
+    assert "Confirm that this unusually low amount is the full monthly rent." in row, (
+        "an older row carries no names, so the sentence has to still reach the reader"
+    )
 
 
 @pytest.mark.parametrize("stored", ["not a list", None, [], [{"status": "unknown"}]])
