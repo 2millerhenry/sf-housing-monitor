@@ -618,6 +618,7 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
             continue
         maximum = int(_positive_int(raw_maximum, f"{path} maximum"))
         ideal = _positive_int(value(f"{path}_ideal"), f"{path} ideal", required=False)
+        minimum = _positive_int(value(f"{path}_minimum"), f"{path} minimum", required=False)
         occupants = (
             int(_positive_int(value(f"{path}_occupants", DEFAULT_OCCUPANTS[path]), f"{path} occupants"))
             if path in SPLIT_PATHS
@@ -631,6 +632,7 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
         budgets[path] = PathBudget(
             maximum_monthly=maximum,
             ideal_monthly=ideal,
+            minimum_monthly=minimum,
             occupants=occupants,
             maximum_building_units=building_limit,
         )
@@ -674,6 +676,7 @@ def profile_form_values(profile: DealProfile) -> dict[str, Any]:
         "budgets": {
             path: {
                 "maximum": budget.maximum_monthly,
+                "minimum": budget.minimum_monthly or "",
                 "ideal": budget.ideal_monthly or "",
                 "occupants": budget.occupants,
                 "building_units": budget.maximum_building_units or 50,

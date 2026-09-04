@@ -4,7 +4,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import yaml
 
@@ -249,6 +249,8 @@ def save_deal_profile(
     path: Path,
     profile: DealProfile,
     previous: Preferences | None = None,
+    *,
+    technical: Mapping[str, Any] | None = None,
 ) -> Preferences:
     """Persist one canonical profile while retaining non-personal source settings."""
     profile.validate()
@@ -260,6 +262,10 @@ def save_deal_profile(
         else {}
     )
     document = canonical_document(profile, base)
+    if technical:
+        # The match cut-off is not a personal answer about housing, so it lives
+        # with the other technical settings rather than inside the profile.
+        document["technical"].update(technical)
     return save_preferences(
         path,
         yaml.safe_dump(document, sort_keys=False, allow_unicode=True, width=100_000),

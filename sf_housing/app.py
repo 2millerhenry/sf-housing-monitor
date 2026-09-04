@@ -1049,6 +1049,7 @@ def create_app(
             "form_values": _preference_form_values(preferences),
             "deal_values": values or profile_form_values(preferences.deal_profile),
             "neighborhood_options": SF_NEIGHBORHOODS,
+            "minimum_score": preferences.minimum_score,
             "message": message,
             "error": error,
             "welcome": welcome or not preferences.profile_active,
@@ -1103,7 +1104,20 @@ def create_app(
             )
 
         first_activation = not current.profile_active
-        preferences = save_deal_profile(active_settings.preferences_path, profile, current)
+        # How close a match has to be before it reaches the shortlist. Anything
+        # under it is kept in near matches rather than thrown away, so this
+        # only moves the line, never the homes.
+        try:
+            requested_score = int(str(form.get("minimum_score", current.minimum_score)).strip() or current.minimum_score)
+        except (TypeError, ValueError):
+            requested_score = current.minimum_score
+        minimum_score = min(95, max(30, requested_score))
+        preferences = save_deal_profile(
+            active_settings.preferences_path,
+            profile,
+            current,
+            technical={"minimum_score": minimum_score},
+        )
         rescored = scanner.rescore_all(preferences)
         if first_activation:
             scanner.start_scan("initial_discovery")

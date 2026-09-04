@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 from fastapi.testclient import TestClient
 
@@ -10,7 +11,7 @@ from sf_housing.deal_profile import (
     DealProfileError,
     deal_profile_from_form,
 )
-from sf_housing.models import ListingCandidate
+from sf_housing.models import ListingCandidate, ScoreResult
 from sf_housing.preferences import ensure_preferences, load_preferences, parse_preferences
 from sf_housing.scoring import score_listing
 from sf_housing.settings import Settings
@@ -391,3 +392,192 @@ def test_technical_settings_never_reports_the_profile_as_a_technical_setting() -
     assert "profile_version" not in carried
     assert "profile" not in carried
     assert carried["minimum_score"] == 70, "genuine technical settings still come through"
+
+
+def wait_until_idle(application, timeout: float = 10.0) -> None:
+    """Block until no source check is running, the way a person would wait.
+
+    Saving the deal is refused while a check runs, so a test that saves twice
+    has to respect the same rule a person does.
+    """
+    import time
+
+    scanner = application.state.scanner
+    deadline = time.monotonic() + timeout
+    while scanner.is_running and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not scanner.is_running, "a scan never finished"
+
+
+def test_the_deal_form_can_set_and_clear_a_price_floor(tmp_path: Path) -> None:
+    """The other half of the range. The floor existed in the model and in the
+    search, but no field ever set it, so the only floor anyone had was one the
+    code invented."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    # Already active, so saving is not a first activation and no discovery scan
+    # starts underneath the test.
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["private_room_minimum"] = "1200"
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        assert client.post("/preferences/deal", data=form, follow_redirects=False).status_code == 303
+        page = client.get("/preferences").text
+
+        assert load_preferences(settings.preferences_path).section("budget")["min_monthly"] == 1200
+        assert 'name="private_room_minimum"' in page, "the field has to be on the page"
+        assert 'value="1200"' in page, "and has to show what was saved"
+
+        # Clearing it removes the floor rather than leaving the old one behind.
+        wait_until_idle(application)
+        form["private_room_minimum"] = ""
+        assert client.post("/preferences/deal", data=form, follow_redirects=False).status_code == 303
+
+    assert "min_monthly" not in load_preferences(settings.preferences_path).section("budget")
+
+
+def test_a_floor_above_the_ceiling_is_refused(tmp_path: Path) -> None:
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["private_room_minimum"] = "99000"
+    with TestClient(application) as client:
+        response = client.post("/preferences/deal", data=form, follow_redirects=True)
+
+    assert "must be below its maximum" in response.text
+
+
+def test_a_stated_floor_reaches_the_craigslist_search(tmp_path: Path) -> None:
+    """A floor is only useful if it actually narrows the search."""
+    from sf_housing.sources import CraigslistSource
+
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    form = valid_form()
+    form["private_room_minimum"] = "1200"
+    with TestClient(application) as client:
+        client.post("/preferences/deal", data=form, follow_redirects=False)
+
+    url = CraigslistSource()._room_url(load_preferences(settings.preferences_path))
+
+    assert "min_price=1200" in url
+
+
+# --------------------------------------------------------------------------
+# how close a match has to be
+# --------------------------------------------------------------------------
+
+
+def test_the_shortlist_cut_off_can_be_moved_from_the_deal_page(tmp_path: Path) -> None:
+    """It was fixed at 60 with no control anywhere, so someone happy to look at
+    a 50 had no way to say so."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["minimum_score"] = "50"
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        assert client.post("/preferences/deal", data=form, follow_redirects=False).status_code == 303
+        page = client.get("/preferences").text
+
+    assert load_preferences(settings.preferences_path).minimum_score == 50
+    assert 'name="minimum_score"' in page, "the control has to be on the page"
+    assert '<option value="50" selected>' in page, "and has to show what was saved"
+
+
+def test_lowering_the_cut_off_puts_more_homes_on_the_shortlist(tmp_path: Path) -> None:
+    """The point of the control, counted on the page a person actually reads.
+
+    The listings are seeded in a real area from the saved deal and scored by the
+    scorer rather than by hand, because saving the deal rescores everything.
+    """
+    import re
+
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    for index, price in enumerate((2100, 2200, 2300, 1500, 900)):
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"r{index}",
+                title=f"Private room {index} in Bernal Heights",
+                original_url=f"https://sfbay.craigslist.org/roo/d/x/{index}.html",
+                price=price,
+                neighborhood="Bernal Heights",
+                listing_type="Room/share",
+                summary="A private room in a shared home, available now, laundry on site.",
+            ),
+            ScoreResult(70, ["fits"], "check", {}),
+        )
+
+    def rows_on_the_shortlist(client) -> int:
+        page = client.get("/?housing=room").text
+        return len(re.findall(r'<tr class="listing-row', page))
+
+    form = valid_form()
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        form["minimum_score"] = "80"
+        client.post("/preferences/deal", data=form, follow_redirects=False)
+        strict = rows_on_the_shortlist(client)
+
+        wait_until_idle(application)
+        form["minimum_score"] = "40"
+        client.post("/preferences/deal", data=form, follow_redirects=False)
+        loose = rows_on_the_shortlist(client)
+
+    assert loose > strict, f"a lower line has to show more homes (80 -> {strict}, 40 -> {loose})"
+
+
+@pytest.mark.parametrize("requested,expected", [("0", 30), ("999", 95), ("", 60), ("abc", 60), ("55", 55)])
+def test_an_impossible_cut_off_is_brought_back_into_range(
+    tmp_path: Path, requested: str, expected: int
+) -> None:
+    """A hand-edited form must not be able to empty the shortlist permanently or
+    crash the page."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["minimum_score"] = requested
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        assert client.post("/preferences/deal", data=form, follow_redirects=False).status_code == 303
+        assert client.get("/").status_code == 200
+
+    assert load_preferences(settings.preferences_path).minimum_score == expected
+
+
+def test_saving_the_deal_does_not_disturb_other_technical_settings(tmp_path: Path) -> None:
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    document = yaml.safe_load(profile_with_room_budget(5000))
+    document["technical"] = {"minimum_score": 60, "sources": {"craigslist_pages": 3}}
+    settings.preferences_path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["minimum_score"] = "70"
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        client.post("/preferences/deal", data=form, follow_redirects=False)
+
+    saved = yaml.safe_load(settings.preferences_path.read_text(encoding="utf-8"))
+    assert saved["technical"]["minimum_score"] == 70
+    assert saved["technical"]["sources"] == {"craigslist_pages": 3}, "unrelated settings must survive"

@@ -499,7 +499,14 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    width and read as a different component, and every card repeated the same
    three field labels. Shared column headers carry them once. */
 .path-ledger { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
-.path-ledger-head, .path-row { display: grid; grid-template-columns: minmax(190px, 1.5fr) repeat(3, minmax(96px, 0.62fr)); gap: 8px 14px; align-items: center; }
+/* One control, given room to be read rather than tucked in with the feature
+   grid above it. */
+.match-cutoff { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); display: grid; gap: 7px; max-width: 62ch; }
+.match-cutoff label { font-size: 0.9rem; }
+.match-cutoff select { min-height: 44px; width: 100%; border: 1px solid var(--line-strong); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; }
+.match-cutoff select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.match-cutoff .field-help { margin: 0; }
+.path-ledger-head, .path-row { display: grid; grid-template-columns: minmax(170px, 1.4fr) repeat(4, minmax(84px, 0.56fr)); gap: 8px 14px; align-items: center; }
 .path-ledger-head { padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--surface-muted); color: var(--muted); font-size: 0.69rem; font-weight: 620; }
 .path-ledger-head span:not(:first-child) { text-align: left; }
 .path-row { padding: 12px 16px; transition: background-color 180ms var(--ease-state); }
@@ -515,7 +522,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    lines up, whichever row it belongs to. */
 .path-row-fields { display: grid; grid-column: 2 / -1; grid-template-columns: subgrid; gap: 8px 14px; transition: opacity 180ms var(--ease-state); }
 @supports not (grid-template-columns: subgrid) {
-  .path-row-fields { grid-template-columns: repeat(3, minmax(96px, 1fr)); }
+  .path-row-fields { grid-template-columns: repeat(4, minmax(84px, 1fr)); }
 }
 .path-row:not(.is-selected) .path-row-fields { opacity: 0.5; }
 .money-cell { min-width: 0; display: grid; gap: 4px; }
@@ -906,7 +913,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .path-ledger-head { display: none; }
   .cell-label { display: block; }
   .path-row { grid-template-columns: 1fr; }
-  .path-row-fields { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .path-row-fields { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-row.three-up, .field-row.two-up { grid-template-columns: 1fr; }
   .path-choice:last-child:nth-child(odd) { grid-column: auto; }
   .preference-head { display: none; }
