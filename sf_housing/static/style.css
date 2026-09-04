@@ -1148,6 +1148,29 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-more > details { border-bottom: 1px solid var(--line); }
 .connect-more > details > summary { padding: 11px 2px; cursor: pointer; color: var(--accent-hover); font-size: 0.8rem; font-weight: 650; list-style: none; }
 .connect-more > details > summary::-webkit-details-marker { display: none; }
+/* Setting up an app password is the one place in this app where somebody is
+   following instructions on a different website. Numbered steps, one provider
+   at a time, and the provider's own words for the buttons they will be
+   looking at. */
+.setup-lede { max-width: 68ch; margin: 0 0 16px; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.setup-lede strong { color: var(--ink); }
+.setup-guides { display: grid; gap: 8px; }
+.setup-guide { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.setup-guide > summary { padding: 11px 14px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; cursor: pointer; list-style: none; font-size: 0.88rem; }
+.setup-guide > summary::-webkit-details-marker { display: none; }
+.setup-guide > summary:hover { background: var(--surface-muted); }
+.setup-guide > summary span { color: var(--faint); font-size: 0.72rem; }
+.setup-guide[open] > summary { border-bottom: 1px solid var(--line); background: var(--surface-muted); }
+.setup-guide ol { margin: 0; padding: 14px 16px 15px 34px; display: grid; gap: 9px; color: var(--ink); font-size: 0.85rem; line-height: 1.6; }
+.setup-guide ol strong { font-weight: 640; }
+.setup-guide ol em { color: var(--muted); font-style: normal; }
+.setup-guide ol code, .setup-other code { padding: 1px 5px; border-radius: 5px; background: var(--surface-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82em; }
+.setup-guide ol a { color: var(--accent); text-underline-offset: 2px; }
+.setup-guide > p { margin: 0; padding: 14px 16px; max-width: 68ch; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.setup-other { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.setup-other h3 { margin: 0 0 5px; font-size: 0.92rem; font-weight: 640; }
+.setup-other p { max-width: 68ch; margin: 0 0 13px; color: var(--muted); font-size: 0.83rem; line-height: 1.6; }
+
 .connect-more > details > summary::before { content: "＋"; margin-right: 8px; color: var(--faint); font-weight: 600; }
 .connect-more > details[open] > summary::before { content: "－"; }
 .connect-more > details > *:not(summary) { margin-bottom: 12px; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }

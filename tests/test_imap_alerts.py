@@ -482,3 +482,64 @@ def test_the_password_is_never_echoed_back_to_the_page(tmp_path: Path, monkeypat
 
     assert "sup3r-s3cret-value" not in page.text
     assert "someone@gmail.com" in page.text, "the address is safe to confirm back"
+
+
+# --------------------------------------------------------------------------
+# the one place someone follows instructions on a different website
+# --------------------------------------------------------------------------
+
+
+def test_every_auto_detected_provider_has_its_own_steps() -> None:
+    """The page claims a provider is recognised from the address alone. Each one
+    it claims has to come with instructions someone can actually follow."""
+    import pathlib
+    import re
+
+    from sf_housing.imap_alerts import KNOWN_HOSTS
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    guides = re.search(r'<div class="setup-guides">(.*?)</div>', page, re.S).group(1)
+
+    for domain in KNOWN_HOSTS:
+        assert domain in guides, f"{domain} is auto-detected but has no instructions"
+
+
+def test_the_steps_name_the_buttons_people_will_be_looking_at() -> None:
+    """Vague instructions are the failure mode here: "create an app password in
+    the security section" is not something a person can follow on a page they
+    have never seen."""
+    import pathlib
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+    for phrase in (
+        "myaccount.google.com/apppasswords",
+        "2-Step Verification",
+        "Sign-In and Security",
+        "App-Specific Passwords",
+        "Generate app password",
+        "Mail (IMAP/POP/SMTP)",
+    ):
+        assert phrase in page, f"the steps no longer name {phrase!r}"
+
+
+def test_an_unsupported_provider_is_told_plainly() -> None:
+    """Outlook cannot work this way. Saying so, and saying what to do instead,
+    beats leaving someone to fail at step three."""
+    import pathlib
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+    assert "no longer issues app passwords" in page
+    assert "different mailbox" in page, "say what they can do instead"
+
+
+def test_the_other_provider_form_is_not_a_second_copy_of_the_first() -> None:
+    """Two identical Connect forms on one page read as a mistake. The second one
+    exists for providers the address cannot identify, and has to say so."""
+    import pathlib
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+    assert "Using a different provider?" in page
+    assert 'name="host"' in page, "and it is the one that asks for a mail server"

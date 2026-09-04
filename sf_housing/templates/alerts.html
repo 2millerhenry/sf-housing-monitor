@@ -69,20 +69,68 @@
     <div class="connect-more">
       <details>
         <summary>How do I get an app password?</summary>
-        <p>Your mail provider makes a 16-character code for one app. It only opens mail, and you can revoke it on its own.</p>
-        <ul>
-          <li><strong>Gmail</strong> Turn on 2-Step Verification, then create an app password under Google Account &rsaquo; Security.</li>
-          <li><strong>iCloud</strong> Turn on two-factor authentication, then generate an app-specific password in your Apple Account.</li>
-          <li><strong>Fastmail, Yahoo, AOL</strong> Create an app password in the account security section.</li>
-          <li><strong>Outlook.com, Hotmail</strong> Not supported. Microsoft no longer allows app passwords for mail.</li>
-        </ul>
-        <p>Gmail, iCloud, Fastmail, Yahoo and AOL are recognised automatically. For any other provider, add the mail server too:</p>
-        <form class="connect-form" method="post" action="/alerts/email/connect">
-          <label class="connect-field"><span>Email address</span><input type="email" name="address" required autocomplete="username"></label>
-          <label class="connect-field"><span>App password</span><input type="password" name="password" required autocomplete="off"></label>
-          <label class="connect-field"><span>Mail server</span><input type="text" name="host" placeholder="imap.example.com" required autocomplete="off"></label>
-          <button type="submit">Connect</button>
-        </form>
+        <p class="setup-lede">An app password is a 16-character code your mail provider makes for one program. It is <strong>not</strong> your normal password, it can only read mail, and you can cancel it later without changing anything else. Find the steps for your provider below.</p>
+
+        <div class="setup-guides">
+          <details class="setup-guide" open>
+            <summary><strong>Gmail</strong> <span>gmail.com, googlemail.com</span></summary>
+            <ol>
+              <li>Open <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">myaccount.google.com/security</a> and sign in.</li>
+              <li>Find <strong>2-Step Verification</strong>. If it says Off, turn it on and finish the phone setup. Google will not offer app passwords until this is on, so this step is not optional.</li>
+              <li>Now open <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a>. If it asks you to sign in again, do that.</li>
+              <li>In the box marked <strong>App name</strong>, type anything you will recognise later. <em>Housing Monitor</em> is fine. Press <strong>Create</strong>.</li>
+              <li>A yellow box shows <strong>16 letters in four groups</strong>, like <code>abcd efgh ijkl mnop</code>. Copy them.</li>
+              <li>Paste them into <strong>App password</strong> above. The spaces do not matter, and you will never see this code again once you close the box, which is fine because you can always make another.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary><strong>iCloud</strong> <span>icloud.com, me.com, mac.com</span></summary>
+            <ol>
+              <li>Open <a href="https://account.apple.com" target="_blank" rel="noopener noreferrer">account.apple.com</a> and sign in.</li>
+              <li>Choose <strong>Sign-In and Security</strong>.</li>
+              <li>Choose <strong>App-Specific Passwords</strong>. If you do not see it, two-factor authentication is off; turn it on first and come back.</li>
+              <li>Press <strong>+</strong>, give it a name such as <em>Housing Monitor</em>, then <strong>Create</strong>.</li>
+              <li>Copy the 16 characters Apple shows and paste them into <strong>App password</strong> above.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary><strong>Yahoo and AOL</strong> <span>yahoo.com, aol.com</span></summary>
+            <ol>
+              <li>Open your account security page: <a href="https://login.yahoo.com/account/security" target="_blank" rel="noopener noreferrer">login.yahoo.com/account/security</a> for Yahoo, or <a href="https://login.aol.com/account/security" target="_blank" rel="noopener noreferrer">login.aol.com/account/security</a> for AOL.</li>
+              <li>Choose <strong>Generate app password</strong> (sometimes written &ldquo;Generate and manage app passwords&rdquo;).</li>
+              <li>Give it a name such as <em>Housing Monitor</em> and press <strong>Generate</strong>.</li>
+              <li>Copy the 16 characters and paste them into <strong>App password</strong> above.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary><strong>Fastmail</strong> <span>fastmail.com, fastmail.fm</span></summary>
+            <ol>
+              <li>Open <a href="https://app.fastmail.com/settings/security/devicekeys" target="_blank" rel="noopener noreferrer">Settings &rsaquo; Privacy &amp; Security &rsaquo; Connected apps</a>.</li>
+              <li>Choose <strong>New app password</strong>.</li>
+              <li>For access, pick <strong>Mail (IMAP/POP/SMTP)</strong>. Read-only is enough.</li>
+              <li>Copy the code Fastmail shows and paste it into <strong>App password</strong> above.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary><strong>Outlook.com, Hotmail, Live</strong> <span>not supported</span></summary>
+            <p>Microsoft has switched personal Outlook.com mail to sign-in-only access and no longer issues app passwords that can read mail this way. There is no step here that will work. Your options are to use a different mailbox for housing alerts, or to leave the six free sources running on their own.</p>
+          </details>
+        </div>
+
+        <div class="setup-other">
+          <h3>Using a different provider?</h3>
+          <p>The five above are recognised from your email address alone. For anything else, ask your provider for its <strong>IMAP server</strong> (it usually looks like <code>imap.yourprovider.com</code>) and enter all three here.</p>
+          <form class="connect-form" method="post" action="/alerts/email/connect">
+            <label class="connect-field"><span>Email address</span><input type="email" name="address" required autocomplete="username"></label>
+            <label class="connect-field"><span>App password</span><input type="password" name="password" required autocomplete="off"></label>
+            <label class="connect-field"><span>Mail server</span><input type="text" name="host" placeholder="imap.example.com" required autocomplete="off"></label>
+            <button type="submit">Connect</button>
+          </form>
+        </div>
       </details>
       <details>
         <summary>After connecting: turn the alert emails on</summary>
