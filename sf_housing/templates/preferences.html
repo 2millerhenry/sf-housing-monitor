@@ -30,12 +30,14 @@
     </header>
     <fieldset class="choice-fieldset">
       <legend class="sr-only">Housing paths and budgets</legend>
-      <div class="path-ledger" aria-live="polite">
+      {% set ranges_in_use = deal_values.budgets.values()|map(attribute='minimum')|select|list
+                             or deal_values.budgets.values()|map(attribute='ideal')|select|list %}
+      <div class="path-ledger{% if ranges_in_use %} show-ranges{% endif %}" data-path-ledger aria-live="polite">
         <div class="path-ledger-head" aria-hidden="true">
           <span>Home type</span>
-          <span>Least you would pay</span>
+          <span class="is-optional">Least you would pay</span>
           <span>Monthly maximum</span>
-          <span>Ideal target</span>
+          <span class="is-optional">Ideal target</span>
           <span>Sharing with</span>
         </div>
       {% set path_options = [
@@ -57,7 +59,7 @@
         <div class="path-row-fields" data-path-fields="{{ key }}">
           {# A floor is only ever one the reader typed. Leaving it blank means no
              floor at all, which is why it says so rather than showing a zero. #}
-          <div class="money-cell">
+          <div class="money-cell is-optional">
             <span class="cell-label" aria-hidden="true">Optional</span>
             <span class="money-field">
               <span aria-hidden="true">$</span>
@@ -73,7 +75,7 @@
                      aria-label="{{ label }}{% if split %} maximum per person{% else %} monthly maximum{% endif %}">
             </span>
           </div>
-          <div class="money-cell">
+          <div class="money-cell is-optional">
             <span class="cell-label" aria-hidden="true">Optional</span>
             <span class="money-field">
               <span aria-hidden="true">$</span>
@@ -97,7 +99,12 @@
       </article>
       {% endfor %}
       </div>
-      <p class="field-help">Tick a home type to use its budget. Untouched rows are ignored entirely.</p>
+      <p class="field-help">
+        Tick a home type to use its budget. Untouched rows are ignored entirely.
+        <button type="button" class="link-button" data-ranges-toggle aria-expanded="{{ 'true' if ranges_in_use else 'false' }}">
+          {% if ranges_in_use %}Hide price ranges{% else %}Add a price range{% endif %}
+        </button>
+      </p>
     </fieldset>
   </section>
 
@@ -151,6 +158,12 @@
       <label>Earliest acceptable move-in <input type="date" name="earliest_move_in" value="{{ deal_values.earliest_move_in }}"></label>
       <label>Prefer to move by <input type="date" name="preferred_by" value="{{ deal_values.preferred_by }}"></label>
     </div>
+    {% set limits_in_use = deal_values.lease_min_months or deal_values.lease_max_months or deal_values.household_maximum %}
+    <details class="deal-fold"{% if limits_in_use %} open{% endif %}>
+      <summary>
+        <span><strong>Lease length and household size</strong><small>Only worth setting if you would turn a home down for it</small></span>
+        <span class="disclosure-action">Set limits</span>
+      </summary>
     <div class="field-row three-up">
       <label>Shortest acceptable lease
         <select name="lease_min_months"><option value="">Flexible</option>{% for count in [1, 3, 6, 9, 12] %}<option value="{{ count }}" {% if deal_values.lease_min_months == count %}selected{% endif %}>{{ count }} month{% if count != 1 %}s{% endif %}</option>{% endfor %}</select>
@@ -162,14 +175,21 @@
         <select name="household_maximum"><option value="">Doesn't matter</option>{% for count in range(2, 11) %}<option value="{{ count }}" {% if deal_values.household_maximum == count %}selected{% endif %}>{{ count }} people total</option>{% endfor %}</select>
       </label>
     </div>
+    </details>
   </section>
 
   <section class="deal-section" aria-labelledby="preferences-title">
     <header class="deal-section-head">
       <span class="step-number" aria-hidden="true">4</span>
-      <h2 id="preferences-title">Fine-tune the order</h2>
-      <p>These never replace your hard limits. A missing fact stays unknown and lowers confidence instead of pretending to match.</p>
+      <h2 id="preferences-title">Fine-tune what you see</h2>
+      <p>None of this rules a home out. A missing fact stays unknown and lowers confidence instead of pretending to match.</p>
     </header>
+    {% set features_in_use = deal_values.preferences.values()|reject('equalto', 'ignore')|list %}
+    <details class="deal-fold"{% if features_in_use %} open{% endif %}>
+      <summary>
+        <span><strong>What matters more to you</strong><small>Nudges the order of results; never rules a home out</small></span>
+        <span class="disclosure-action">Choose</span>
+      </summary>
     <div class="preference-matrix">
       <div class="preference-head" aria-hidden="true">
         <span>Feature</span><span>Important</span><span>Nice to have</span><span>Doesn't matter</span>
@@ -184,6 +204,7 @@
       </fieldset>
       {% endfor %}
     </div>
+    </details>
 
     {# The shortlist used to cut off at 60 with no way to move the line. Nothing
        is discarded below it -- those homes are in Near matches -- so this only

@@ -641,3 +641,119 @@ def test_saving_the_deal_does_not_disturb_other_technical_settings(tmp_path: Pat
     saved = yaml.safe_load(settings.preferences_path.read_text(encoding="utf-8"))
     assert saved["technical"]["minimum_score"] == 70
     assert saved["technical"]["sources"] == {"craigslist_pages": 3}, "unrelated settings must survive"
+
+
+# --------------------------------------------------------------------------
+# the form asks for what it needs, and no more
+# --------------------------------------------------------------------------
+
+
+def visible_control_count(markup: str) -> tuple[int, int]:
+    """Controls in the form, and the ones a reader actually meets first."""
+    import re
+
+    total = len(re.findall(r"<(input|select|textarea)\b", markup))
+    folded = sum(
+        len(re.findall(r"<(input|select|textarea)\b", match.group(0)))
+        for match in re.finditer(
+            r'<details class="deal-fold"(?![^>]*\bopen\b).*?</details>', markup, re.S
+        )
+    )
+    optional = (
+        0
+        if "show-ranges" in markup
+        else len(re.findall(r'name="\w+_(?:minimum|ideal)"', markup))
+    )
+    return total, total - folded - optional
+
+
+def test_a_new_deal_asks_for_far_less_than_it_can_hold(tmp_path: Path) -> None:
+    """Everything used to be asked at once and at equal weight, so the three
+    answers that decide what you see sat among two dozen refinements."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/preferences?welcome=1").text
+
+    total, visible = visible_control_count(page)
+    assert total > 55, "nothing was removed from the form"
+    assert visible <= total * 0.55, f"{visible} of {total} controls still meet the reader at once"
+
+
+def test_a_refinement_you_already_set_is_never_hidden_from_you(tmp_path: Path) -> None:
+    """A value you cannot see is a value you cannot correct."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["private_room_minimum"] = "1200"
+    form["lease_min_months"] = "6"
+    form["preference_laundry"] = "important"
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        client.post("/preferences/deal", data=form, follow_redirects=False)
+        page = client.get("/preferences").text
+
+    assert "show-ranges" in page, "a price range you set comes back on show"
+    assert page.count('<details class="deal-fold" open') == 2, "and both folds open themselves"
+    assert 'value="1200"' in page
+
+
+def test_a_deal_saves_with_every_optional_answer_left_blank(tmp_path: Path) -> None:
+    """The fields inside a closed fold still submit; blank has to mean blank
+    rather than an error or a silently invented value."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = {
+        "housing_paths": ["private_room"],
+        "private_room_maximum": "2200",
+        "private_room_minimum": "",
+        "private_room_ideal": "",
+        "areas_dream": ["Mission District"],
+        "move_in_flexible": "1",
+        "minimum_score": "60",
+        "lease_min_months": "",
+        "lease_max_months": "",
+        "household_maximum": "",
+    }
+    with TestClient(application) as client:
+        assert client.post("/preferences/deal", data=form, follow_redirects=False).status_code == 303
+        page = client.get("/preferences").text
+
+    preferences = load_preferences(settings.preferences_path)
+    assert preferences.profile_active
+    assert preferences.section("budget")["max_monthly"] == 2200
+    assert "min_monthly" not in preferences.section("budget")
+    assert preferences.deal_profile.lease_min_months is None
+    assert preferences.deal_profile.household_maximum is None
+    assert "show-ranges" not in page, "and the form stays as simple as it was"
+
+
+def test_nothing_the_form_can_set_was_dropped(tmp_path: Path) -> None:
+    """Simplifying must mean tucking away, never removing."""
+    import re
+
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    for field in (
+        "housing_paths", "private_room_maximum", "private_room_minimum", "private_room_ideal",
+        "two_bedroom_occupants", "three_bedroom_occupants", "four_bedroom_occupants",
+        "anywhere_in_sf", "move_in_flexible", "earliest_move_in", "preferred_by",
+        "lease_min_months", "lease_max_months", "household_maximum",
+        "preference_natural_light", "preference_parking", "minimum_score",
+    ):
+        assert f'name="{field}"' in page, f"{field} disappeared from the form"
+    # Area chips only exist once an area is chosen, so the picker is the control
+    # to look for on a blank deal.
+    for tier in ("dream", "strong", "okay", "avoid"):
+        assert f'data-area-add="{tier}"' in page, f"the {tier} area picker disappeared"

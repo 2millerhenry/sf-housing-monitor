@@ -511,6 +511,22 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 /* Full width on purpose: the track is a scale, and a scale reads better with
    room. Everything else stays quiet so the number and the line are the only
    things asking for attention. */
+/* A fold for the answers that only some people have. Closed, it is one quiet
+   line; open, it is the section it always was. */
+.deal-fold { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.deal-fold > summary { min-height: 60px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; list-style: none; }
+.deal-fold > summary::-webkit-details-marker { display: none; }
+.deal-fold > summary:hover { background: var(--surface-muted); }
+.deal-fold > summary span:first-child { display: grid; gap: 3px; }
+.deal-fold > summary small { color: var(--muted); font-size: 0.78rem; font-weight: 450; }
+.deal-fold[open] > summary { border-bottom: 1px solid var(--line); }
+.deal-fold[open] > summary .disclosure-action::after { content: ""; }
+.deal-fold > .field-row, .deal-fold > .preference-matrix { padding: 14px 16px; }
+
+/* A control that reads as a sentence rather than a button. */
+.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 620; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-button:hover { color: var(--accent-hover); }
+
 .match-cutoff { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); --cutoff-fill: 46%; }
 .cutoff-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px; }
 .cutoff-head label { color: var(--ink); font-size: 0.9rem; font-weight: 620; }
@@ -582,7 +598,14 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .cutoff-slider:hover::-webkit-slider-thumb, .cutoff-slider:active::-webkit-slider-thumb { transform: none; }
   .cutoff-slider:hover::-moz-range-thumb, .cutoff-slider:active::-moz-range-thumb { transform: none; }
 }
-.path-ledger-head, .path-row { display: grid; grid-template-columns: minmax(170px, 1.4fr) repeat(4, minmax(84px, 0.56fr)); gap: 8px 14px; align-items: center; }
+/* The form opens with the one number a home type actually needs. A minimum and
+   an ideal are refinements, so they stay out of the way until someone asks for
+   them -- and come back on their own for anyone who has already set one. */
+.path-ledger-head, .path-row { display: grid; grid-template-columns: minmax(200px, 1.7fr) repeat(2, minmax(110px, 0.8fr)); gap: 8px 14px; align-items: center; }
+.path-ledger .is-optional { display: none; }
+.path-ledger.show-ranges .is-optional { display: block; }
+.path-ledger.show-ranges .path-ledger-head,
+.path-ledger.show-ranges .path-row { grid-template-columns: minmax(170px, 1.4fr) repeat(4, minmax(84px, 0.56fr)); }
 .path-ledger-head { padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--surface-muted); color: var(--muted); font-size: 0.69rem; font-weight: 620; }
 .path-ledger-head span:not(:first-child) { text-align: left; }
 .path-row { padding: 12px 16px; transition: background-color 180ms var(--ease-state); }
@@ -598,7 +621,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    lines up, whichever row it belongs to. */
 .path-row-fields { display: grid; grid-column: 2 / -1; grid-template-columns: subgrid; gap: 8px 14px; transition: opacity 180ms var(--ease-state); }
 @supports not (grid-template-columns: subgrid) {
-  .path-row-fields { grid-template-columns: repeat(4, minmax(84px, 1fr)); }
+  .path-row-fields { grid-template-columns: repeat(2, minmax(110px, 1fr)); }
+  .path-ledger.show-ranges .path-row-fields { grid-template-columns: repeat(4, minmax(84px, 1fr)); }
 }
 .path-row:not(.is-selected) .path-row-fields { opacity: 0.5; }
 .money-cell { min-width: 0; display: grid; gap: 4px; }

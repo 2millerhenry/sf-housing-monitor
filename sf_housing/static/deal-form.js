@@ -17,6 +17,19 @@
     syncPath(toggle);
   });
 
+  // The optional price columns. Hidden by default so a home type asks for one
+  // number, revealed on request, and revealed already for anyone who has set
+  // one -- a value you cannot see is a value you cannot correct.
+  const ledger = form.querySelector("[data-path-ledger]");
+  const rangesToggle = form.querySelector("[data-ranges-toggle]");
+  if (ledger && rangesToggle) {
+    rangesToggle.addEventListener("click", () => {
+      const shown = ledger.classList.toggle("show-ranges");
+      rangesToggle.setAttribute("aria-expanded", String(shown));
+      rangesToggle.textContent = shown ? "Hide price ranges" : "Add a price range";
+    });
+  }
+
   const anywhere = form.querySelector("[data-anywhere-toggle]");
   const areaPicker = form.querySelector("[data-area-picker]");
   const areaTiers = [...form.querySelectorAll("[data-area-tier]")];
