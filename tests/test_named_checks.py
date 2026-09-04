@@ -397,3 +397,101 @@ def test_ordering_survives_anything_stored_in_the_constraint_list(constraints) -
 @pytest.mark.parametrize("details", [None, "text", {}, {"price": None}, {"price": {"known": False}}])
 def test_unmeasured_criteria_survives_anything_stored_in_the_details(details) -> None:
     assert unmeasured_criteria(details, set()) == []
+
+
+# --------------------------------------------------------------------------
+# a card the app only skimmed must not read as certainty
+# --------------------------------------------------------------------------
+
+
+def test_a_room_whose_detail_page_was_never_read_says_so(tmp_path: pathlib.Path) -> None:
+    """Whole units have declared an unread Craigslist page since the beginning;
+    rooms never did. So a card the app had only skimmed could sit on the
+    shortlist at 90 with "100% evidence" beside it, never opened, with no
+    posting date known. The detail budget is finite by design -- this is a
+    normal state that has to be stated rather than counted as certainty."""
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scoring import score_listing
+    from tests.conftest import TEST_PREFERENCES
+
+    preferences = parse_preferences(TEST_PREFERENCES)
+    card = ListingCandidate(
+        platform="Craigslist",
+        source_id="card-only",
+        title="Private room in NOPA",
+        original_url="https://sfbay.craigslist.org/sfc/roo/d/x/card-only.html",
+        price=1500,
+        neighborhood="NOPA",
+        listing_type="Room/share",
+        summary="Private room in NOPA",
+    )
+
+    result = score_listing(classify_listing(card), preferences)
+
+    unknowns = [
+        entry
+        for entry in result.details.get("hard_constraints", [])
+        if entry.get("status") == "unknown" and entry.get("check") == "listing page"
+    ]
+    assert unknowns, result.details.get("hard_constraints")
+    assert "Only the search card was read" in unknowns[0]["reason"]
+
+
+def test_a_room_whose_detail_page_was_read_raises_no_such_question(
+    tmp_path: pathlib.Path,
+) -> None:
+    from dataclasses import replace
+
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scoring import score_listing
+    from tests.conftest import TEST_PREFERENCES
+
+    preferences = parse_preferences(TEST_PREFERENCES)
+    card = ListingCandidate(
+        platform="Craigslist",
+        source_id="opened",
+        title="Private room in NOPA",
+        original_url="https://sfbay.craigslist.org/sfc/roo/d/x/opened.html",
+        price=1500,
+        neighborhood="NOPA",
+        listing_type="Room/share",
+        summary="A bright private room in a shared flat, laundry on site, six month lease.",
+        metadata={"craigslist_detail_checked": True},
+    )
+
+    result = score_listing(classify_listing(card), preferences)
+
+    assert not [
+        entry
+        for entry in result.details.get("hard_constraints", [])
+        if entry.get("check") == "listing page" and entry.get("status") == "unknown"
+    ]
+
+
+def test_a_source_that_publishes_full_text_is_not_asked_to_be_opened(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The rule is about Craigslist's two-step search, not about every source."""
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scoring import score_listing
+    from tests.conftest import TEST_PREFERENCES
+
+    preferences = parse_preferences(TEST_PREFERENCES)
+    card = ListingCandidate(
+        platform="SpareRoom",
+        source_id="spare",
+        title="Private room in NOPA",
+        original_url="https://www.spareroom.com/123",
+        price=1500,
+        neighborhood="NOPA",
+        listing_type="Room/share",
+        summary="A bright private room in a shared flat.",
+    )
+
+    result = score_listing(classify_listing(card), preferences)
+
+    assert not [
+        entry
+        for entry in result.details.get("hard_constraints", [])
+        if entry.get("check") == "listing page"
+    ]

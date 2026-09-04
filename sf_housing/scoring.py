@@ -1427,6 +1427,22 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
             "check": "listing page",
             "reason": "The source verified this listing is inactive.",
         })
+    elif (
+        listing.platform == "Craigslist"
+        and "craigslist.org/" in listing.original_url.casefold()
+        and listing.metadata.get("craigslist_detail_checked") is not True
+    ):
+        # Only the search card was read. Whole units have said so since the
+        # beginning; rooms never did, so a card the app had only skimmed could
+        # sit on the shortlist at 90 with "100% evidence" beside it, having
+        # never been opened and with no posting date known. The budget for
+        # detail pages is finite by design, so this is a normal state -- it just
+        # has to be stated rather than counted as certainty.
+        hard_constraints.append({
+            "status": "unknown",
+            "check": "listing page",
+            "reason": "Only the search card was read; open the listing to confirm the details.",
+        })
     if dealbreaker_hits:
         hard_constraints.append({"status": "fail", "check": "dealbreaker", "reason": f"Possible dealbreaker: {', '.join(dealbreaker_hits[:2])}."})
     if is_sublet and sublet_months is None:
