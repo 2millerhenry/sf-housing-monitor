@@ -198,7 +198,7 @@
               <span class="match-grade">{% if listing.score >= 85 %}Excellent{% elif listing.score >= 75 %}Strong{% else %}Possible{% endif %}</span>
             </span>
             <small class="confidence-label">{{ listing.confidence }}% evidence</small>
-            {% if listing.eligibility == 'needs_verification' %}<small class="verification-label" title="{{ listing.checks|map(attribute='reason')|join(' ') }}">{% if listing.lead_check %}Check {{ listing.lead_check }}{% else %}Needs verification{% endif %}</small>{% elif listing.eligibility == 'ineligible' %}<small class="ineligible-label" title="{{ listing.blockers|map(attribute='reason')|join(' ') }}">Outside deal</small>{% endif %}
+            {% if listing.eligibility == 'ineligible' %}<small class="ineligible-label" title="{{ listing.blockers|map(attribute='reason')|join(' ') }}">Outside deal</small>{% elif listing.checks %}<small class="verification-label" title="{{ listing.checks|map(attribute='reason')|join(' ') }}">{% if listing.lead_check %}Check {{ listing.lead_check }}{% else %}Needs verification{% endif %}</small>{% endif %}
           </td>
           <td class="cell-quick-open">
             {% if listing.application_url %}

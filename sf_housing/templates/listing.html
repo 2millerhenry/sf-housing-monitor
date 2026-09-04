@@ -41,6 +41,7 @@
     <div><dt>Posted</dt><dd>{% if listing.published_at %}{{ listing.published_at|pacific_datetime }}{% else %}<span class="unknown">{{ listing.platform }} publishes no date</span>{% endif %}</dd></div>
     <div><dt>First found</dt><dd>{{ listing.first_found|pacific_datetime }}</dd></div>
     <div><dt>Still listed</dt><dd>Last seen {{ listing.last_seen|pacific_datetime }}</dd></div>
+    <div><dt>Last confirmed</dt><dd>{% if listing.last_verified_at %}{{ listing.last_verified_at|pacific_datetime }}{% else %}<span class="unknown">Never confirmed</span>{% endif %}</dd></div>
     <div><dt>Goes to</dt><dd class="detail-url">{{ listing.original_url }}</dd></div>
   </dl>
 </section>

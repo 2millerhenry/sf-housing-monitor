@@ -14,7 +14,7 @@
       <span>{{ listing.home_facts.primary or listing.listing_type or 'Type not stated' }}</span>
       <span>{{ listing.neighborhood or 'Area unknown' }}</span>
     </p>
-    <p class="saved-score"><strong>{{ listing.score }}</strong> match{% if listing.eligibility == 'needs_verification' %} · <span class="saved-caution">{% if listing.lead_check %}check {{ listing.lead_check }}{% else %}needs verification{% endif %}</span>{% elif listing.eligibility == 'ineligible' %} · <span class="saved-caution">outside deal</span>{% endif %}</p>
+    <p class="saved-score"><strong>{{ listing.score }}</strong> match{% if listing.eligibility == 'ineligible' %} · <span class="saved-caution">outside deal</span>{% elif listing.checks %} · <span class="saved-caution">{% if listing.lead_check %}check {{ listing.lead_check }}{% else %}needs verification{% endif %}</span>{% endif %}</p>
   </div>
   {% if not expanded %}
   <h3 class="saved-title"><a href="/listings/{{ listing.id }}">{{ listing.title }}</a></h3>

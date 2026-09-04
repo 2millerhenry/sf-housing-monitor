@@ -24,10 +24,27 @@ from .sources import ListingSource, facebook_coordinate_neighborhood, visible_sf
 
 LOGGER = logging.getLogger(__name__)
 
-# How many shortlisted homes a source may re-verify per scan. Small on purpose:
-# discovery comes first, and attention rotates oldest-checked first, so a whole
-# shortlist is covered over a few runs rather than all at once.
-DEFAULT_RECHECK_BUDGET = 6
+# Rechecking is bounded by time, not by a count. A fixed six-per-source meant a
+# sixty-home shortlist took days to cycle, so "no stale results" was a direction
+# rather than a promise. The scan finishes well inside its allowance, and the
+# leftover time is spent confirming homes instead of being given back.
+#
+# Every source still gets a fair share of what is left, so one slow source
+# cannot spend the whole allowance and starve the rest, and each is guaranteed a
+# small floor so it always makes progress even when the share is thin.
+RECHECK_FLOOR_PER_SOURCE = 3
+RECHECK_HARD_CEILING = 250
+
+# Scans run at 10:00 and 18:00, so the gaps are eight hours and sixteen. The
+# window has to be shorter than the shorter gap, or a home that goes quiet is
+# passed over for a whole cycle and can reach a full day unconfirmed. At seven
+# hours every scan re-examines anything the previous one did not confirm, which
+# puts the worst case at sixteen hours rather than twenty-four.
+RECHECK_AFTER = timedelta(hours=7)
+
+# What the reader is told. A home nobody has confirmed for a day is not a home
+# the app can vouch for, whatever its score says.
+CONFIRMATION_STALE_AFTER = timedelta(hours=24)
 
 # How far back the one-off `initial_discovery` scan reaches when a profile
 # first goes active, so a new install opens on real listings instead of an
@@ -194,19 +211,41 @@ class Scanner:
         *,
         seen_source_ids: set[str],
         deadline: float,
+        sources_remaining: int = 1,
     ) -> int:
-        """Re-verify shortlisted homes this source has stopped returning.
+        """Re-confirm shortlisted homes this source has stopped returning.
 
-        The detail page is what decides: a source that says the post is gone
-        already sets ``verified_inactive``, and scoring already refuses it. A
-        fetch that fails proves nothing, so the home is left exactly as it was.
+        Bounded by time rather than by a count, so the shortlist is covered in a
+        day instead of a week. The page is what decides: a source that says the
+        post is gone already sets ``verified_inactive`` and scoring already
+        refuses it. Everything else is left exactly as it was -- a fetch that
+        fails proves nothing, and neither does silence.
+
+        ``sources_remaining`` includes this source, so the share it may spend is
+        what is left divided by how many sources still have to run. One slow
+        source therefore cannot spend the whole allowance, and the floor below
+        keeps a thin share from meaning no progress at all.
         """
-        budget = max(0, int(getattr(source, "recheck_budget", DEFAULT_RECHECK_BUDGET)))
-        if budget <= 0 or not hasattr(source, "enrich"):
+        if not hasattr(source, "enrich"):
             return 0
+        now = time.monotonic()
+        available = deadline - now - self.timeout_seconds
+        if available <= 0:
+            return 0
+        share = available / max(1, int(sources_remaining))
+        recheck_deadline = now + share
+        floor = max(0, int(getattr(source, "recheck_floor", RECHECK_FLOOR_PER_SOURCE)))
+        ceiling = max(0, int(getattr(source, "recheck_budget", RECHECK_HARD_CEILING)))
+        if ceiling <= 0:
+            return 0
+
         try:
             candidates = self.repository.shortlisted_absent_from_search(
-                source.platform, seen_source_ids, preferences.minimum_score, limit=budget
+                source.platform,
+                seen_source_ids,
+                preferences.minimum_score,
+                limit=ceiling,
+                recheck_after=RECHECK_AFTER,
             )
         except Exception:  # a recheck must never cost the scan its results
             LOGGER.warning("%s recheck lookup failed", source.platform, exc_info=True)
@@ -214,12 +253,17 @@ class Scanner:
 
         checked = 0
         for listing_id, candidate in candidates:
-            if time.monotonic() + self.timeout_seconds > deadline:
+            # The floor is what a source is owed regardless of its share; past
+            # that it stops at its share, and never past the scan's own deadline.
+            limit = deadline if checked < floor else min(recheck_deadline, deadline)
+            if time.monotonic() + self.timeout_seconds > limit:
                 break
             try:
                 refreshed = source.enrich(client, candidate)
             except Exception as exc:
-                # Unreachable is not gone. Leave the home untouched.
+                # Unreachable is not gone. Leave the home exactly as it was, and
+                # leave its confirmation date alone so it is tried again rather
+                # than counted as checked.
                 LOGGER.info(
                     "%s could not recheck %s: %s", source.platform, candidate.original_url, exc
                 )
@@ -482,6 +526,7 @@ class Scanner:
         """Run a scan while the caller holds ``_scan_lock``."""
         run_id: int | None = None
         deadline = time.monotonic() + self.max_scan_seconds
+        scan_started_at = utc_now()
         total_seen = total_added = total_updated = sources_failed = 0
         final_status = "failed"
         try:
@@ -670,6 +715,15 @@ class Scanner:
                             matched_neighborhood = result.details.get("neighborhood", {}).get("match_label")
                             if matched_neighborhood:
                                 listing = replace(listing, neighborhood=str(matched_neighborhood))
+                            # A search that returns a home is the source saying it
+                            # still lists it, which is a confirmation and a
+                            # stronger one than re-reading a single page. Stamping
+                            # it here is what keeps the recheck pass aimed only at
+                            # the homes nobody has heard about.
+                            listing = replace(
+                                listing,
+                                metadata={**listing.metadata, "last_verified_at": scan_started_at},
+                            )
                             _, created = self.repository.upsert_listing(listing, result)
                             if created:
                                 source_added += 1
@@ -695,6 +749,7 @@ class Scanner:
                             preferences,
                             seen_source_ids={item["listing"].source_id for item in prepared},
                             deadline=deadline,
+                            sources_remaining=max(1, len(active_sources) - source_index + 1),
                         )
                         message = (
                             f"Completed with {detail_failures} detail-page warning(s)."

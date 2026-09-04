@@ -153,6 +153,38 @@ CREATE TABLE IF NOT EXISTS connector_states (
 """
 
 
+# A day without confirmation is the point at which the app stops being able
+# to vouch for a home. It matches the scanner's own window with room for a
+# missed scan, so a single skipped run does not flag the whole board.
+CONFIRMATION_STALE_AFTER = timedelta(hours=24)
+
+
+def _confirmation_check(stamp: object) -> dict[str, str] | None:
+    """The open question a home raises simply by not having been seen lately.
+
+    Returns nothing while the home is inside the window, so a freshly confirmed
+    listing carries no extra noise.
+    """
+    if not isinstance(stamp, str) or not stamp:
+        return {
+            "check": "confirmation",
+            "reason": "Nobody has confirmed this home is still listed; open it before relying on it.",
+        }
+    try:
+        moment = datetime.fromisoformat(stamp).astimezone(UTC)
+    except ValueError:
+        return None
+    age = datetime.now(UTC) - moment
+    if age < CONFIRMATION_STALE_AFTER:
+        return None
+    days = max(1, int(age.total_seconds() // 86400))
+    when = "a day" if days == 1 else f"{days} days"
+    return {
+        "check": "confirmation",
+        "reason": f"Not confirmed as still listed for {when}; open it before relying on it.",
+    }
+
+
 class Repository:
     def __init__(self, path: Path):
         self.path = Path(path)
@@ -713,6 +745,23 @@ class Repository:
         constraints = score_details.get("hard_constraints")
         item["checks"] = ordered_checks(constraints, "unknown")
         item["blockers"] = ordered_checks(constraints, "fail")
+        # How long since anyone confirmed the source still lists this home. A
+        # score says how well it fits; it says nothing about whether the home is
+        # still there, and a home nobody has confirmed for a day is not one the
+        # app can vouch for. Computed here rather than in scoring, so a stored
+        # score never changes meaning just because time passed.
+        # last_seen is when a search last returned this home, which is the same
+        # confirmation by another name. Using it as the fallback means an install
+        # that predates the explicit stamp is judged on what it actually knows,
+        # rather than every stored home flagging itself the moment of upgrade.
+        item["last_verified_at"] = item["metadata"].get("last_verified_at") or item.get("last_seen")
+        confirmation = _confirmation_check(item["last_verified_at"])
+        if confirmation is not None and item["eligibility"] != "ineligible":
+            item["checks"] = ordered_checks(
+                [{"status": "unknown", **confirmation}]
+                + [{"status": "unknown", **entry} for entry in item["checks"]],
+                "unknown",
+            )
         item["lead_check"] = item["checks"][0]["check"] if item["checks"] else ""
         # Criteria that are merely unmeasured rather than blocking. They belong
         # with the coverage figure, not with the questions, and a fact already

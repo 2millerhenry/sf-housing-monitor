@@ -45,6 +45,7 @@ CHECK_ORDER = (
     "dealbreaker",
     "rent",
     "listing page",
+    "confirmation",
     "stay length",
     "home type",
     "private room",
@@ -112,6 +113,7 @@ CHECK_EXCLUSION_PHRASES = {
     "sublet term": "a sublet shorter than you accept",
     "stay length": "a stay shorter than a month",
     "listing page": "a listing page that could not be confirmed",
+    "confirmation": "not confirmed as still listed recently",
     "dealbreaker": "carrying something you listed as a dealbreaker",
 }
 
