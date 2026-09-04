@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from dataclasses import dataclass
 from datetime import date, datetime
 from math import ceil
@@ -201,10 +202,24 @@ def _normal(value: str | None) -> str:
     return re.sub(r"\s+", " ", (value or "").casefold()).strip()
 
 
+@lru_cache(maxsize=4096)
+def _word_pattern(phrase: str) -> re.Pattern[str] | None:
+    """One compiled whole-word matcher per phrase.
+
+    The phrase lists are fixed vocabularies -- amenities, sublet terms,
+    neighborhood names -- so the same few hundred patterns were being rebuilt
+    and re-escaped for every listing on every rescore.
+    """
+    normalized = _normal(phrase)
+    if not normalized:
+        return None
+    return re.compile(rf"(?<!\w){re.escape(normalized)}(?!\w)")
+
+
 def _contains(text: str, phrases: tuple[str, ...] | list[str]) -> bool:
     for phrase in phrases:
-        normalized = _normal(phrase)
-        if normalized and re.search(rf"(?<!\w){re.escape(normalized)}(?!\w)", text):
+        pattern = _word_pattern(phrase)
+        if pattern is not None and pattern.search(text):
             return True
     return False
 

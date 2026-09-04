@@ -404,71 +404,93 @@ class Repository:
         result: ScoreResult,
         neighborhood: str | None = None,
         listing: ListingCandidate | None = None,
+        *,
+        connection: sqlite3.Connection | None = None,
     ) -> None:
+        """Write one listing's verdict.
+
+        ``connection`` lets a caller rescoring the whole board reuse a single
+        connection. Opening and closing one per listing costs an fsync each
+        time; on a board of 870 homes that turned a rescore into half a minute
+        of disk sync, and start-up blocks on it.
+        """
+        if connection is not None:
+            self._update_score(connection, listing_id, result, neighborhood, listing)
+            return
         with self.connection() as connection:
-            classified = classify_listing(listing) if listing is not None else None
-            if classified is not None:
-                # The evidence has to be stored with the verdict. Without this a
-                # recheck wrote "inactive" into the score and threw away the
-                # metadata that said why, so the next rescore read the old
-                # metadata and put the home straight back on the shortlist.
-                stored = connection.execute(
-                    "SELECT metadata_json FROM listings WHERE id = ?", (listing_id,)
-                ).fetchone()
-                merged = json.loads(stored["metadata_json"] or "{}") if stored else {}
-                merged.update(classified.metadata)
-                connection.execute(
-                    "UPDATE listings SET metadata_json = ? WHERE id = ?",
-                    (json.dumps(merged, ensure_ascii=False), listing_id),
-                )
-            values = (
-                result.score,
-                json.dumps(result.reasons, ensure_ascii=False),
-                result.concern,
-                result.confidence,
-                result.eligibility,
-                json.dumps(result.eligibility_reasons, ensure_ascii=False),
-                json.dumps(result.unknowns, ensure_ascii=False),
-                json.dumps(result.details, ensure_ascii=False),
+            self._update_score(connection, listing_id, result, neighborhood, listing)
+
+    def _update_score(
+        self,
+        connection: sqlite3.Connection,
+        listing_id: int,
+        result: ScoreResult,
+        neighborhood: str | None = None,
+        listing: ListingCandidate | None = None,
+    ) -> None:
+        classified = classify_listing(listing) if listing is not None else None
+        if classified is not None:
+            # The evidence has to be stored with the verdict. Without this a
+            # recheck wrote "inactive" into the score and threw away the
+            # metadata that said why, so the next rescore read the old
+            # metadata and put the home straight back on the shortlist.
+            stored = connection.execute(
+                "SELECT metadata_json FROM listings WHERE id = ?", (listing_id,)
+            ).fetchone()
+            merged = json.loads(stored["metadata_json"] or "{}") if stored else {}
+            merged.update(classified.metadata)
+            connection.execute(
+                "UPDATE listings SET metadata_json = ? WHERE id = ?",
+                (json.dumps(merged, ensure_ascii=False), listing_id),
             )
-            if classified is not None:
-                connection.execute(
-                    """UPDATE listings
-                       SET score = ?, match_reasons_json = ?, concern = ?, confidence = ?,
-                           eligibility = ?, eligibility_reasons_json = ?, unknowns_json = ?,
-                           score_details_json = ?,
-                           neighborhood = COALESCE(?, neighborhood), housing_kind = ?, unit_type = ?,
-                           building_units = ?
-                       WHERE id = ?""",
-                    (
-                        *values,
-                        neighborhood,
-                        classified.housing_kind,
-                        classified.unit_type,
-                        classified.building_units,
-                        listing_id,
-                    ),
-                )
-            elif neighborhood:
-                connection.execute(
-                    """UPDATE listings
-                       SET score = ?, match_reasons_json = ?, concern = ?, confidence = ?,
-                           eligibility = ?, eligibility_reasons_json = ?, unknowns_json = ?,
-                           score_details_json = ?,
-                           neighborhood = ?
-                       WHERE id = ?""",
-                    (*values, neighborhood, listing_id),
-                )
-            else:
-                connection.execute(
-                    """UPDATE listings
-                       SET score = ?, match_reasons_json = ?, concern = ?, confidence = ?,
-                           eligibility = ?, eligibility_reasons_json = ?, unknowns_json = ?,
-                           score_details_json = ?
-                       WHERE id = ?""",
-                    (*values, listing_id),
-                )
-            connection.commit()
+        values = (
+            result.score,
+            json.dumps(result.reasons, ensure_ascii=False),
+            result.concern,
+            result.confidence,
+            result.eligibility,
+            json.dumps(result.eligibility_reasons, ensure_ascii=False),
+            json.dumps(result.unknowns, ensure_ascii=False),
+            json.dumps(result.details, ensure_ascii=False),
+        )
+        if classified is not None:
+            connection.execute(
+                """UPDATE listings
+                   SET score = ?, match_reasons_json = ?, concern = ?, confidence = ?,
+                       eligibility = ?, eligibility_reasons_json = ?, unknowns_json = ?,
+                       score_details_json = ?,
+                       neighborhood = COALESCE(?, neighborhood), housing_kind = ?, unit_type = ?,
+                       building_units = ?
+                   WHERE id = ?""",
+                (
+                    *values,
+                    neighborhood,
+                    classified.housing_kind,
+                    classified.unit_type,
+                    classified.building_units,
+                    listing_id,
+                ),
+            )
+        elif neighborhood:
+            connection.execute(
+                """UPDATE listings
+                   SET score = ?, match_reasons_json = ?, concern = ?, confidence = ?,
+                       eligibility = ?, eligibility_reasons_json = ?, unknowns_json = ?,
+                       score_details_json = ?,
+                       neighborhood = ?
+                   WHERE id = ?""",
+                (*values, neighborhood, listing_id),
+            )
+        else:
+            connection.execute(
+                """UPDATE listings
+                   SET score = ?, match_reasons_json = ?, concern = ?, confidence = ?,
+                       eligibility = ?, eligibility_reasons_json = ?, unknowns_json = ?,
+                       score_details_json = ?
+                   WHERE id = ?""",
+                (*values, listing_id),
+            )
+        connection.commit()
 
     def all_candidates(self) -> list[tuple[int, ListingCandidate]]:
         with self.connection() as connection:

@@ -927,6 +927,15 @@ class Scanner:
         if not active_preferences.profile_active:
             return 0
         candidates = self.repository.all_candidates()
+        # One connection for the whole board. A connection per listing costs an
+        # fsync on every close, which on 870 homes was half a minute of disk
+        # sync while start-up waited on it and the dashboard was unreachable.
+        with self.repository.connection() as connection:
+            self._rescore(candidates, active_preferences, connection)
+        LOGGER.info("Rescored %s stored listings after preference update", len(candidates))
+        return len(candidates)
+
+    def _rescore(self, candidates, active_preferences, connection) -> None:
         for listing_id, listing in candidates:
             visible_area: str | None = None
             if listing.platform == "Facebook Marketplace":
@@ -953,6 +962,6 @@ class Scanner:
                     else visible_area
                 ),
                 listing=listing,
+                connection=connection,
             )
-        LOGGER.info("Rescored %s stored listings after preference update", len(candidates))
-        return len(candidates)
+        connection.commit()

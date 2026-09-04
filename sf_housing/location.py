@@ -104,24 +104,45 @@ _UNAMBIGUOUS_OUTSIDE_SF_CITIES = tuple(
 OUTSIDE_SF_CITIES = _OUTSIDE_SF_CITIES
 
 
+# These run for every listing on every rescore, once per city, and building the
+# patterns inside the loop meant re.escape and a cache lookup on each one: 315
+# regex searches per listing, and a rescore of 870 homes spending fifteen
+# seconds of pure CPU while start-up blocked on it. Same patterns, same order,
+# compiled once.
+_LOCATION_PREFIX = (
+    r"(?:in|at|near|around|location\s*:\s*|located\s+in|available\s+in|"
+    r"for\s+rent\s+in|downtown|central|north|south|east|west)\s+"
+)
+_CITY_WITH_STATE = tuple(
+    (re.compile(rf"(?<!\w){re.escape(city)}(?!\w)\s*,?\s+ca(?:\s+\d{{5}})?\b"), f"{city.title()} (outside SF)")
+    for city in _OUTSIDE_SF_CITIES
+)
+# Group posts and short public cards often omit the state. Only accept strong
+# location grammar for unambiguous city names; "Richmond" alone can mean San
+# Francisco's Richmond District and therefore still requires CA. Both patterns
+# for a city are tried before the next city, exactly as before.
+_CITY_BY_GRAMMAR = tuple(
+    (
+        re.compile(rf"{_LOCATION_PREFIX}(?:the\s+)?{re.escape(city)}(?!\w)"),
+        re.compile(rf"^[^a-z0-9]{{0,8}}{re.escape(city)}(?!\w)"),
+        f"{city.title()} (outside SF)",
+    )
+    for city in _UNAMBIGUOUS_OUTSIDE_SF_CITIES
+)
+_WHITESPACE = re.compile(r"\s+")
+
+
 def declared_outside_sf_area_hint(text: str | None) -> str | None:
     """Return a clearly declared city outside San Francisco."""
-    normalized = re.sub(r"\s+", " ", (text or "").casefold()).strip()
-    for city in _OUTSIDE_SF_CITIES:
-        if re.search(rf"(?<!\w){re.escape(city)}(?!\w)\s*,?\s+ca(?:\s+\d{{5}})?\b", normalized):
-            return f"{city.title()} (outside SF)"
-    # Group posts and short public cards often omit the state. Only accept
-    # strong location grammar for unambiguous city names; "Richmond" alone can
-    # mean San Francisco's Richmond District and therefore still requires CA.
-    location_prefix = (
-        r"(?:in|at|near|around|location\s*:\s*|located\s+in|available\s+in|"
-        r"for\s+rent\s+in|downtown|central|north|south|east|west)\s+"
-    )
-    for city in _UNAMBIGUOUS_OUTSIDE_SF_CITIES:
-        if re.search(rf"{location_prefix}(?:the\s+)?{re.escape(city)}(?!\w)", normalized):
-            return f"{city.title()} (outside SF)"
-        if re.match(rf"^[^a-z0-9]{{0,8}}{re.escape(city)}(?!\w)", normalized):
-            return f"{city.title()} (outside SF)"
+    normalized = _WHITESPACE.sub(" ", (text or "").casefold()).strip()
+    if not normalized:
+        return None
+    for pattern, label in _CITY_WITH_STATE:
+        if pattern.search(normalized):
+            return label
+    for prefixed, at_start, label in _CITY_BY_GRAMMAR:
+        if prefixed.search(normalized) or at_start.match(normalized):
+            return label
     return None
 
 
@@ -143,13 +164,20 @@ def outside_sf_location_label(label: str | None) -> str | None:
     return None
 
 
+_CITY_IN_URL = tuple(
+    (re.compile(rf"/view/d/{re.escape(city.replace(' ', '-'))}(?:-|/)"), f"{city.title()} (outside SF)")
+    for city in _OUTSIDE_SF_CITIES
+)
+
+
 def declared_outside_sf_url_hint(url: str | None) -> str | None:
     """Return an outside city explicitly encoded in a Craigslist detail URL."""
     normalized = (url or "").casefold()
-    for city in _OUTSIDE_SF_CITIES:
-        slug = city.replace(" ", "-")
-        if re.search(rf"/view/d/{re.escape(slug)}(?:-|/)", normalized):
-            return f"{city.title()} (outside SF)"
+    if "/view/d/" not in normalized:
+        return None
+    for pattern, label in _CITY_IN_URL:
+        if pattern.search(normalized):
+            return label
     return None
 
 
