@@ -16,7 +16,12 @@ from .classification import ROOM, UNKNOWN, WHOLE_UNIT
 from .deal_profile import SF_NEIGHBORHOODS
 from .connectors import gmail_provider_key
 from .gmail_alerts import AlertEmail, GmailAlertMailbox
-from .location import declared_outside_sf_area_hint, sf_area_from_address
+from .location import (
+    declared_outside_sf_area_hint,
+    declared_outside_sf_url_hint,
+    outside_sf_location_label,
+    sf_area_from_address,
+)
 from .models import ListingCandidate
 from .preferences import Preferences
 
@@ -2211,6 +2216,13 @@ class CraigslistSource:
             price_node = node.select_one(".price")
             if not original_url or not title:
                 continue
+            area_label = _clean_text(location_node.get_text(" ", strip=True)) if location_node else None
+            # A San Francisco search is padded with the rest of the Bay Area
+            # when it runs thin. Those homes are not near matches for an SF
+            # search, and collecting them spent the detail budget and filled
+            # the archive with places nobody asked about.
+            if declared_outside_sf_url_hint(original_url) or outside_sf_location_label(area_label):
+                continue
             listings.append(
                 ListingCandidate(
                     platform="Craigslist",
@@ -2218,7 +2230,7 @@ class CraigslistSource:
                     title=title,
                     original_url=original_url,
                     price=_parse_price(price_node.get_text(" ", strip=True) if price_node else None),
-                    neighborhood=_clean_text(location_node.get_text(" ", strip=True)) if location_node else None,
+                    neighborhood=area_label,
                     listing_type=(
                         "Room/share"
                         if search_kind == ROOM

@@ -11,50 +11,93 @@ from .deal_profile import SF_NEIGHBORHOODS
 
 _OUTSIDE_SF_CITIES = (
     "alameda",
+    "albany",
+    "american canyon",
+    "antioch",
     "belmont",
+    "benicia",
     "berkeley",
+    "brisbane",
     "burlingame",
+    "calistoga",
     "campbell",
+    "castro valley",
     "concord",
+    "corte madera",
     "cupertino",
     "daly city",
     "danville",
     "dublin",
+    "el cerrito",
     "emeryville",
+    "fairfield",
     "foster city",
     "fremont",
     "half moon bay",
     "hayward",
+    "healdsburg",
+    "lafayette",
+    "larkspur",
+    "livermore",
     "los altos",
     "los gatos",
+    "martinez",
     "menlo park",
-    "milpitas",
     "mill valley",
+    "millbrae",
+    "milpitas",
+    "moraga",
     "mountain view",
+    "napa",
+    "newark",
+    "novato",
     "oakland",
+    "orinda",
     "pacifica",
     "palo alto",
+    "petaluma",
     "pleasanton",
     "redwood city",
     "richmond",
+    "rohnert park",
+    "san anselmo",
     "san bruno",
     "san carlos",
     "san diego",
     "san jose",
     "san leandro",
+    "san lorenzo",
     "san mateo",
-    "san ramon",
+    "san pablo",
     "san rafael",
-    "sausalito",
-    "south san francisco",
+    "san ramon",
     "santa clara",
+    "santa rosa",
+    "sausalito",
+    "sonoma",
+    "south san francisco",
+    "st helena",
+    "suisun city",
     "sunnyvale",
     "tiburon",
     "union city",
+    "vacaville",
+    "vallejo",
     "walnut creek",
+    "windsor",
+    "yountville",
 )
 
-_UNAMBIGUOUS_OUTSIDE_SF_CITIES = tuple(city for city in _OUTSIDE_SF_CITIES if city != "richmond")
+# Cities whose names are also San Francisco streets, parks or districts. A
+# listing near Lafayette Park or on Vallejo Street is in San Francisco, so these
+# need "<city>, CA" spelled out before they mean anywhere else.
+_ALSO_SAN_FRANCISCO_PLACES = frozenset(
+    {"richmond", "lafayette", "moraga", "vallejo", "napa", "santa rosa", "corte madera", "sonoma"}
+)
+
+_UNAMBIGUOUS_OUTSIDE_SF_CITIES = tuple(
+    city for city in _OUTSIDE_SF_CITIES if city not in _ALSO_SAN_FRANCISCO_PLACES
+)
 
 # Shared with scoring: "south san francisco" contains the string a naive
 # San Francisco check would accept, and is a different city.
@@ -78,6 +121,24 @@ def declared_outside_sf_area_hint(text: str | None) -> str | None:
         if re.search(rf"{location_prefix}(?:the\s+)?{re.escape(city)}(?!\w)", normalized):
             return f"{city.title()} (outside SF)"
         if re.match(rf"^[^a-z0-9]{{0,8}}{re.escape(city)}(?!\w)", normalized):
+            return f"{city.title()} (outside SF)"
+    return None
+
+
+def outside_sf_location_label(label: str | None) -> str | None:
+    """Return the city when a search card's own area label is another one.
+
+    Craigslist pads a thin San Francisco search with the rest of the Bay Area,
+    and those cards label themselves plainly ("Napa"). Only an exact match
+    counts, and only for a name that is not also a San Francisco place: the
+    city's own area labels include "richmond / seacliff", which must never read
+    as the city of Richmond.
+    """
+    normalized = re.sub(r"\s+", " ", (label or "").casefold()).strip(" ()")
+    if not normalized:
+        return None
+    for city in _UNAMBIGUOUS_OUTSIDE_SF_CITIES:
+        if normalized == city:
             return f"{city.title()} (outside SF)"
     return None
 

@@ -387,6 +387,13 @@ button.row-action { display: inline-flex; }
 .note-form button { min-height: 34px; margin-top: 6px; padding: 6px 10px; font-size: 0.75rem; }
 .empty { text-align: center; padding: 72px 20px; }
 .empty-mark { width: 44px; height: 44px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 14px; background: var(--surface-muted); color: var(--muted); font-size: 1.3rem; }
+/* Why an empty shortlist is empty. Quiet: it is an explanation, not an alarm,
+   and the two ways out sit right under it. */
+.why-empty { max-width: 46ch; margin: 18px auto 0; padding-top: 16px; border-top: 1px solid var(--line); text-align: left; }
+.why-empty-lead { margin: 0 0 8px; color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+.why-empty ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--ink); font-size: 0.84rem; line-height: 1.5; }
+.why-empty ul b { font-weight: 680; font-variant-numeric: tabular-nums; }
+.why-empty-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 16px 0 0; font-size: 0.82rem; }
 .empty h3 { margin: 0 0 7px; font-size: 1.05rem; }
 .empty p { color: var(--muted); margin: 0; }
 

@@ -761,3 +761,112 @@ def test_plain_language_deal_form_updates_profile_and_preserves_advanced_setting
         "max_per_person": 2500,
         "max_building_units": 50,
     }
+
+
+# --------------------------------------------------------------------------
+# an empty shortlist has to say why it is empty
+# --------------------------------------------------------------------------
+
+
+def narrow_profile() -> str:
+    """One area, a high bar: a deal that collects plenty and shortlists none."""
+    import yaml
+
+    return yaml.safe_dump(
+        {
+            "profile_version": 1,
+            "profile": {
+                "state": "active",
+                "enabled_paths": ["private_room"],
+                "budgets": {"private_room": {"maximum_monthly": 1200}},
+                "geography": {"anywhere_in_sf": False, "dream": ["Sea Cliff"]},
+                "room_household": {"private_room_required": True},
+            },
+            "technical": {"minimum_score": 85},
+        }
+    )
+
+
+def seed_rooms(repository: Repository, count: int = 6) -> None:
+    for index in range(count):
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"x{index}",
+                title=f"Private room {index}",
+                original_url=f"https://sfbay.craigslist.org/roo/d/x/{index}.html",
+                price=2600 + index,
+                neighborhood="Tenderloin",
+                listing_type="Room/share",
+                summary="A private room in a shared home.",
+            ),
+            ScoreResult(70, ["fits"], "check", {}),
+        )
+
+
+def test_an_empty_shortlist_names_what_held_the_homes_back(tmp_path: Path) -> None:
+    """An empty list with no explanation reads as a broken search. It almost
+    never is: the deal is narrow, and the page should say which limit cost what.
+    """
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(narrow_profile(), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    seed_rooms(application.state.repository)
+
+    with TestClient(application) as client:
+        page = client.get("/?housing=room").text
+
+    from sf_housing.models import CHECK_EXCLUSION_PHRASES
+
+    assert "No homes made the shortlist yet" in page
+    assert "Of 6 homes collected for this tab" in page
+    known = set(CHECK_EXCLUSION_PHRASES.values()) | {"below your 85 match cut-off"}
+    assert any(phrase in page for phrase in known), "the reason has to be one it can name"
+    assert 'href="/preferences"' in page, "and offers the way out"
+    assert "view=near_matches" in page, "and the homes themselves are still reachable"
+
+
+def test_the_reasons_are_counted_not_guessed(tmp_path: Path) -> None:
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(narrow_profile(), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    seed_rooms(repository, count=7)
+
+    with TestClient(application) as client:
+        client.get("/?housing=room")
+        summary = repository.exclusion_summary(85, "room", ())
+
+    assert summary, "seven collected homes have to be accounted for"
+    assert sum(item["count"] for item in summary) == 7, "every held-back home is counted once"
+
+
+def test_a_healthy_shortlist_pays_nothing_for_the_explanation(tmp_path: Path) -> None:
+    """The breakdown is only computed when the list is thin, and never shown
+    when there is a real shortlist to read."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    for index in range(6):
+        add_listing(repository, "Craigslist", f"good{index}", f"Sunny room {index}", 1500, "NOPA")
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    assert "collected for this tab" not in page
+
+
+def test_nothing_collected_at_all_does_not_pretend_to_explain(tmp_path: Path) -> None:
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(narrow_profile(), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/?housing=room")
+
+    assert page.status_code == 200
+    assert "collected for this tab" not in page.text

@@ -804,6 +804,15 @@ def create_app(
             listing["was_checked_today"] = _was_checked_today(
                 str(listing.get("last_seen") or ""), now=current_time
             )
+        # An empty shortlist with nothing else on the page reads as a broken
+        # search. Almost always the search worked and the deal is narrow, so
+        # when little or nothing survives, say what held the rest back. Only
+        # computed on the thin path, so the normal one pays nothing.
+        exclusion_summary: list[dict[str, object]] = []
+        if view == "active" and len(listings) < 5:
+            exclusion_summary = repository.exclusion_summary(
+                preferences.minimum_score, housing_kind, mode_unit_types
+            )
         option_minimum = preferences.minimum_score if view == "active" else 0
         neighborhoods, stored_platforms = repository.filter_options(
             option_minimum, housing_kind, mode_unit_types
@@ -928,6 +937,8 @@ def create_app(
                 ),
                 "return_to": return_to,
                 "sort_urls": sort_urls,
+                "exclusion_summary": exclusion_summary,
+                "excluded_total": sum(int(item["count"]) for item in exclusion_summary),
             },
         )
 

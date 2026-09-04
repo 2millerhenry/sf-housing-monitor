@@ -12,7 +12,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .classification import classify_listing
 from .connectors import CONNECTOR_STATES, ConnectorStatus
-from .models import ListingCandidate, ScoreResult, ordered_checks, unmeasured_criteria
+from .models import (
+    CHECK_EXCLUSION_PHRASES,
+    ListingCandidate,
+    ScoreResult,
+    ordered_checks,
+    unmeasured_criteria,
+)
 
 
 SCHEMA_VERSION = 3
@@ -538,6 +544,49 @@ class Repository:
                 )
             )
         return items
+
+    def exclusion_summary(
+        self,
+        minimum_score: int,
+        housing_kind: str = "room",
+        unit_types: tuple[str, ...] = (),
+        *,
+        limit: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Why the homes that were collected did not reach the shortlist.
+
+        An empty shortlist with nothing else on the page reads as a broken
+        search. Almost always the search worked and the deal is narrow, so this
+        counts the leading reason each collected home was held back and lets the
+        page say so.
+        """
+        clauses = ["status IN ('active', 'saved')", "housing_kind = ?"]
+        parameters: list[Any] = [housing_kind]
+        if unit_types:
+            placeholders = ",".join("?" for _ in unit_types)
+            clauses.append(f"(unit_type IN ({placeholders}) OR unit_type IS NULL)")
+            parameters.extend(unit_types)
+        clauses.append("(eligibility = 'ineligible' OR score < ?)")
+        parameters.append(int(minimum_score))
+        sql = f"SELECT score, eligibility, score_details_json FROM listings WHERE {' AND '.join(clauses)}"
+        with self.connection() as connection:
+            rows = connection.execute(sql, parameters).fetchall()
+
+        counts: dict[str, int] = {}
+        for row in rows:
+            if row["eligibility"] == "ineligible":
+                try:
+                    details = json.loads(row["score_details_json"] or "{}")
+                except ValueError:
+                    details = {}
+                blockers = ordered_checks(details.get("hard_constraints"), "fail")
+                name = blockers[0]["check"] if blockers and blockers[0]["check"] else ""
+                label = CHECK_EXCLUSION_PHRASES.get(name, "outside your deal's limits")
+            else:
+                label = f"below your {int(minimum_score)} match cut-off"
+            counts[label] = counts.get(label, 0) + 1
+        ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
+        return [{"reason": reason, "count": count} for reason, count in ordered[:limit]]
 
     def shortlist_counts(self, thresholds: Sequence[int]) -> dict[int, int]:
         """How many homes each cut-off would put on the shortlist.

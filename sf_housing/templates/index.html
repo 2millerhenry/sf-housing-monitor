@@ -313,7 +313,23 @@
     {% elif view == 'near_matches' %}
       <p>No collected homes are just outside this deal. Check again later or review the deal without changing it automatically.</p>
     {% else %}
-      <p>{% if scan_running %}Sources are still checking. Results appear as they are saved.{% elif source_attention_count %}{{ source_attention_count }} source{% if source_attention_count != 1 %}s need{% else %} needs{% endif %} attention. Open System status for the exact recovery step.{% elif scans and scans[0].sources_failed %}The last check had a source problem. Open System status for the exact source and recovery action.{% elif scans %}The last check finished, but no collected homes met this path and threshold. <a href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score">See near matches</a> or <a href="/preferences">review your deal</a>.{% else %}Run the first source check. If inventory is genuinely empty, the source status below will explain what happened.{% endif %}</p>
+      <p>{% if scan_running %}Sources are still checking. Results appear as they are saved.{% elif source_attention_count %}{{ source_attention_count }} source{% if source_attention_count != 1 %}s need{% else %} needs{% endif %} attention. Open System status for the exact recovery step.{% elif scans and scans[0].sources_failed %}The last check had a source problem. Open System status for the exact source and recovery action.{% elif scans %}The last check worked; {{ excluded_total if excluded_total else 'no collected home' }} {% if excluded_total %}homes were collected and every one was held back by your deal{% else %}met this path and threshold{% endif %}.{% else %}Run the first source check. If inventory is genuinely empty, the source status below will explain what happened.{% endif %}</p>
+    {% endif %}
+    {# The search almost always worked; the deal is narrow. Say which limit cost
+       what, so the next move is obvious instead of a guess. #}
+    {% if exclusion_summary and view == 'active' %}
+    <div class="why-empty">
+      <p class="why-empty-lead">Of {{ excluded_total }} home{{ 's' if excluded_total != 1 }} collected for this tab:</p>
+      <ul>
+        {% for item in exclusion_summary %}
+        <li><b>{{ item.count }}</b> {{ item.reason }}</li>
+        {% endfor %}
+      </ul>
+      <p class="why-empty-actions">
+        <a class="button" href="/preferences">Widen your deal</a>
+        <a href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score">See them in Near matches</a>
+      </p>
+    </div>
     {% endif %}
   </div>
   {% endif %}

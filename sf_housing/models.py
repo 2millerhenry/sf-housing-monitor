@@ -96,6 +96,26 @@ def unmeasured_criteria(score_details: Any, answered: set[str]) -> list[str]:
     return unmeasured
 
 
+# The same names, said the way a person would say them, for the line that
+# explains an empty shortlist. Kept beside CHECK_ORDER so one vocabulary covers
+# both the badge on a row and the reason a home never reached one.
+CHECK_EXCLUSION_PHRASES = {
+    "area": "outside your areas",
+    "price": "over your budget",
+    "rent": "priced in a way that needs checking",
+    "home type": "a home type you have not turned on",
+    "private room": "not a private room",
+    "building size": "in a building larger than your limit",
+    "lease": "a lease length that does not fit",
+    "move-in": "available outside your move-in dates",
+    "household": "sharing with more people than you allow",
+    "sublet term": "a sublet shorter than you accept",
+    "stay length": "a stay shorter than a month",
+    "listing page": "a listing page that could not be confirmed",
+    "dealbreaker": "carrying something you listed as a dealbreaker",
+}
+
+
 def ordered_checks(constraints: Any, status: str) -> list[dict[str, str]]:
     """The constraints of one status, most decision-relevant first.
 
