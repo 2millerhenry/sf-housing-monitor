@@ -4,7 +4,7 @@ import json
 import re
 import sqlite3
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from bisect import bisect_left
 from typing import Any, Iterator, Sequence
@@ -375,6 +375,20 @@ class Repository:
     ) -> None:
         with self.connection() as connection:
             classified = classify_listing(listing) if listing is not None else None
+            if classified is not None:
+                # The evidence has to be stored with the verdict. Without this a
+                # recheck wrote "inactive" into the score and threw away the
+                # metadata that said why, so the next rescore read the old
+                # metadata and put the home straight back on the shortlist.
+                stored = connection.execute(
+                    "SELECT metadata_json FROM listings WHERE id = ?", (listing_id,)
+                ).fetchone()
+                merged = json.loads(stored["metadata_json"] or "{}") if stored else {}
+                merged.update(classified.metadata)
+                connection.execute(
+                    "UPDATE listings SET metadata_json = ? WHERE id = ?",
+                    (json.dumps(merged, ensure_ascii=False), listing_id),
+                )
             values = (
                 result.score,
                 json.dumps(result.reasons, ensure_ascii=False),
@@ -544,6 +558,58 @@ class Repository:
                 )
             )
         return items
+
+    def shortlisted_absent_from_search(
+        self,
+        platform: str,
+        seen_source_ids: set[str],
+        minimum_score: int,
+        *,
+        limit: int = 8,
+        recheck_after: timedelta = timedelta(hours=20),
+        now: datetime | None = None,
+    ) -> list[tuple[int, ListingCandidate]]:
+        """Homes still on the shortlist that this source has stopped listing.
+
+        A listing is enriched once, when it is first collected, and never looked
+        at again, so a room that was verified live on Monday and taken down on
+        Wednesday stays on the shortlist looking exactly as current as one posted
+        this morning. Absence from one search is not proof -- a source returns
+        one page and an older post falls off it -- so these are candidates to go
+        and check, not homes to mark gone.
+
+        Oldest-checked first, so attention rotates rather than landing on the
+        same few every scan.
+        """
+        moment = (now or datetime.now(UTC)).astimezone(UTC)
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM listings WHERE platform = ? AND status IN ('active', 'saved') "
+                "AND eligibility != 'ineligible' AND score >= ? ORDER BY score DESC",
+                (platform, int(minimum_score)),
+            ).fetchall()
+
+        candidates: list[tuple[float, int, ListingCandidate]] = []
+        for row in rows:
+            if str(row["source_id"]) in seen_source_ids:
+                continue
+            metadata = json.loads(row["metadata_json"] or "{}")
+            checked = metadata.get("last_verified_at")
+            age = None
+            if isinstance(checked, str):
+                try:
+                    age = moment - datetime.fromisoformat(checked).astimezone(UTC)
+                except ValueError:
+                    age = None
+                if age is not None and age < recheck_after:
+                    continue
+            candidates.append((
+                age.total_seconds() if age is not None else float("inf"),
+                int(row["id"]),
+                self._row_to_candidate(row),
+            ))
+        candidates.sort(key=lambda item: (-item[0], -item[1]))
+        return [(listing_id, candidate) for _, listing_id, candidate in candidates[:limit]]
 
     def exclusion_summary(
         self,

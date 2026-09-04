@@ -13,7 +13,7 @@ import httpx
 
 from .classification import classify_listing
 from .connectors import GMAIL_PROVIDERS, aggregate_gmail_status, connector_state_for_error
-from .database import Repository
+from .database import Repository, utc_now
 from .filelock import release as release_file_lock, try_acquire as try_acquire_file_lock
 from .freshness import source_is_in_backoff, source_key as watchdog_source_key
 from .models import ListingCandidate, ScanOutcome
@@ -23,6 +23,11 @@ from .sources import ListingSource, facebook_coordinate_neighborhood, visible_sf
 
 
 LOGGER = logging.getLogger(__name__)
+
+# How many shortlisted homes a source may re-verify per scan. Small on purpose:
+# discovery comes first, and attention rotates oldest-checked first, so a whole
+# shortlist is covered over a few runs rather than all at once.
+DEFAULT_RECHECK_BUDGET = 6
 
 # How far back the one-off `initial_discovery` scan reaches when a profile
 # first goes active, so a new install opens on real listings instead of an
@@ -180,6 +185,59 @@ class Scanner:
         if published.tzinfo is None:
             published = published.replace(tzinfo=UTC)
         return published >= (now or datetime.now(UTC)) - INITIAL_DISCOVERY_WINDOW
+
+    def _recheck_absent(
+        self,
+        client: httpx.Client,
+        source: ListingSource,
+        preferences: Preferences,
+        *,
+        seen_source_ids: set[str],
+        deadline: float,
+    ) -> int:
+        """Re-verify shortlisted homes this source has stopped returning.
+
+        The detail page is what decides: a source that says the post is gone
+        already sets ``verified_inactive``, and scoring already refuses it. A
+        fetch that fails proves nothing, so the home is left exactly as it was.
+        """
+        budget = max(0, int(getattr(source, "recheck_budget", DEFAULT_RECHECK_BUDGET)))
+        if budget <= 0 or not hasattr(source, "enrich"):
+            return 0
+        try:
+            candidates = self.repository.shortlisted_absent_from_search(
+                source.platform, seen_source_ids, preferences.minimum_score, limit=budget
+            )
+        except Exception:  # a recheck must never cost the scan its results
+            LOGGER.warning("%s recheck lookup failed", source.platform, exc_info=True)
+            return 0
+
+        checked = 0
+        for listing_id, candidate in candidates:
+            if time.monotonic() + self.timeout_seconds > deadline:
+                break
+            try:
+                refreshed = source.enrich(client, candidate)
+            except Exception as exc:
+                # Unreachable is not gone. Leave the home untouched.
+                LOGGER.info(
+                    "%s could not recheck %s: %s", source.platform, candidate.original_url, exc
+                )
+                continue
+            metadata = dict(refreshed.metadata)
+            metadata["last_verified_at"] = utc_now()
+            refreshed = replace(classify_listing(refreshed), metadata=metadata)
+            try:
+                self.repository.update_score(
+                    listing_id, score_listing(refreshed, preferences), listing=refreshed
+                )
+            except Exception:
+                LOGGER.warning("%s recheck could not be stored", source.platform, exc_info=True)
+                continue
+            checked += 1
+            if self.detail_delay_seconds:
+                time.sleep(self.detail_delay_seconds)
+        return checked
 
     @staticmethod
     def _merge_stored(
@@ -589,6 +647,8 @@ class Scanner:
                             if self.detail_delay_seconds:
                                 time.sleep(self.detail_delay_seconds)
 
+                        # Pass 4 is below; pass 3 first, so a home this search
+                        # did return is up to date before anything is rechecked.
                         # Pass 3: classify, score and store every listing.
                         for item in prepared:
                             listing = item["listing"]
@@ -621,6 +681,21 @@ class Scanner:
                                 listings_seen=total_seen,
                                 listings_added=total_added,
                             )
+                        # Pass 4: go and look at the shortlisted homes this
+                        # search stopped returning. A listing is enriched once
+                        # and never revisited, so a room verified live on Monday
+                        # and taken down on Wednesday stayed on the shortlist
+                        # looking as current as one posted this morning. Absence
+                        # from one page is not proof, so this checks the page
+                        # rather than inferring anything from the silence, and
+                        # only runs where the search itself succeeded.
+                        rechecked = self._recheck_absent(
+                            client,
+                            source,
+                            preferences,
+                            seen_source_ids={item["listing"].source_id for item in prepared},
+                            deadline=deadline,
+                        )
                         message = (
                             f"Completed with {detail_failures} detail-page warning(s)."
                             if detail_failures
@@ -628,6 +703,9 @@ class Scanner:
                             if source_seen == 0
                             else None
                         )
+                        if rechecked:
+                            note = f"Rechecked {rechecked} home(s) this search no longer lists."
+                            message = f"{message} {note}" if message else note
                         self.repository.finish_source_run(
                             source_run_id,
                             "success",

@@ -373,6 +373,9 @@ def test_craigslist_detail_page_records_the_posting_time() -> None:
     from sf_housing.models import ListingCandidate
 
     class Response:
+        # A real response always carries a status; a double without one hid the
+        # fact that a deleted post answers 410 rather than raising.
+        status_code = 200
         url = "https://www.craigslist.org/view/d/room/1.html"
         text = (
             '<html><body><section id="postingbody">A sunny room near the park.</section>'

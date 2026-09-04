@@ -2392,6 +2392,23 @@ class CraigslistSource:
 
     def enrich(self, client: httpx.Client, listing: ListingCandidate) -> ListingCandidate:
         response = client.get(listing.original_url)
+        # Craigslist answers a deleted post with 410, and a post that never
+        # existed with 404. Both are the source stating plainly that the home is
+        # not there, so they are an answer rather than a failure -- raising here
+        # meant a deleted post looked exactly like a dropped connection, and the
+        # home kept its place on the shortlist.
+        if response.status_code in (404, 410):
+            return replace(
+                listing,
+                metadata={
+                    **listing.metadata,
+                    "craigslist_detail_checked": True,
+                    "verified_inactive": True,
+                    "verification_concern": (
+                        f"Verified inactive: Craigslist answered {response.status_code} for this post."
+                    ),
+                },
+            )
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         metadata = dict(listing.metadata)

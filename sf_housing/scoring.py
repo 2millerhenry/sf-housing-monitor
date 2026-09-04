@@ -1265,6 +1265,13 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
         score = min(score, 54)
     if dealbreaker_hits:
         score = min(score, 49)
+    # A room the source has taken down is not a room you can rent. Whole units
+    # have refused this since the beginning; rooms are the larger half of what
+    # Craigslist publishes and were never asked, so a deleted post kept its full
+    # score and stayed on the shortlist indefinitely.
+    room_verified_inactive = listing.metadata.get("verified_inactive") is True
+    if room_verified_inactive:
+        score = min(score, 49)
 
     ranked_reasons = sorted(
         (item for item in active if item.positive),
@@ -1273,7 +1280,12 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
     )
     reasons = [item.positive for item in ranked_reasons[:3] if item.positive]
 
-    if dealbreaker_hits:
+    if room_verified_inactive:
+        concern = str(
+            listing.metadata.get("verification_concern")
+            or "Verified inactive: the source has removed this post."
+        ).strip()[:500]
+    elif dealbreaker_hits:
         concern = f"Possible dealbreaker mentioned: {', '.join(dealbreaker_hits[:2])}."
     elif household_restriction:
         concern = household_restriction
@@ -1351,6 +1363,12 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
             hard_constraints.append({"status": "fail", "check": check, "reason": criterion.mismatch or f"The {label} conflicts with your deal."})
         elif criterion and not criterion.known:
             hard_constraints.append({"status": "unknown", "check": check, "reason": criterion.missing})
+    if room_verified_inactive:
+        hard_constraints.append({
+            "status": "fail",
+            "check": "listing page",
+            "reason": "The source verified this listing is inactive.",
+        })
     if dealbreaker_hits:
         hard_constraints.append({"status": "fail", "check": "dealbreaker", "reason": f"Possible dealbreaker: {', '.join(dealbreaker_hits[:2])}."})
     if is_sublet and sublet_months is None:
