@@ -653,3 +653,46 @@ def test_only_unambiguous_zips_name_a_neighbourhood(zip_code: str, expected: str
     from sf_housing.sources import sf_area_from_zip
 
     assert sf_area_from_zip(zip_code) == expected
+
+
+def test_the_result_cap_takes_the_whole_craigslist_page() -> None:
+    """Craigslist's search page carries about 220 results and ignores an offset,
+    so a 120 cap threw away roughly a hundred homes per search -- on a live
+    scan, 197 listings instead of 290, and 108 rooms instead of 201. Nobody
+    chose that number; it was a default nobody had revisited."""
+    from sf_housing.deal_profile import legacy_view, DealProfile
+
+    profile = DealProfile.from_dict(
+        {
+            "state": "active",
+            "enabled_paths": ["private_room"],
+            "budgets": {"private_room": {"maximum_monthly": 2500}},
+            "geography": {"anywhere_in_sf": True},
+        }
+    )
+    view = legacy_view(profile, {})
+
+    assert view["sources"]["max_results_per_source"] >= 220, (
+        "the cap has to clear one full Craigslist page"
+    )
+
+
+def test_a_stored_cap_is_still_respected() -> None:
+    """Raising the default must not override someone who set their own."""
+    from sf_housing.preferences import parse_preferences
+
+    import yaml
+
+    document = {
+        "profile_version": 1,
+        "profile": {
+            "state": "active",
+            "enabled_paths": ["private_room"],
+            "budgets": {"private_room": {"maximum_monthly": 2500}},
+            "geography": {"anywhere_in_sf": True},
+        },
+        "technical": {"sources": {"max_results_per_source": 40}},
+    }
+    preferences = parse_preferences(yaml.safe_dump(document))
+
+    assert preferences.section("sources")["max_results_per_source"] == 40

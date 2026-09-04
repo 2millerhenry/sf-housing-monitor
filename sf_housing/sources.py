@@ -23,7 +23,7 @@ from .location import (
     sf_area_from_address,
 )
 from .models import ListingCandidate
-from .preferences import Preferences
+from .preferences import Preferences, setting_int
 
 
 class SourceError(RuntimeError):
@@ -1395,14 +1395,14 @@ class ApifyFacebookMarketplaceSource:
         if budget.get("max_monthly") is not None:
             maximum = int(budget["max_monthly"])
             if whole_unit.get("enabled", True) is True:
-                maximum = max(maximum, int(whole_unit.get("max_monthly", 3000)))
+                maximum = max(maximum, setting_int(whole_unit.get("max_monthly"), 3000))
             if two_bedroom.get("enabled", True) is True:
-                shared_total = int(two_bedroom.get("occupants", 2)) * int(
+                shared_total = setting_int(two_bedroom.get("occupants"), 2) * int(
                     two_bedroom.get("max_per_person", 2700)
                 )
                 maximum = max(maximum, shared_total)
             if three_bedroom.get("enabled", True) is True:
-                shared_total = int(three_bedroom.get("occupants", 3)) * int(
+                shared_total = setting_int(three_bedroom.get("occupants"), 3) * int(
                     three_bedroom.get("max_per_person", 2500)
                 )
                 maximum = max(maximum, shared_total)
@@ -2041,8 +2041,8 @@ class FurnishedFinderSource:
         if not token:
             raise SourceError("The Apify token is missing or invalid; reconnect it from Alerts.")
         budget = preferences.section("budget")
-        min_price = int(budget.get("min_monthly", 800))
-        max_price = int(budget.get("max_monthly", 2700))
+        min_price = setting_int(budget.get("min_monthly"), 800)
+        max_price = setting_int(budget.get("max_monthly"), 2700)
         source_settings = preferences.section("sources")
         try:
             results_limit = int(source_settings.get("furnished_finder_results_per_scan", self.results_limit))
@@ -2124,7 +2124,7 @@ class CraigslistSource:
         settings = preferences.section("whole_unit")
         query: dict[str, str | int] = {
             "sort": "date",
-            "max_price": int(settings.get("max_monthly", 3000)),
+            "max_price": setting_int(settings.get("max_monthly"), 3000),
             "min_bedrooms": 0,
             "max_bedrooms": 1,
         }
@@ -2135,16 +2135,16 @@ class CraigslistSource:
         enabled = set(preferences.deal_profile.enabled_paths)
         ceilings: list[int] = []
         if "private_room" in enabled:
-            ceilings.append(int(preferences.section("budget").get("max_monthly", 2700)))
+            ceilings.append(setting_int(preferences.section("budget").get("max_monthly"), 2700))
         whole_unit = preferences.section("whole_unit")
         two_bedroom = preferences.section("two_bedroom")
         three_bedroom = preferences.section("three_bedroom")
         if enabled.intersection({"studio", "one_bedroom"}):
-            ceilings.append(int(whole_unit.get("max_monthly", 3000)))
+            ceilings.append(setting_int(whole_unit.get("max_monthly"), 3000))
         if "two_bedroom" in enabled:
-            ceilings.append(int(two_bedroom.get("occupants", 2)) * int(two_bedroom.get("max_per_person", 2700)))
+            ceilings.append(setting_int(two_bedroom.get("occupants"), 2) * setting_int(two_bedroom.get("max_per_person"), 2700))
         if "three_bedroom" in enabled:
-            ceilings.append(int(three_bedroom.get("occupants", 3)) * int(three_bedroom.get("max_per_person", 2500)))
+            ceilings.append(setting_int(three_bedroom.get("occupants"), 3) * setting_int(three_bedroom.get("max_per_person"), 2500))
         maximum = max(ceilings or [3000])
         query: dict[str, str | int] = {"sort": "date", "max_price": maximum}
         budget = preferences.section("budget")
@@ -2155,7 +2155,7 @@ class CraigslistSource:
     def _two_bedroom_url(self, preferences: Preferences) -> str:
         """Build an exact 2-bedroom search with its own hard cap."""
         two_bedroom = preferences.section("two_bedroom")
-        two_bedroom_max = int(two_bedroom.get("occupants", 2)) * int(
+        two_bedroom_max = setting_int(two_bedroom.get("occupants"), 2) * int(
             two_bedroom.get("max_per_person", 2700)
         )
         query: dict[str, str | int] = {
@@ -2169,7 +2169,7 @@ class CraigslistSource:
     def _four_bedroom_url(self, preferences: Preferences) -> str:
         """Exact 4-bedroom inventory, which 2-3 bedroom volume would otherwise bury."""
         settings = preferences.section("four_bedroom")
-        max_monthly = int(settings.get("occupants", 4)) * int(settings.get("max_per_person", 2300))
+        max_monthly = setting_int(settings.get("occupants"), 4) * setting_int(settings.get("max_per_person"), 2300)
         query: dict[str, str | int] = {
             "sort": "date",
             "max_price": max_monthly,
@@ -2181,7 +2181,7 @@ class CraigslistSource:
     def _three_bedroom_url(self, preferences: Preferences) -> str:
         """Return exact 3-bedroom inventory so 2-bedroom volume cannot hide it."""
         settings = preferences.section("three_bedroom")
-        max_monthly = int(settings.get("occupants", 3)) * int(
+        max_monthly = setting_int(settings.get("occupants"), 3) * int(
             settings.get("max_per_person", 2500)
         )
         query: dict[str, str | int] = {
@@ -2255,16 +2255,16 @@ class CraigslistSource:
         two_enabled = "two_bedroom" in enabled
         three_enabled = "three_bedroom" in enabled
         four_enabled = "four_bedroom" in enabled
-        room_details = int(source_settings.get("craigslist_detail_pages_per_scan", 10))
-        unit_details = int(source_settings.get("craigslist_unit_detail_pages_per_scan", 10))
-        two_bedroom_details = int(source_settings.get("craigslist_two_bedroom_detail_pages_per_scan", 10))
+        room_details = setting_int(source_settings.get("craigslist_detail_pages_per_scan"), 10)
+        unit_details = setting_int(source_settings.get("craigslist_unit_detail_pages_per_scan"), 10)
+        two_bedroom_details = setting_int(source_settings.get("craigslist_two_bedroom_detail_pages_per_scan"), 10)
         three_bedroom_details = int(
             source_settings.get("craigslist_three_bedroom_detail_pages_per_scan", 25)
         )
         four_bedroom_details = int(
             source_settings.get("craigslist_four_bedroom_detail_pages_per_scan", 15)
         )
-        sublet_details = int(source_settings.get("craigslist_sublet_detail_pages_per_scan", 15))
+        sublet_details = setting_int(source_settings.get("craigslist_sublet_detail_pages_per_scan"), 15)
         room_details = max(0, min(room_details, 50))
         unit_details = max(0, min(unit_details, 50))
         two_bedroom_details = max(0, min(two_bedroom_details, 50))
@@ -2284,7 +2284,7 @@ class CraigslistSource:
             + four_bedroom_details
             + sublet_details
         )
-        max_results = int(source_settings.get("max_results_per_source", 120))
+        max_results = setting_int(source_settings.get("max_results_per_source"), 250)
         room_url = self._room_url(preferences)
         unit_url = self._unit_url(preferences)
         two_bedroom_url = self._two_bedroom_url(preferences)
@@ -2503,7 +2503,7 @@ class SpareRoomSource:
         if "private_room" not in preferences.deal_profile.enabled_paths:
             self.empty_result_message = "Skipped because private rooms are not enabled in Your deal."
             return []
-        max_results = int(preferences.section("sources").get("max_results_per_source", 120))
+        max_results = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
         response = client.get(self.search_url)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")

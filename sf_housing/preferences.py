@@ -245,6 +245,23 @@ def ensure_preferences(path: Path) -> Preferences:
     )
 
 
+def setting_int(value: object, default: int) -> int:
+    """Read a numeric setting that may be missing, null, or nonsense.
+
+    Readers all wrote ``int(section.get(key, default))``, where the default only
+    applies when the key is absent. A key present and null therefore reached
+    int() and raised, which on the dashboard is a 500 on the page the whole app
+    opens to. A configuration value nobody can parse should fall back, not take
+    the page down.
+    """
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def save_deal_profile(
     path: Path,
     profile: DealProfile,

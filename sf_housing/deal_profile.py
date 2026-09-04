@@ -499,7 +499,10 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
         "parking": importance_weights[feature_levels["parking"]],
         "lifestyle": 0,
     }
-    result.setdefault("sources", {"max_results_per_source": 120, "craigslist_detail_pages_per_scan": 10})
+    # Craigslist's search page carries about 220 results and ignores an offset,
+    # so 120 was throwing away roughly a hundred homes per search for no reason
+    # anyone chose. 250 takes the page as it comes; scoring them is cheap.
+    result.setdefault("sources", {"max_results_per_source": 250, "craigslist_detail_pages_per_scan": 10})
     result["ideal_neighborhoods"] = list(profile.areas.get("dream", ()))
     result["preferred_neighborhoods"] = list(profile.areas.get("strong", ()))
     result["acceptable_neighborhoods"] = list(profile.areas.get("okay", ()))

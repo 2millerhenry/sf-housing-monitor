@@ -1005,3 +1005,41 @@ def test_the_score_cell_no_longer_repeats_the_check_column(tmp_path: Path) -> No
     assert "verification-label" not in score_cell
     assert "Check " not in score_cell
     assert "% evidence" in score_cell, "what the cell does keep"
+
+
+# --------------------------------------------------------------------------
+# a configuration value nobody can parse must not take the page down
+# --------------------------------------------------------------------------
+
+
+def test_a_null_budget_setting_does_not_500_the_dashboard(tmp_path: Path) -> None:
+    """Readers wrote int(section.get(key, default)), where the default only
+    applies when the key is absent. A key present and null reached int() and
+    raised, which on the dashboard is a 500 on the page the app opens to."""
+    import yaml
+
+    from tests.conftest import TEST_PREFERENCES
+
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    document = yaml.safe_load(TEST_PREFERENCES)
+    document.setdefault("budget", {})["min_monthly"] = None
+    document["budget"]["max_monthly"] = None
+    settings.preferences_path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        for path in ("/", "/preferences", "/?housing=room", "/?view=near_matches"):
+            assert client.get(path).status_code == 200, path
+
+
+def test_an_unreadable_setting_falls_back_instead_of_raising() -> None:
+    from sf_housing.preferences import setting_int
+
+    assert setting_int(None, 800) == 800
+    assert setting_int("", 800) == 800
+    assert setting_int("nonsense", 800) == 800
+    assert setting_int([], 800) == 800
+    assert setting_int("1200", 800) == 1200
+    assert setting_int(1200, 800) == 1200
+    assert setting_int(1200.0, 800) == 1200

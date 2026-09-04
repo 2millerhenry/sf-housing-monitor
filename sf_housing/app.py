@@ -47,6 +47,7 @@ from .gmail_alerts import GmailAlertError, GmailAlertMailbox
 from .imap_alerts import AlertMailboxRouter, ImapAlertError, ImapAlertMailbox, host_for_address
 from .liveness import describe_age, next_run_label, schedule_health
 from .preferences import (
+    setting_int,
     PreferenceError,
     Preferences,
     ensure_preferences,
@@ -149,8 +150,8 @@ def _prepared_zillow_searches(preferences: Preferences | None = None) -> list[di
         return []
     configured = (preferences.data.get("zillow_searches") if preferences else None) or []
     budget = preferences.section("budget") if preferences else {}
-    room_minimum = int(budget.get("min_monthly", 800))
-    room_maximum = int(budget.get("max_monthly", 2700))
+    room_minimum = setting_int(budget.get("min_monthly"), 800)
+    room_maximum = setting_int(budget.get("max_monthly"), 2700)
     searches: list[dict[str, str]] = []
     if isinstance(configured, list):
         for item in configured:
@@ -199,7 +200,7 @@ def _prepared_zillow_unit_searches(preferences: Preferences) -> list[dict[str, s
     """Prepared whole-unit searches that can become Zillow Instant alerts."""
     if not set(preferences.deal_profile.enabled_paths).intersection({"studio", "one_bedroom"}):
         return []
-    max_monthly = int(preferences.section("whole_unit").get("max_monthly", 3000))
+    max_monthly = setting_int(preferences.section("whole_unit").get("max_monthly"), 3000)
     state = quote(
         json.dumps(
             {
@@ -917,15 +918,15 @@ def create_app(
                 "neighborhoods": neighborhoods,
                 "platforms": platforms,
                 "minimum_score": preferences.minimum_score,
-                "room_min_monthly": int(preferences.section("budget").get("min_monthly", 800)),
-                "room_max_monthly": int(preferences.section("budget").get("max_monthly", 2700)),
+                "room_min_monthly": setting_int(preferences.section("budget").get("min_monthly"), 800),
+                "room_max_monthly": setting_int(preferences.section("budget").get("max_monthly"), 2700),
                 "whole_unit_max_monthly": int(
                     preferences.section("whole_unit").get("max_monthly", 3000)
                 ),
-                "two_bedroom_occupants": int(preferences.section("two_bedroom").get("occupants", 2)),
-                "two_bedroom_max_per_person": int(preferences.section("two_bedroom").get("max_per_person", 2700)),
-                "three_bedroom_occupants": int(preferences.section("three_bedroom").get("occupants", 3)),
-                "three_bedroom_max_per_person": int(preferences.section("three_bedroom").get("max_per_person", 2500)),
+                "two_bedroom_occupants": setting_int(preferences.section("two_bedroom").get("occupants"), 2),
+                "two_bedroom_max_per_person": setting_int(preferences.section("two_bedroom").get("max_per_person"), 2700),
+                "three_bedroom_occupants": setting_int(preferences.section("three_bedroom").get("occupants"), 3),
+                "three_bedroom_max_per_person": setting_int(preferences.section("three_bedroom").get("max_per_person"), 2500),
                 "profile_incomplete": preferences.profile_incomplete,
                 "source_statuses": source_statuses,
                 "source_attention_count": source_attention_count,
@@ -1074,7 +1075,17 @@ def create_app(
             "minimum_score": preferences.minimum_score,
             # What each stop on the slider would actually put on the shortlist,
             # so the number means something while it is being dragged.
-            "shortlist_counts": repository.shortlist_counts(CUTOFF_STOPS),
+            # Only the home shapes this deal actually shows, so the number under
+            # the slider is the number of rows the tabs will hold.
+            "shortlist_counts": repository.shortlist_counts(
+                CUTOFF_STOPS,
+                kinds=sorted(
+                    {
+                        "room" if path == "private_room" else "whole_unit"
+                        for path in preferences.deal_profile.enabled_paths
+                    }
+                ),
+            ),
             "cutoff_stops": CUTOFF_STOPS,
             "message": message,
             "error": error,
@@ -1475,8 +1486,8 @@ def create_app(
                 "facebook_split_searches": _prepared_facebook_split_searches(preferences),
                 "facebook_sublet_searches": _prepared_facebook_sublet_searches(preferences),
                 "facebook_groups": _prepared_facebook_groups(preferences),
-                "room_min_monthly": int(preferences.section("budget").get("min_monthly", 800)),
-                "room_max_monthly": int(preferences.section("budget").get("max_monthly", 2700)),
+                "room_min_monthly": setting_int(preferences.section("budget").get("min_monthly"), 800),
+                "room_max_monthly": setting_int(preferences.section("budget").get("max_monthly"), 2700),
                 "whole_unit_max_monthly": int(
                     preferences.section("whole_unit").get("max_monthly", 3000)
                 ),

@@ -708,20 +708,32 @@ class Repository:
         ordered = sorted(counts.items(), key=lambda item: (-item[1], item[0]))
         return [{"reason": reason, "count": count} for reason, count in ordered[:limit]]
 
-    def shortlist_counts(self, thresholds: Sequence[int]) -> dict[int, int]:
+    def shortlist_counts(
+        self, thresholds: Sequence[int], kinds: Sequence[str] = ()
+    ) -> dict[int, int]:
         """How many homes each cut-off would put on the shortlist.
 
         The same predicate the active view uses, so the number under the slider
-        is the number the reader will actually get. One pass over the scores
-        rather than one query per stop.
+        is the number the reader will actually get. ``kinds`` narrows it to the
+        home shapes the deal enables, because the tabs only ever show those: a
+        deal for rooms alone counted whole units it would never display, and the
+        slider read six higher than the page. One pass over the scores rather
+        than one query per stop.
         """
+        clauses = [
+            "status IN ('active', 'saved')",
+            "eligibility IN ('eligible', 'needs_verification')",
+        ]
+        parameters: list[Any] = []
+        wanted = [str(kind) for kind in kinds if str(kind)]
+        if wanted:
+            clauses.append(f"housing_kind IN ({','.join('?' for _ in wanted)})")
+            parameters.extend(wanted)
         with self.connection() as connection:
             scores = [
                 int(row[0])
                 for row in connection.execute(
-                    "SELECT score FROM listings "
-                    "WHERE status IN ('active', 'saved') "
-                    "AND eligibility IN ('eligible', 'needs_verification')"
+                    f"SELECT score FROM listings WHERE {' AND '.join(clauses)}", parameters
                 )
             ]
         scores.sort()
