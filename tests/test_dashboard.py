@@ -870,3 +870,51 @@ def test_nothing_collected_at_all_does_not_pretend_to_explain(tmp_path: Path) ->
 
     assert page.status_code == 200
     assert "collected for this tab" not in page.text
+
+
+# --------------------------------------------------------------------------
+# "there should be more listings than this"
+# --------------------------------------------------------------------------
+
+
+def test_a_short_shortlist_says_what_the_deal_held_back(tmp_path: Path) -> None:
+    """A list far shorter than what was collected reads as a broken scraper.
+    It almost never is, and the page had no way of saying which limit cost what.
+    """
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(narrow_profile(), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    # One home that fits, and plenty that the deal holds back.
+    repository.upsert_listing(
+        ListingCandidate(
+            platform="Craigslist", source_id="fits", title="Private room in Sea Cliff",
+            original_url="https://sfbay.craigslist.org/roo/d/x/fits.html", price=1100,
+            neighborhood="Sea Cliff", listing_type="Room/share",
+            summary="A private room in a shared home, available now.",
+        ),
+        ScoreResult(92, ["fits"], "", {}),
+    )
+    seed_rooms(repository, count=9)
+
+    with TestClient(application) as client:
+        page = client.get("/?housing=room").text
+
+    assert "listing-row" in page, "this shortlist is not empty"
+    assert "held back by your deal" in page, "and still explains what is missing"
+    assert 'href="/preferences"' in page
+
+
+def test_a_shortlist_holding_everything_collected_says_nothing(tmp_path: Path) -> None:
+    """No exclusions, no explanation. The note is context, not decoration."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    for index in range(4):
+        add_listing(application.state.repository, "Craigslist", f"g{index}", f"Room {index}", 1500, "NOPA")
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    assert "held back by your deal" not in page

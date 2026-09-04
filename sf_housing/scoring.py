@@ -515,14 +515,19 @@ def _lease(listing: ListingCandidate, text: str, preferences: Preferences) -> Cr
     is_sublet, sublet_months = _targeted_sublet_term(listing, text)
     if is_sublet:
         if sublet_months is None:
+            # A sublet that never states its length is an unknown, not a
+            # refusal. Failing it outright broke the one rule the rest of this
+            # file keeps -- a missing fact lowers confidence and gets named for
+            # checking, it does not decide the answer -- and it threw away homes
+            # whose term nobody had asked about yet.
             return Criterion(
                 "lease",
-                0.0,
+                0.5,
                 configured,
-                True,
+                False,
                 None,
-                "",
-                f"This sublet does not explicitly offer at least {SUBLET_MINIMUM_MONTHS} months.",
+                f"Unknown: this sublet does not state its length; confirm it runs at least "
+                f"{SUBLET_MINIMUM_MONTHS} months.",
             )
         if sublet_months < SUBLET_MINIMUM_MONTHS:
             return Criterion(

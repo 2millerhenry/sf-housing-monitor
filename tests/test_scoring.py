@@ -1177,3 +1177,55 @@ def test_anywhere_in_sf_still_means_inside_san_francisco() -> None:
         assert "not a recognized San Francisco area" in result.details["neighborhood"]["missing"]
         # It must not be able to outrank a confirmed San Francisco home.
         assert result.score < score_listing(room("Mission District"), preferences).score
+
+
+def test_a_sublet_that_never_states_its_length_is_unknown_not_refused() -> None:
+    """The rule the rest of the scorer keeps: a missing fact lowers confidence
+    and gets named for checking. This one was refusing homes outright for a
+    length nobody had stated either way."""
+    from sf_housing.preferences import parse_preferences
+    from tests.conftest import TEST_PREFERENCES
+
+    preferences = parse_preferences(TEST_PREFERENCES)
+    listing = ListingCandidate(
+        platform="Craigslist",
+        source_id="sub",
+        title="Sublet in a sunny NOPA flat",
+        original_url="https://sfbay.craigslist.org/roo/d/x/sub.html",
+        price=1500,
+        neighborhood="NOPA",
+        listing_type="Room/share",
+        summary="Sublease available in a shared home. Message for details.",
+    )
+
+    result = score_listing(classify_listing(listing), preferences)
+
+    assert result.eligibility != "ineligible", "an unstated term is not a refusal"
+    reasons = [
+        entry["reason"]
+        for entry in result.details.get("hard_constraints", [])
+        if entry.get("check") == "lease"
+    ]
+    assert any(reason.startswith("Unknown:") for reason in reasons), reasons
+
+
+def test_a_sublet_that_states_a_short_term_is_still_refused() -> None:
+    """The guarantee that had to survive."""
+    from sf_housing.preferences import parse_preferences
+    from tests.conftest import TEST_PREFERENCES
+
+    preferences = parse_preferences(TEST_PREFERENCES)
+    listing = ListingCandidate(
+        platform="Craigslist",
+        source_id="short",
+        title="2 month sublet in NOPA",
+        original_url="https://sfbay.craigslist.org/roo/d/x/short.html",
+        price=1500,
+        neighborhood="NOPA",
+        listing_type="Room/share",
+        summary="Sublease for 2 months only, October through November.",
+    )
+
+    result = score_listing(classify_listing(listing), preferences)
+
+    assert result.eligibility == "ineligible"

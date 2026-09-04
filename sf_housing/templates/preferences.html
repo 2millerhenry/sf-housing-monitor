@@ -112,7 +112,7 @@
     <header class="deal-section-head">
       <span class="step-number" aria-hidden="true">2</span>
       <h2 id="areas-title">Where would you live?</h2>
-      <p>Priority groups control order. A known listing outside every acceptable group stays out of the shortlist.</p>
+      <p><strong>Anywhere you do not list here is left out of your shortlist.</strong> So list every area you would genuinely take, not just the favourites, or tick anywhere in San Francisco below. The groups only set the order.</p>
     </header>
     <label class="choice-row anywhere-choice">
       <input type="checkbox" name="anywhere_in_sf" value="1" data-anywhere-toggle {% if deal_values.anywhere_in_sf %}checked{% endif %}>
@@ -140,7 +140,7 @@
         </section>
         {% endfor %}
       </div>
-      <p class="field-help">Up to five neighborhoods in each group. A neighborhood can belong to only one group.</p>
+      <p class="field-help">Up to five in each group, and an area can sit in only one. Homes somewhere you have not listed are kept in Near matches rather than thrown away.</p>
     </div>
   </section>
 
@@ -148,15 +148,15 @@
     <header class="deal-section-head">
       <span class="step-number" aria-hidden="true">3</span>
       <h2 id="timing-title">Timing and household</h2>
-      <p>Only set limits you would actually reject a home for. Flexible answers keep uncertain listings reviewable.</p>
+      <p>Set a date only if you would turn a home down for it. Most listings never state one, and an unstated date is never held against a home.</p>
     </header>
     <label class="choice-row">
       <input type="checkbox" name="move_in_flexible" value="1" data-flexible-toggle {% if deal_values.move_in_flexible %}checked{% endif %}>
-      <span><strong>My move-in timing is flexible</strong><small>Missing listing dates will not count against a home</small></span>
+      <span><strong>I can move whenever the right place comes up</strong><small>Leave this ticked unless a date would actually rule a home out</small></span>
     </label>
     <div class="field-row two-up" data-date-fields {% if deal_values.move_in_flexible %}hidden{% endif %}>
-      <label>Earliest acceptable move-in <input type="date" name="earliest_move_in" value="{{ deal_values.earliest_move_in }}"></label>
-      <label>Prefer to move by <input type="date" name="preferred_by" value="{{ deal_values.preferred_by }}"></label>
+      <label>I cannot move in before <input type="date" name="earliest_move_in" value="{{ deal_values.earliest_move_in }}"><small>A home available earlier is still fine</small></label>
+      <label>I would like to be in by <input type="date" name="preferred_by" value="{{ deal_values.preferred_by }}"><small>Later homes rank lower; they are not ruled out</small></label>
     </div>
     {% set limits_in_use = deal_values.lease_min_months or deal_values.lease_max_months or deal_values.household_maximum %}
     <details class="deal-fold"{% if limits_in_use %} open{% endif %}>
@@ -165,10 +165,10 @@
         <span class="disclosure-action">Set limits</span>
       </summary>
     <div class="field-row three-up">
-      <label>Shortest acceptable lease
+      <label>I would not take less than
         <select name="lease_min_months"><option value="">Flexible</option>{% for count in [1, 3, 6, 9, 12] %}<option value="{{ count }}" {% if deal_values.lease_min_months == count %}selected{% endif %}>{{ count }} month{% if count != 1 %}s{% endif %}</option>{% endfor %}</select>
       </label>
-      <label>Longest acceptable lease
+      <label>I would not sign more than
         <select name="lease_max_months"><option value="">Flexible</option>{% for count in [3, 6, 9, 12, 18, 24] %}<option value="{{ count }}" {% if deal_values.lease_max_months == count %}selected{% endif %}>{{ count }} months</option>{% endfor %}</select>
       </label>
       <label>Largest shared household <small>Rooms only</small>
@@ -194,7 +194,10 @@
       <div class="preference-head" aria-hidden="true">
         <span>Feature</span><span>Important</span><span>Nice to have</span><span>Doesn't matter</span>
       </div>
-      {% for key, label, coverage in [('natural_light', 'Natural light', 'Often missing'), ('laundry', 'Laundry', 'Usually stated'), ('outdoor_space', 'Outdoor space', 'Sometimes stated'), ('furnished', 'Furnished', 'Usually stated'), ('pets', 'Pet friendly', 'Sometimes stated'), ('parking', 'Parking', 'Sometimes stated')] %}
+      {# Four features, and only ones a listing actually states often enough to
+         rank on. Natural light and outdoor space are named in prose too rarely
+         to order anything by, so asking about them bought nothing. #}
+      {% for key, label, coverage in [('laundry', 'Laundry', 'Usually stated'), ('furnished', 'Furnished', 'Usually stated'), ('pets', 'Pet friendly', 'Sometimes stated'), ('parking', 'Parking', 'Sometimes stated')] %}
       {% set selected = deal_values.preferences.get(key, 'ignore') %}
       <fieldset class="preference-row">
         <legend><strong>{{ label }}</strong><small>{{ coverage }}</small></legend>
@@ -253,6 +256,18 @@
     <p>{% if welcome %}Your first check can include current listings and honestly available results from the last five days. <span data-draft-status>Your choices save on this Mac as you go.</span>{% else %}Saving reranks stored homes without changing your decisions.{% endif %}</p>
     <div class="deal-submit-group">
       <p class="submit-status" data-submit-status role="status" aria-live="polite"></p>
+      {% if deal_values.active %}
+      {# formaction keeps this inside the one form -- a nested form would be
+         invalid -- and formnovalidate lets it through while required budget
+         fields are still empty. It asks once, in place, rather than in a dialog. #}
+      <details class="reset-deal">
+        <summary>Start over</summary>
+        <div class="reset-deal-confirm">
+          <p>Clears every answer on this page. Your saved homes, notes and history are kept, and nothing is deleted from your Mac.</p>
+          <button type="submit" formaction="/preferences/deal/reset" formnovalidate data-deal-reset>Clear my deal</button>
+        </div>
+      </details>
+      {% endif %}
       <button class="primary" type="submit" data-deal-submit data-first-activation="{{ 'true' if welcome else 'false' }}"><span data-deal-submit-label>{% if welcome %}Save deal and find matches{% else %}Save deal and rerank{% endif %}</span></button>
     </div>
   </div>

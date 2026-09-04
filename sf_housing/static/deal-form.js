@@ -30,6 +30,37 @@
     });
   }
 
+  // The review section describes the deal the form holds right now. The
+  // sentence comes from the profile itself rather than being rebuilt here, so
+  // there is only ever one description of a deal. Responses can arrive out of
+  // order, so only the newest one is allowed to win.
+  const summaryTarget = form.querySelector("[data-deal-summary]");
+  let summarySequence = 0;
+  let summaryTimer = null;
+  const refreshSummary = () => {
+    if (!summaryTarget) return;
+    const mine = ++summarySequence;
+    fetch("/preferences/deal/preview", {
+      method: "POST",
+      body: new FormData(form),
+      credentials: "same-origin",
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        if (!data || mine !== summarySequence) return;
+        // A form mid-edit is often not a valid deal yet. Keeping the last good
+        // sentence is better than flashing an error at someone still typing.
+        if (data.ok && data.summary) summaryTarget.textContent = data.summary;
+      })
+      .catch(() => {});
+  };
+  const queueSummary = () => {
+    window.clearTimeout(summaryTimer);
+    summaryTimer = window.setTimeout(refreshSummary, 250);
+  };
+  form.addEventListener("input", queueSummary);
+  form.addEventListener("change", queueSummary);
+
   const anywhere = form.querySelector("[data-anywhere-toggle]");
   const areaPicker = form.querySelector("[data-area-picker]");
   const areaTiers = [...form.querySelectorAll("[data-area-tier]")];

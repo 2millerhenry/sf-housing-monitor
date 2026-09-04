@@ -333,6 +333,19 @@
     {% endif %}
   </div>
   {% endif %}
+  {% if listings and exclusion_summary and view == 'active' %}
+  {# The list is not empty, but it is far shorter than what was collected.
+     Saying which limit costs what turns "why so few?" into a decision. #}
+  <details class="why-short">
+    <summary>{{ excluded_total }} more home{{ 's' if excluded_total != 1 }} were collected and held back by your deal</summary>
+    <ul>
+      {% for item in exclusion_summary %}
+      <li><b>{{ item.count }}</b> {{ item.reason }}</li>
+      {% endfor %}
+    </ul>
+    <p><a href="/preferences">Widen your deal</a> or <a href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score">see them in Near matches</a>.</p>
+  </details>
+  {% endif %}
 </section>
 
 <details class="system-disclosure">

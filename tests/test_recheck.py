@@ -618,3 +618,22 @@ def test_a_home_whose_source_did_not_run_keeps_its_old_date(tmp_path: pathlib.Pa
     assert any(check["check"] == "confirmation" for check in stale["checks"]), (
         "and the home says plainly that nobody has confirmed it"
     )
+
+
+def test_a_sublet_with_no_stated_term_stays_on_the_shortlist(tmp_path: pathlib.Path) -> None:
+    """Craigslist is the biggest source and most of its sublets never state a
+    length. Refusing them outright removed a hundred and eleven homes from a
+    real board for a fact nobody had asked about."""
+    repository, preferences = board(tmp_path)
+    sublet = replace(
+        room("sublet"),
+        title="Sublease in a sunny NOPA flat",
+        summary="Sublet available in a shared home, message for details.",
+    )
+    Scanner(repository, lambda: preferences, [Source([sublet])]).run_scan("manual")
+
+    stored = repository.query_listings(0, view="all", housing_kind="room")[0]
+    assert stored["eligibility"] != "ineligible"
+    assert any(
+        entry["check"] == "lease" for entry in stored["checks"]
+    ), "and it is named for checking instead"

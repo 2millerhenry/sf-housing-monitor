@@ -642,10 +642,12 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
     flexible = str(value("move_in_flexible", "")).casefold() in {"1", "true", "on", "yes"}
     importance = {
         feature: str(value(f"preference_{feature}", "ignore"))
+        # The four a listing states often enough to rank on. Natural light and
+        # outdoor space are named in prose too rarely to order anything by, so
+        # asking about them bought nothing; a stored answer for either is
+        # dropped the next time the deal is saved.
         for feature in (
-            "natural_light",
             "laundry",
-            "outdoor_space",
             "furnished",
             "pets",
             "parking",

@@ -809,7 +809,12 @@ def create_app(
         # when little or nothing survives, say what held the rest back. Only
         # computed on the thin path, so the normal one pays nothing.
         exclusion_summary: list[dict[str, object]] = []
-        if view == "active" and len(listings) < 5:
+        # Shown whenever the deal is holding back more homes than it is letting
+        # through, not only when the shortlist is empty. "There should be more
+        # listings than this" is the right instinct, and the answer is almost
+        # never that a source broke -- it is which limit is costing what, which
+        # the page had no way of saying.
+        if view == "active":
             exclusion_summary = repository.exclusion_summary(
                 preferences.minimum_score, housing_kind, mode_unit_types
             )
@@ -1148,6 +1153,55 @@ def create_app(
             )
         return RedirectResponse(
             f"/?message=Your+deal+was+saved%3B+{rescored}+stored+listings+were+reranked",
+            status_code=303,
+        )
+
+    @application.post("/preferences/deal/preview")
+    async def preview_deal_profile(request: Request):
+        """Describe the deal the form currently holds, without saving anything.
+
+        The review section reads the profile's own summary, so it has to come
+        from the same code that writes it -- rebuilding that sentence in the
+        browser would be two descriptions of one deal, free to disagree.
+        """
+        try:
+            profile = deal_profile_from_form(await request.form(), state="draft")
+        except (DealProfileError, ValueError) as exc:
+            return JSONResponse({"ok": False, "reason": str(exc)}, status_code=200)
+        return JSONResponse({"ok": True, "summary": profile.summary()})
+
+    @application.post("/preferences/deal/reset")
+    async def reset_deal_profile(request: Request):
+        """Put the deal back to a blank draft, and touch nothing else.
+
+        Starting over means starting the answers over. The homes already
+        collected, the ones starred, the notes written against them and every
+        first-found date stay exactly where they are, and are reranked against
+        whatever deal comes next.
+        """
+        current = load_preferences(active_settings.preferences_path)
+        if scanner.is_running:
+            return templates.TemplateResponse(
+                request=request,
+                name="preferences.html",
+                status_code=409,
+                context=deal_page_context(
+                    current,
+                    error="A source check is still running. Wait for it to finish, then start over.",
+                ),
+            )
+        # Built through the same constructor the form uses, so a reset profile
+        # is exactly the profile a new install has, with the technical settings
+        # left alone.
+        save_deal_profile(
+            active_settings.preferences_path,
+            deal_profile_from_form({}, state="draft"),
+            current,
+        )
+        LOGGER_APP = logging.getLogger(__name__)
+        LOGGER_APP.info("Deal profile reset to a blank draft on request")
+        return RedirectResponse(
+            "/preferences?welcome=1&message=Your+deal+was+cleared%3B+your+saved+homes+and+notes+were+kept",
             status_code=303,
         )
 

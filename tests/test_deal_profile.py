@@ -750,7 +750,8 @@ def test_nothing_the_form_can_set_was_dropped(tmp_path: Path) -> None:
         "two_bedroom_occupants", "three_bedroom_occupants", "four_bedroom_occupants",
         "anywhere_in_sf", "move_in_flexible", "earliest_move_in", "preferred_by",
         "lease_min_months", "lease_max_months", "household_maximum",
-        "preference_natural_light", "preference_parking", "minimum_score",
+        "preference_laundry", "preference_furnished", "preference_pets",
+        "preference_parking", "minimum_score",
     ):
         assert f'name="{field}"' in page, f"{field} disappeared from the form"
     # Area chips only exist once an area is chosen, so the picker is the control

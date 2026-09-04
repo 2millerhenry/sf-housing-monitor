@@ -11,6 +11,11 @@
   --accent: oklch(43% 0.09 162);
   --accent-hover: oklch(37% 0.085 162);
   --accent-soft: oklch(95% 0.022 155);
+  /* Where you have already been. A hint of the accent hue at almost full
+     lightness: legible as a group when rows stack up, invisible as a colour. */
+  --visited: oklch(97.9% 0.011 158);
+  --visited-hover: oklch(95.9% 0.021 158);
+
   --accent-line: oklch(80% 0.04 155);
   --amber: oklch(51% 0.11 73);
   --amber-soft: oklch(96% 0.035 82);
@@ -274,24 +279,20 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .area-priority-strong { background: oklch(92% 0.035 238); color: oklch(34% 0.075 238); }
 .area-priority-secondary { background: var(--amber-soft); color: var(--amber); }
 .listing-table tbody tr:last-child td { border-bottom: 0; }
-.listing-table tbody tr:nth-child(even) td { background: oklch(98.5% 0.005 95); }
-.listing-table tbody tr:hover td { background: var(--accent-soft); }
-.listing-table tbody tr.new-listing td { background: oklch(97.3% 0.022 155); }
-.listing-table tbody tr.new-listing:nth-child(even) td { background: oklch(96.7% 0.025 155); }
-.listing-table tbody tr.new-listing:hover td { background: oklch(93.8% 0.04 155); }
+/* A row is white until you have done something with it.
+   Sixteen overlapping rules had this backwards: a new listing was tinted green
+   and an opened one went grey, so the strongest colour on the page marked the
+   homes nobody had looked at. Recency is already stated in words -- the "New"
+   badge sits in the score cell -- so it does not also need a background.
+   Opening a home is the one thing worth recording in colour, and barely:
+   enough that a long list shows where you have been, not enough to shout. */
+.listing-table tbody tr td { background: var(--surface); }
+.listing-table tbody tr:hover td { background: var(--surface-muted); }
+.listing-table tbody tr.opened-listing td { background: var(--visited); }
+.listing-table tbody tr.opened-listing:hover td { background: var(--visited-hover); }
+/* Starring is deliberate, so it outranks having merely opened one. */
 .listing-table tbody tr.saved-listing td { background: var(--accent-soft); }
 .listing-table tbody tr.saved-listing:hover td { background: oklch(93% 0.03 155); }
-.listing-table tbody tr.new-listing.saved-listing td { background: oklch(95.3% 0.03 155); }
-.listing-table tbody tr.new-listing.saved-listing:hover td { background: oklch(93.5% 0.042 155); }
-.listing-table tbody tr.opened-listing td { background: oklch(96.3% 0.006 95); }
-.listing-table tbody tr.opened-listing:nth-child(even) td { background: oklch(95.8% 0.008 95); }
-.listing-table tbody tr.opened-listing:hover td { background: oklch(93.8% 0.018 155); }
-.listing-table tbody tr.opened-listing.new-listing td,
-.listing-table tbody tr.opened-listing.saved-listing td,
-.listing-table tbody tr.opened-listing.new-listing.saved-listing td { background: oklch(95.2% 0.018 155); }
-.listing-table tbody tr.opened-listing.new-listing:hover td,
-.listing-table tbody tr.opened-listing.saved-listing:hover td,
-.listing-table tbody tr.opened-listing.new-listing.saved-listing:hover td { background: oklch(93.7% 0.03 155); }
 .cell-score strong { display: block; color: var(--accent-hover); font-size: 1.16rem; line-height: 1.05; letter-spacing: -0.025em; }
 .cell-score span { display: block; margin-top: 4px; color: var(--muted); font-size: 0.62rem; font-weight: 650; }
 .cell-score .score-state { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
@@ -387,6 +388,17 @@ button.row-action { display: inline-flex; }
 .note-form button { min-height: 34px; margin-top: 6px; padding: 6px 10px; font-size: 0.75rem; }
 .empty { text-align: center; padding: 72px 20px; }
 .empty-mark { width: 44px; height: 44px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 14px; background: var(--surface-muted); color: var(--muted); font-size: 1.3rem; }
+/* The same answer for a shortlist that is merely short. Folded, because it is
+   context rather than a problem. */
+.why-short { margin: 14px 0 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.why-short > summary { cursor: pointer; list-style: none; color: var(--muted); font-size: 0.82rem; }
+.why-short > summary::-webkit-details-marker { display: none; }
+.why-short > summary:hover { color: var(--ink); }
+.why-short[open] > summary { margin-bottom: 10px; color: var(--ink); font-weight: 600; }
+.why-short ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 0.84rem; line-height: 1.5; }
+.why-short ul b { font-weight: 680; font-variant-numeric: tabular-nums; }
+.why-short p { margin: 12px 0 0; font-size: 0.82rem; }
+
 /* Why an empty shortlist is empty. Quiet: it is an explanation, not an alarm,
    and the two ways out sit right under it. */
 .why-empty { max-width: 46ch; margin: 18px auto 0; padding-top: 16px; border-top: 1px solid var(--line); text-align: left; }
@@ -450,6 +462,14 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 .deal-form { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-low); overflow: hidden; }
 .deal-section { padding: 26px 30px 30px; border-bottom: 1px solid var(--line); }
+/* Five long sections in one card read as one wall of controls. Alternating
+   tonal bands separate them without adding borders or nesting cards, and every
+   control on the page sits on --surface, so each one lifts off its band. */
+.deal-form > .deal-section:nth-of-type(even) { background: var(--band); }
+.deal-form > .deal-section:last-of-type { border-bottom: 0; }
+/* The copy rail used to take 40% of every section to hold three lines of text
+   beside a very tall control column. A full-width header returns that space to
+   the controls, which is where the work actually happens. */
 /* The copy rail used to take 40% of every section to hold three lines of text
    beside a very tall control column. A full-width header returns that space to
    the controls, which is where the work actually happens. */
@@ -522,6 +542,19 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .deal-fold[open] > summary { border-bottom: 1px solid var(--line); }
 .deal-fold[open] > summary .disclosure-action::after { content: ""; }
 .deal-fold > .field-row, .deal-fold > .preference-matrix { padding: 14px 16px; }
+
+/* Starting over is a real thing to want and a bad thing to do by accident, so
+   it asks once, in place, rather than behind a dialog. */
+.reset-deal { margin-left: auto; }
+.reset-deal > summary { list-style: none; cursor: pointer; color: var(--muted); font-size: 0.8rem; text-decoration: underline; text-underline-offset: 3px; }
+.reset-deal > summary::-webkit-details-marker { display: none; }
+.reset-deal > summary:hover { color: var(--ink); }
+.reset-deal[open] > summary { color: var(--ink); font-weight: 600; }
+.reset-deal-confirm { margin-top: 10px; padding: 12px 14px; display: grid; gap: 10px; justify-items: start; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); max-width: 44ch; }
+.reset-deal-confirm p { margin: 0; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+.reset-deal-confirm button { min-height: 38px; padding: 0 14px; border: 1px solid var(--red-line); border-radius: 9px; background: var(--red-soft); color: var(--red); font: inherit; font-weight: 620; font-size: 0.82rem; cursor: pointer; }
+.reset-deal-confirm button:hover { background: var(--surface); }
+.reset-deal-confirm button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 /* A control that reads as a sentence rather than a button. */
 .link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 620; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
