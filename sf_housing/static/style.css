@@ -501,30 +501,35 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .path-ledger { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
 /* The shortlist cut-off. One number, so it gets a real readout and a track you
    can drag rather than a dropdown that hides what the choice costs. */
-.match-cutoff { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); max-width: 62ch; --cutoff-fill: 46%; }
-.cutoff-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 18px; }
+/* Full width on purpose: the track is a scale, and a scale reads better with
+   room. Everything else stays quiet so the number and the line are the only
+   things asking for attention. */
+.match-cutoff { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); --cutoff-fill: 46%; }
+.cutoff-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 24px; }
 .cutoff-head label { color: var(--ink); font-size: 0.9rem; font-weight: 620; }
 .cutoff-readout { margin: 0; display: flex; align-items: baseline; gap: 7px; }
-.cutoff-value { color: var(--accent-hover); font-size: 1.6rem; font-weight: 720; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.cutoff-value { color: var(--accent-hover); font-size: 1.75rem; font-weight: 730; letter-spacing: -0.035em; line-height: 1; font-variant-numeric: tabular-nums; }
 .cutoff-count { color: var(--muted); font-size: 0.76rem; font-weight: 560; }
 
 .cutoff-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  /* A comfortable touch target while the visible track stays thin. */
-  margin: 16px 0 8px;
-  padding: 11px 0;
+  /* The padding is the touch target and is invisible: 7px of track inside
+     19px either side clears the 44px minimum without moving anything on the
+     page, so the margin gives back what the padding takes. */
+  margin: 13px 0 4px;
+  padding: 19px 0;
   background: transparent;
   cursor: pointer;
 }
 .cutoff-slider::-webkit-slider-runnable-track {
-  height: 6px;
+  height: 7px;
   border-radius: 999px;
   background: linear-gradient(to right, var(--accent) var(--cutoff-fill), var(--line) var(--cutoff-fill));
 }
 .cutoff-slider::-moz-range-track {
-  height: 6px;
+  height: 7px;
   border-radius: 999px;
   background: linear-gradient(to right, var(--accent) var(--cutoff-fill), var(--line) var(--cutoff-fill));
 }
@@ -533,7 +538,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   appearance: none;
   height: 24px;
   width: 24px;
-  margin-top: -9px;
+  margin-top: -8.5px;
   border: 2px solid var(--accent);
   border-radius: 50%;
   background: var(--surface);
@@ -560,7 +565,10 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .cutoff-scale { display: flex; justify-content: space-between; gap: 10px; color: var(--faint); font-size: 0.68rem; }
 .cutoff-scale span:nth-child(2) { text-align: center; }
 .cutoff-scale span:last-child { text-align: right; }
-.match-cutoff .field-help { margin: 9px 0 0; }
+/* The one line of prose keeps a readable measure even though the control does
+   not; a sentence stretched across the full width is harder to read, not
+   easier. */
+.match-cutoff .field-help { max-width: 74ch; margin: 11px 0 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .cutoff-slider::-webkit-slider-thumb, .cutoff-slider::-moz-range-thumb { transition: none; }
