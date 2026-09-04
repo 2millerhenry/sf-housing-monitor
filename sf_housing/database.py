@@ -11,7 +11,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .classification import classify_listing
 from .connectors import CONNECTOR_STATES, ConnectorStatus
-from .models import ListingCandidate, ScoreResult
+from .models import ListingCandidate, ScoreResult, ordered_checks, unmeasured_criteria
 
 
 SCHEMA_VERSION = 3
@@ -556,6 +556,23 @@ class Repository:
         item["contact_rank"] = 0 if item["application_url"] else 1 if item["direct_lister"] else 2
         item["contact_ready"] = item["contact_rank"] < 2
         score_details = json.loads(item.pop("score_details_json") or "{}")
+        # What is still unresolved, named. "Needs verification" told the reader
+        # that something was unknown but never what, and the one sentence the
+        # row did show came from a different selection than the constraints
+        # that actually held the listing back.
+        constraints = score_details.get("hard_constraints")
+        item["checks"] = ordered_checks(constraints, "unknown")
+        item["blockers"] = ordered_checks(constraints, "fail")
+        item["lead_check"] = item["checks"][0]["check"] if item["checks"] else ""
+        # Criteria that are merely unmeasured rather than blocking. They belong
+        # with the coverage figure, not with the questions, and a fact already
+        # named as a check must not be asked about twice in two different voices.
+        answered = set()
+        for entry in item["checks"] + item["blockers"]:
+            answered.add(entry["reason"])
+            if entry["check"]:
+                answered.add(entry["check"])
+        item["other_unknowns"] = unmeasured_criteria(score_details, answered)
         neighborhood_details = score_details.get("neighborhood")
         item["neighborhood_priority"] = (
             neighborhood_details.get("priority")

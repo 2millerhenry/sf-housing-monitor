@@ -297,7 +297,9 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .cell-score .score-state { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
 .cell-score .score-state .match-grade { margin: 0; font-size: inherit; }
 .cell-score .new-badge { margin: 0; color: var(--accent-hover); font-weight: 760; }
-.cell-score .confidence-label, .cell-score .verification-label, .cell-score .ineligible-label { display: block; margin-top: 4px; font-size: 0.57rem; line-height: 1.2; font-weight: 680; }
+/* The badge now carries a name rather than a fixed phrase, and the column is
+   56px on a narrow screen, so the longest one has to wrap rather than spill. */
+.cell-score .confidence-label, .cell-score .verification-label, .cell-score .ineligible-label { display: block; margin-top: 4px; font-size: 0.57rem; line-height: 1.2; font-weight: 680; overflow-wrap: anywhere; }
 .cell-score .confidence-label { color: var(--muted); }
 .cell-score .verification-label { color: var(--amber); }
 .cell-score .ineligible-label { color: var(--danger); }
@@ -330,6 +332,12 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .cell-fit li { position: relative; padding-left: 14px; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 1; color: var(--ink); font-size: 0.71rem; }
 .cell-fit li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 760; }
 .cell-check > span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; color: oklch(39% 0.065 73); font-size: 0.71rem; }
+/* Every open question, in full. The score cell names the leading one so a
+   narrow screen still says what is unresolved; this column is where the
+   sentences live. Two lines each keeps a row with three of them the same
+   height as the three-line columns beside it. */
+.cell-check .check-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.cell-check .check-list li { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: oklch(39% 0.065 73); font-size: 0.71rem; line-height: 1.25; }
 .cell-check > span.unknown, .unknown { color: var(--muted); }
 .compact-row-details { display: none; margin-top: 6px; }
 .compact-row-details > summary { cursor: pointer; color: var(--accent); font-size: 0.68rem; font-weight: 650; }

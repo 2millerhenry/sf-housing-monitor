@@ -32,6 +32,101 @@ class ScoreResult:
     eligibility_reasons: list[str] = field(default_factory=list)
 
 
+# Every hard constraint carries the short name of what is unresolved as well as
+# the sentence explaining it. "Needs verification" told a renter that something
+# was unknown but never what, which is the one thing they could have acted on.
+#
+# Ordered by how much knowing the answer should change what they do next: a rent
+# that looks wrong is worth a minute right now, a building size the source never
+# publishes is something they can park. A name missing from this tuple keeps its
+# place at the end rather than vanishing, so adding a constraint can never
+# silently hide it.
+CHECK_ORDER = (
+    "dealbreaker",
+    "rent",
+    "listing page",
+    "stay length",
+    "home type",
+    "private room",
+    "price",
+    "area",
+    "sublet term",
+    "lease",
+    "move-in",
+    "household",
+    "building size",
+)
+_CHECK_RANK = {name: index for index, name in enumerate(CHECK_ORDER)}
+
+# The same fact reaches the reader twice: once as a criterion that could not be
+# measured ("building size is not stated") and once as the constraint it fails
+# ("confirm the building has 50 units or fewer"). Naming the criterion here lets
+# the second one be recognised as the same question and asked only once. Kept
+# beside CHECK_ORDER so the two vocabularies cannot drift apart unnoticed.
+CRITERION_CHECKS = {
+    "availability": "move-in",
+    "building_size": "building size",
+    "household": "household",
+    "lease": "lease",
+    "neighborhood": "area",
+    "price": "price",
+    "private_room": "private room",
+    "unit_type": "home type",
+}
+
+
+def unmeasured_criteria(score_details: Any, answered: set[str]) -> list[str]:
+    """Criteria that could not be measured and are not already being asked about.
+
+    These belong with the coverage figure rather than with the questions: they
+    lower confidence, but none of them is the reason a listing was held back.
+    """
+    if not isinstance(score_details, dict):
+        return []
+    unmeasured: list[str] = []
+    for name, detail in score_details.items():
+        if not isinstance(detail, dict) or detail.get("known") is not False:
+            continue
+        missing = str(detail.get("missing") or "").strip()
+        if not missing or missing in unmeasured:
+            continue
+        if CRITERION_CHECKS.get(name, name) in answered or missing in answered:
+            continue
+        unmeasured.append(missing)
+    return unmeasured
+
+
+def ordered_checks(constraints: Any, status: str) -> list[dict[str, str]]:
+    """The constraints of one status, most decision-relevant first.
+
+    Ordering happens on the way to the screen rather than at scoring time, so a
+    stored result is never rewritten and nothing that reads it changes meaning.
+    A row scored before checks were named has no short name; it keeps its
+    sentence, so an older listing degrades to what it showed before instead of
+    disappearing from the page.
+    """
+    if not isinstance(constraints, list):
+        return []
+    named: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for constraint in constraints:
+        if not isinstance(constraint, dict) or constraint.get("status") != status:
+            continue
+        reason = str(constraint.get("reason") or "").strip()
+        if not reason:
+            continue
+        check = str(constraint.get("check") or "").strip()
+        # Two constraints can raise the same question -- an unstated building
+        # size is both an unknown criterion and an unmet limit -- and a renter
+        # should be asked once.
+        key = check or reason
+        if key in seen:
+            continue
+        seen.add(key)
+        named.append({"check": check, "reason": reason})
+    return sorted(named, key=lambda item: _CHECK_RANK.get(item["check"], len(CHECK_ORDER)))
+
+
 @dataclass(slots=True)
 class ScanOutcome:
     run_id: int

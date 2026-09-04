@@ -1124,35 +1124,35 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         }
     constraints = details["hard_constraints"]
     if neighborhood.known and neighborhood.value == 0:
-        constraints.append({"status": "fail", "reason": neighborhood.mismatch or "Outside your selected areas."})
+        constraints.append({"status": "fail", "check": "area", "reason": neighborhood.mismatch or "Outside your selected areas."})
     elif not neighborhood.known:
-        constraints.append({"status": "unknown", "reason": neighborhood.missing})
+        constraints.append({"status": "unknown", "check": "area", "reason": neighborhood.missing})
     if listing.unit_type is None:
-        constraints.append({"status": "unknown", "reason": "Confirm the unit type."})
+        constraints.append({"status": "unknown", "check": "home type", "reason": "Confirm the unit type."})
     elif not type_matches:
-        constraints.append({"status": "fail", "reason": "The home type is outside this deal path."})
+        constraints.append({"status": "fail", "check": "home type", "reason": "The home type is outside this deal path."})
     if not price_known:
-        constraints.append({"status": "unknown", "reason": "Confirm the monthly price."})
+        constraints.append({"status": "unknown", "check": "price", "reason": "Confirm the monthly price."})
     elif not price_matches:
-        constraints.append({"status": "fail", "reason": "The monthly price exceeds this path's maximum."})
+        constraints.append({"status": "fail", "check": "price", "reason": "The monthly price exceeds this path's maximum."})
     if not building_known:
-        constraints.append({"status": "unknown", "reason": f"Confirm the building has {max_building_units} units or fewer."})
+        constraints.append({"status": "unknown", "check": "building size", "reason": f"Confirm the building has {max_building_units} units or fewer."})
     elif not building_matches:
-        constraints.append({"status": "fail", "reason": "The stated building size exceeds your maximum."})
+        constraints.append({"status": "fail", "check": "building size", "reason": "The stated building size exceeds your maximum."})
     if verified_inactive:
-        constraints.append({"status": "fail", "reason": "The source verified this listing is inactive."})
+        constraints.append({"status": "fail", "check": "listing page", "reason": "The source verified this listing is inactive."})
     if craigslist_content_rejected:
-        constraints.append({"status": "fail", "reason": "The Craigslist detail page conflicts with the result card."})
+        constraints.append({"status": "fail", "check": "listing page", "reason": "The Craigslist detail page conflicts with the result card."})
     elif unverified_craigslist_unit:
-        constraints.append({"status": "unknown", "reason": "Confirm the Craigslist detail page before relying on this home."})
+        constraints.append({"status": "unknown", "check": "listing page", "reason": "Confirm the Craigslist detail page before relying on this home."})
     if implausibly_low_craigslist_unit or unusually_low:
-        constraints.append({"status": "unknown", "reason": "Confirm that this unusually low amount is the full monthly rent."})
+        constraints.append({"status": "unknown", "check": "rent", "reason": "Confirm that this unusually low amount is the full monthly rent."})
     if short_stay_days is not None and short_stay_days < 28:
-        constraints.append({"status": "fail", "reason": "The stated stay is shorter than one month."})
+        constraints.append({"status": "fail", "check": "stay length", "reason": "The stated stay is shorter than one month."})
     if is_sublet and sublet_months is None:
-        constraints.append({"status": "unknown", "reason": f"Confirm a sublet term of at least {SUBLET_MINIMUM_MONTHS} months."})
+        constraints.append({"status": "unknown", "check": "sublet term", "reason": f"Confirm a sublet term of at least {SUBLET_MINIMUM_MONTHS} months."})
     elif is_sublet and not sublet_term_eligible:
-        constraints.append({"status": "fail", "reason": f"The sublet is shorter than {SUBLET_MINIMUM_MONTHS} months."})
+        constraints.append({"status": "fail", "check": "sublet term", "reason": f"The sublet is shorter than {SUBLET_MINIMUM_MONTHS} months."})
     if neighborhood.match_label:
         details["neighborhood"]["match_label"] = neighborhood.match_label
     return _finalize_score(ScoreResult(score, shown_reasons, concern, details))
@@ -1179,12 +1179,12 @@ def _enforce_enabled_path(
 
     constraints = result.details.setdefault("hard_constraints", [])
     if failure:
-        constraints.append({"status": "fail", "reason": failure})
+        constraints.append({"status": "fail", "check": "home type", "reason": failure})
         result = ScoreResult(
             min(result.score, 20), result.reasons, failure, result.details
         )
     elif verification:
-        constraints.append({"status": "unknown", "reason": verification})
+        constraints.append({"status": "unknown", "check": "home type", "reason": verification})
     result.details["deal_path"] = {
         "unit_type": listing.unit_type,
         "housing_kind": listing.housing_kind,
@@ -1333,30 +1333,30 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
     hard_constraints: list[dict[str, str]] = []
     if neighborhood:
         if neighborhood.known and neighborhood.value == 0:
-            hard_constraints.append({"status": "fail", "reason": neighborhood.mismatch or "Outside your selected areas."})
+            hard_constraints.append({"status": "fail", "check": "area", "reason": neighborhood.mismatch or "Outside your selected areas."})
         elif not neighborhood.known:
-            hard_constraints.append({"status": "unknown", "reason": neighborhood.missing})
+            hard_constraints.append({"status": "unknown", "check": "area", "reason": neighborhood.missing})
     if private_room:
         if private_room.known and private_room.value == 0:
-            hard_constraints.append({"status": "fail", "reason": private_room.mismatch or "This is not a private room."})
+            hard_constraints.append({"status": "fail", "check": "private room", "reason": private_room.mismatch or "This is not a private room."})
         elif not private_room.known:
-            hard_constraints.append({"status": "unknown", "reason": private_room.missing})
-    for criterion, label in (
-        (price, "price"),
-        (lease, "lease"),
-        (availability, "move-in timing"),
-        (household, "household size"),
+            hard_constraints.append({"status": "unknown", "check": "private room", "reason": private_room.missing})
+    for criterion, label, check in (
+        (price, "price", "price"),
+        (lease, "lease", "lease"),
+        (availability, "move-in timing", "move-in"),
+        (household, "household size", "household"),
     ):
         if criterion and criterion.known and criterion.value == 0:
-            hard_constraints.append({"status": "fail", "reason": criterion.mismatch or f"The {label} conflicts with your deal."})
+            hard_constraints.append({"status": "fail", "check": check, "reason": criterion.mismatch or f"The {label} conflicts with your deal."})
         elif criterion and not criterion.known:
-            hard_constraints.append({"status": "unknown", "reason": criterion.missing})
+            hard_constraints.append({"status": "unknown", "check": check, "reason": criterion.missing})
     if dealbreaker_hits:
-        hard_constraints.append({"status": "fail", "reason": f"Possible dealbreaker: {', '.join(dealbreaker_hits[:2])}."})
+        hard_constraints.append({"status": "fail", "check": "dealbreaker", "reason": f"Possible dealbreaker: {', '.join(dealbreaker_hits[:2])}."})
     if is_sublet and sublet_months is None:
-        hard_constraints.append({"status": "unknown", "reason": f"Confirm a sublet term of at least {SUBLET_MINIMUM_MONTHS} months."})
+        hard_constraints.append({"status": "unknown", "check": "sublet term", "reason": f"Confirm a sublet term of at least {SUBLET_MINIMUM_MONTHS} months."})
     elif is_sublet and sublet_months < SUBLET_MINIMUM_MONTHS:
-        hard_constraints.append({"status": "fail", "reason": f"The sublet is shorter than {SUBLET_MINIMUM_MONTHS} months."})
+        hard_constraints.append({"status": "fail", "check": "sublet term", "reason": f"The sublet is shorter than {SUBLET_MINIMUM_MONTHS} months."})
     details["hard_constraints"] = hard_constraints
     return _enforce_enabled_path(
         listing, preferences, _finalize_score(ScoreResult(score, reasons, concern, details))
