@@ -16,7 +16,7 @@ from .classification import ROOM, UNKNOWN, WHOLE_UNIT
 from .deal_profile import SF_NEIGHBORHOODS
 from .connectors import gmail_provider_key
 from .gmail_alerts import AlertEmail, GmailAlertMailbox
-from .location import declared_outside_sf_area_hint
+from .location import declared_outside_sf_area_hint, sf_area_from_address
 from .models import ListingCandidate
 from .preferences import Preferences
 
@@ -1013,12 +1013,14 @@ class SFHousingPortalSource:
                     title=f"{name} - {raw_type}",
                     original_url=f"{self.search_url}/{listing_id}?unit={unit_slug}",
                     price=int(round(rent)),
-                    # A street address is not a neighborhood; only take one the
-                    # portal actually names.
                     # The portal states a street address and a ZIP but never a
-                    # neighbourhood, so take whichever of those is unambiguous.
+                    # neighbourhood. Take a name the portal itself uses first,
+                    # then the block the address sits on, and only then the ZIP,
+                    # which can answer for the few that do not straddle two
+                    # areas.
                     neighborhood=(
                         visible_sf_area_hint(f"{name} {address}")
+                        or sf_area_from_address(address)
                         or sf_area_from_zip(record.get("Building_Zip_Code"))
                     ),
                     listing_type=raw_type,

@@ -4,7 +4,9 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-data/
+# The developer's own database, profile and logs. Anchored to the repo root:
+# sf_housing/data holds the read-only street table, which has to ship.
+/data/
 *.egg-info/
 build/
 dist/

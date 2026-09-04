@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import tomllib
 import zipfile
 from pathlib import Path
 
@@ -73,11 +75,40 @@ def test_release_assets_are_generic_and_preserve_private_data_by_default() -> No
 
 
 def test_release_wheel_never_packages_a_profile_or_mutable_data() -> None:
-    project = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    """A release starts blank. The wheel may carry read-only reference data
+    built from public records, and nothing that belongs to a person: no
+    profile, no database, no log, no credential."""
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    project = tomllib.loads(text)
 
-    assert 'include = ["sf_housing", "sf_housing.*"]' in project
-    assert "config/preferences.yaml" not in project
-    assert "data/" not in project
+    assert 'include = ["sf_housing", "sf_housing.*"]' in text
+    assert "config/preferences.yaml" not in text
+
+    patterns = sorted(
+        {glob for globs in project["tool"]["setuptools"]["package-data"].values() for glob in globs}
+    )
+    assert patterns == ["*.css", "*.html", "*.js", "*.zip", "data/*.json"]
+
+    # The one shipped data directory holds exactly one file, and it is the
+    # street table. Anything else appearing there would be packaged silently.
+    assert sorted(p.name for p in (ROOT / "sf_housing" / "data").iterdir()) == ["sf_streets.json"]
+    table = json.loads((ROOT / "sf_housing" / "data" / "sf_streets.json").read_text(encoding="utf-8"))
+    assert table["source"].startswith("DataSF"), "the shipped table must be public city data"
+
+
+def test_the_street_table_is_committed_and_not_swallowed_by_an_ignore_rule() -> None:
+    """The wheel builds from the working tree, so a table that exists locally
+    but is untracked would pass every other check here and still leave a fresh
+    clone shipping no neighbourhoods at all."""
+    table = ROOT / "sf_housing" / "data" / "sf_streets.json"
+    result = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", str(table.relative_to(ROOT))],
+        cwd=ROOT,
+        capture_output=True,
+    )
+    if result.returncode != 0 and b"not a git repository" in result.stderr.lower():
+        pytest.skip("not a git checkout")
+    assert result.returncode == 0, "sf_housing/data/sf_streets.json is not tracked by git"
 
 
 def test_release_accepts_only_a_loopback_owner_gmail_client(tmp_path: Path) -> None:
