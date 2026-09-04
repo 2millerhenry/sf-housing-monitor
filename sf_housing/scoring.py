@@ -405,14 +405,21 @@ def _neighborhood(listing: ListingCandidate, preferences: Preferences) -> Criter
         " ".join(filter(None, [listing.title, listing.summary]))
     )
     if outside_area:
+        # Always configured, whatever the deal says about areas. This is a San
+        # Francisco housing search, so a home the listing itself places in
+        # another city is out of scope even for someone who listed no
+        # neighbourhoods -- and "anywhere in San Francisco" is exactly that
+        # someone. Marking it unconfigured dropped the criterion before it could
+        # fail anything, which put Palo Alto, Union City and Daly City rooms on
+        # the shortlist at 81.
         return Criterion(
             "neighborhood",
             0.0,
-            configured,
+            True,
             True,
             None,
             "",
-            f"{outside_area} is outside your target neighborhoods.",
+            f"{outside_area} is outside San Francisco.",
         )
     declared_detail_area = listing.metadata.get("detail_declared_neighborhood")
     location = _normal(

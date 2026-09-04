@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from sf_housing.classification import ROOM, UNKNOWN, classify_listing
 from sf_housing.models import ListingCandidate
+import pytest
+
 from sf_housing.preferences import Preferences, load_preferences, parse_preferences
 from sf_housing.scoring import score_listing
 from tests.paths import BENCHMARK_PROFILE
@@ -1267,3 +1269,85 @@ def test_every_area_the_form_offers_can_match_a_plainly_written_listing() -> Non
     ]
 
     assert unmatchable == [], f"these areas cannot match a plainly written listing: {unmatchable}"
+
+
+# --------------------------------------------------------------------------
+# "anywhere in San Francisco" means in San Francisco
+# --------------------------------------------------------------------------
+
+
+def anywhere_in_sf_profile() -> Preferences:
+    """A real shape: anywhere in the city, no neighbourhoods listed."""
+    import yaml
+
+    return parse_preferences(
+        yaml.safe_dump(
+            {
+                "profile_version": 1,
+                "profile": {
+                    "state": "active",
+                    "enabled_paths": ["private_room"],
+                    "budgets": {"private_room": {"maximum_monthly": 3000}},
+                    "geography": {"anywhere_in_sf": True},
+                    "room_household": {"private_room_required": True},
+                },
+                "technical": {"minimum_score": 60},
+            }
+        )
+    )
+
+
+@pytest.mark.parametrize(
+    "url,city",
+    [
+        ("https://www.craigslist.org/view/d/palo-alto-seeking-a-roommate/a1", "Palo Alto"),
+        ("https://www.craigslist.org/view/d/union-city-room-for-rent/b2", "Union City"),
+        ("https://www.craigslist.org/view/d/daly-city-sunny-rooms/c3", "Daly City"),
+        ("https://www.craigslist.org/view/d/south-san-francisco-private-bedroom/d4", "South San Francisco"),
+    ],
+)
+def test_anywhere_in_sf_still_refuses_another_city(url: str, city: str) -> None:
+    """Listing no neighbourhoods made the area criterion unconfigured, so it was
+    dropped before it could fail anything and these sat on the shortlist at 81.
+    Someone who said "anywhere in San Francisco" has stated a requirement, not
+    waived one."""
+    listing = ListingCandidate(
+        platform="Craigslist",
+        source_id=city.lower().replace(" ", "-"),
+        title="Private room available",
+        original_url=url,
+        price=1500,
+        listing_type="Room/share",
+        summary="A private room in a shared home, available now.",
+    )
+
+    result = score_listing(classify_listing(listing), anywhere_in_sf_profile())
+
+    assert result.eligibility == "ineligible", result.details.get("hard_constraints")
+    failures = [
+        entry["reason"]
+        for entry in result.details.get("hard_constraints", [])
+        if entry.get("status") == "fail"
+    ]
+    assert any(city in reason for reason in failures), failures
+    assert any("outside San Francisco" in reason for reason in failures), failures
+
+
+def test_anywhere_in_sf_still_accepts_a_san_francisco_home() -> None:
+    """The guard must not refuse the homes it exists to find."""
+    listing = ListingCandidate(
+        platform="Craigslist",
+        source_id="sf-room",
+        title="Sunny private room in the Mission",
+        original_url="https://sfbay.craigslist.org/sfc/roo/d/san-francisco-sunny-room/e5",
+        price=1500,
+        neighborhood="Mission District",
+        listing_type="Room/share",
+        summary="A private room in a shared flat in San Francisco, available now.",
+        metadata={"craigslist_detail_checked": True},
+    )
+
+    result = score_listing(classify_listing(listing), anywhere_in_sf_profile())
+
+    assert result.eligibility != "ineligible"
+    assert result.score >= 60
