@@ -512,18 +512,21 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
     if room:
         ideal = room.ideal_monthly or room.maximum_monthly
         result["budget"] = {
-            # Only a minimum the user actually stated. Deriving one from the
-            # ceiling meant raising your budget hid cheap homes: a $5,000 cap
-            # invented a $1,750 floor, which went to Craigslist as min_price and
-            # cut its room search from 241 results to 49. The deal form has no
-            # minimum field at all, so nobody could see or undo it.
-            "min_monthly": room.minimum_monthly,
             "ideal_monthly": ideal,
             "max_monthly": room.maximum_monthly,
             "sweet_spot_min": room.preferred_minimum or ideal,
             "sweet_spot_max": room.preferred_maximum or ideal,
             "flexible_margin_percent": 0.05,
         }
+        # Only a minimum the user actually stated, and the key is left out
+        # entirely rather than set to None, because every reader of it does
+        # .get("min_monthly", <default>) and a present-but-None key defeats the
+        # default. Deriving a floor from the ceiling meant raising your budget
+        # hid cheap homes: a $5,000 cap invented a $1,750 floor, which went to
+        # Craigslist as min_price and cut its room search from 241 results to
+        # 49. The deal form has no minimum field, so nobody could see or undo it.
+        if room.minimum_monthly is not None:
+            result["budget"]["min_monthly"] = room.minimum_monthly
 
     whole_paths = [path for path in ("studio", "one_bedroom") if path in profile.enabled_paths]
     whole_budgets = [profile.budgets[path] for path in whole_paths if path in profile.budgets]

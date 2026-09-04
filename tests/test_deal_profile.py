@@ -281,9 +281,30 @@ def test_a_budget_ceiling_does_not_invent_a_floor_underneath_it() -> None:
     could see the number or undo it.
     """
     preferences = parse_preferences(profile_with_room_budget(5000))
+    budget = preferences.section("budget")
 
-    assert preferences.section("budget")["min_monthly"] is None
-    assert preferences.section("budget")["max_monthly"] == 5000
+    # Absent, not None: every reader asks with .get("min_monthly", <default>),
+    # and a present-but-None key defeats the default and crashes on int().
+    assert "min_monthly" not in budget
+    assert budget.get("min_monthly", 800) == 800
+    assert budget["max_monthly"] == 5000
+
+
+def test_every_page_renders_for_a_deal_with_no_stated_minimum(tmp_path: Path) -> None:
+    """The regression this file's first version caused.
+
+    Leaving the key present but None satisfied the profile tests and took the
+    whole dashboard down with a TypeError on int(None), because the readers all
+    supply a default that a None value quietly defeats.
+    """
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        for path in ("/", "/?housing=room", "/?view=near_matches", "/preferences", "/alerts", "/support"):
+            assert client.get(path).status_code == 200, path
 
 
 def test_a_minimum_the_user_actually_stated_is_still_honoured() -> None:
