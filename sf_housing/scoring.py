@@ -51,6 +51,9 @@ FLEXIBLE_TERMS = (
 )
 SUBLET_TERMS = ("sublease", "sublet", "lease takeover", "lease transfer")
 SUBLET_PLATFORMS = {"Craigslist", "Facebook Marketplace", "Facebook Groups"}
+# The shortest sublet worth showing when the reader has not said otherwise.
+# Sublet inventory churns, so a default floor is right; imposing it over an
+# explicit "three months is fine" is the app deciding the deal for them.
 SUBLET_MINIMUM_MONTHS = 6
 _DURATION_WORDS = {
     "one": 1,
@@ -231,6 +234,26 @@ def _duration_months(value: str) -> int | None:
     return _DURATION_WORDS.get(normalized)
 
 
+def _sublet_minimum(preferences: Preferences) -> int:
+    """The shortest sublet this reader would take.
+
+    Their own stated minimum wins; the built-in floor only applies when they
+    have not set one. Someone who said three months is fine was still having
+    four-month sublets refused by a number they never chose.
+    """
+    try:
+        stated = preferences.section("lease").get("min_months")
+    except Exception:
+        return SUBLET_MINIMUM_MONTHS
+    if stated is None:
+        return SUBLET_MINIMUM_MONTHS
+    try:
+        value = int(stated)
+    except (TypeError, ValueError):
+        return SUBLET_MINIMUM_MONTHS
+    return value if value > 0 else SUBLET_MINIMUM_MONTHS
+
+
 def _targeted_sublet_term(listing: ListingCandidate, text: str) -> tuple[bool, int | None]:
     """Return whether this source advertises a sublet and its stated minimum term.
 
@@ -256,12 +279,27 @@ def _targeted_sublet_term(listing: ListingCandidate, text: str) -> tuple[bool, i
     return True, None
 
 
+@lru_cache(maxsize=2048)
+def _location_pattern(phrase: str) -> re.Pattern[str] | None:
+    """Match an area name however a source happens to punctuate it.
+
+    Sources write "haight ashbury"; the product calls it "Haight-Ashbury". A
+    literal match meant that name, and "St. Francis Wood", could never match a
+    real listing, so anyone who chose either got nothing from Craigslist. The
+    words have to match in order; whatever sits between them does not.
+    """
+    normalized = _normal(phrase)
+    words = [word for word in re.split(r"[^a-z0-9]+", normalized) if word]
+    if not words:
+        return None
+    return re.compile(rf"(?<!\w){r'[^a-z0-9]*'.join(map(re.escape, words))}(?!\w)")
+
+
 def _contains_location(text: str, phrase: str) -> bool:
     """Match a neighborhood phrase without treating street/region names as it."""
-    normalized = _normal(phrase)
-    if not normalized:
+    pattern = _location_pattern(phrase)
+    if pattern is None:
         return False
-    pattern = re.compile(rf"(?<!\w){re.escape(normalized)}(?!\w)")
     for match in pattern.finditer(text):
         remainder = text[match.end():].lstrip(" ,-/")
         next_word = re.match(r"([a-z]+)", remainder)
@@ -542,9 +580,9 @@ def _lease(listing: ListingCandidate, text: str, preferences: Preferences) -> Cr
                 False,
                 None,
                 f"Unknown: this sublet does not state its length; confirm it runs at least "
-                f"{SUBLET_MINIMUM_MONTHS} months.",
+                f"{_sublet_minimum(preferences)} months.",
             )
-        if sublet_months < SUBLET_MINIMUM_MONTHS:
+        if sublet_months < _sublet_minimum(preferences):
             return Criterion(
                 "lease",
                 0.0,
@@ -554,7 +592,7 @@ def _lease(listing: ListingCandidate, text: str, preferences: Preferences) -> Cr
                 "",
                 (
                     f"This sublet offers {sublet_months} months, below the "
-                    f"{SUBLET_MINIMUM_MONTHS}-month minimum."
+                    f"{_sublet_minimum(preferences)}-month minimum."
                 ),
             )
         in_ideal = (
@@ -871,7 +909,7 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
     is_sublet, sublet_months = _targeted_sublet_term(listing, _text(listing))
     sublet_term_eligible = (
         not is_sublet
-        or (sublet_months is not None and sublet_months >= SUBLET_MINIMUM_MONTHS)
+        or (sublet_months is not None and sublet_months >= _sublet_minimum(preferences))
     )
     craigslist_detail_checked = listing.metadata.get("craigslist_detail_checked") is True
     craigslist_content_rejected = listing.metadata.get("craigslist_content_rejected") is True
@@ -1034,13 +1072,13 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         )
     elif is_sublet and sublet_months is None:
         concern = (
-            f"This Facebook or Craigslist sublet needs an explicit {SUBLET_MINIMUM_MONTHS}-month "
+            f"This Facebook or Craigslist sublet needs an explicit {_sublet_minimum(preferences)}-month "
             "term before it can be recommended."
         )
     elif is_sublet and not sublet_term_eligible:
         concern = (
             f"This sublet offers {sublet_months} months, below the "
-            f"{SUBLET_MINIMUM_MONTHS}-month minimum."
+            f"{_sublet_minimum(preferences)}-month minimum."
         )
     elif implausibly_low_craigslist_unit:
         concern = (
@@ -1170,9 +1208,9 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
     if short_stay_days is not None and short_stay_days < 28:
         constraints.append({"status": "fail", "check": "stay length", "reason": "The stated stay is shorter than one month."})
     if is_sublet and sublet_months is None:
-        constraints.append({"status": "unknown", "check": "sublet term", "reason": f"Confirm a sublet term of at least {SUBLET_MINIMUM_MONTHS} months."})
+        constraints.append({"status": "unknown", "check": "sublet term", "reason": f"Confirm a sublet term of at least {_sublet_minimum(preferences)} months."})
     elif is_sublet and not sublet_term_eligible:
-        constraints.append({"status": "fail", "check": "sublet term", "reason": f"The sublet is shorter than {SUBLET_MINIMUM_MONTHS} months."})
+        constraints.append({"status": "fail", "check": "sublet term", "reason": f"The sublet is shorter than {_sublet_minimum(preferences)} months."})
     if neighborhood.match_label:
         details["neighborhood"]["match_label"] = neighborhood.match_label
     return _finalize_score(ScoreResult(score, shown_reasons, concern, details))
@@ -1275,7 +1313,7 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
     # A Facebook or Craigslist sublet belongs in the normal room results only
     # when the card explicitly commits to at least six months.  The ordinary
     # lease preference is a soft score; this is the requested admission rule.
-    if is_sublet and (sublet_months is None or sublet_months < SUBLET_MINIMUM_MONTHS):
+    if is_sublet and (sublet_months is None or sublet_months < _sublet_minimum(preferences)):
         score = min(score, 49 if sublet_months is not None else 59)
     availability = by_name.get("availability")
     if availability and availability.known and availability.value == 0:
@@ -1347,7 +1385,7 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
         "minimum_months": sublet_months,
         "main_results_eligible": (
             not is_sublet
-            or (sublet_months is not None and sublet_months >= SUBLET_MINIMUM_MONTHS)
+            or (sublet_months is not None and sublet_months >= _sublet_minimum(preferences))
         ),
     }
     if household_restriction:
@@ -1392,9 +1430,9 @@ def score_listing(listing: ListingCandidate, preferences: Preferences) -> ScoreR
     if dealbreaker_hits:
         hard_constraints.append({"status": "fail", "check": "dealbreaker", "reason": f"Possible dealbreaker: {', '.join(dealbreaker_hits[:2])}."})
     if is_sublet and sublet_months is None:
-        hard_constraints.append({"status": "unknown", "check": "sublet term", "reason": f"Confirm a sublet term of at least {SUBLET_MINIMUM_MONTHS} months."})
-    elif is_sublet and sublet_months < SUBLET_MINIMUM_MONTHS:
-        hard_constraints.append({"status": "fail", "check": "sublet term", "reason": f"The sublet is shorter than {SUBLET_MINIMUM_MONTHS} months."})
+        hard_constraints.append({"status": "unknown", "check": "sublet term", "reason": f"Confirm a sublet term of at least {_sublet_minimum(preferences)} months."})
+    elif is_sublet and sublet_months < _sublet_minimum(preferences):
+        hard_constraints.append({"status": "fail", "check": "sublet term", "reason": f"The sublet is shorter than {_sublet_minimum(preferences)} months."})
     details["hard_constraints"] = hard_constraints
     return _enforce_enabled_path(
         listing, preferences, _finalize_score(ScoreResult(score, reasons, concern, details))

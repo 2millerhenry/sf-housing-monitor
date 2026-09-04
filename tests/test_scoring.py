@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sf_housing.classification import ROOM, UNKNOWN, classify_listing
 from sf_housing.models import ListingCandidate
-from sf_housing.preferences import Preferences, load_preferences
+from sf_housing.preferences import Preferences, load_preferences, parse_preferences
 from sf_housing.scoring import score_listing
 from tests.paths import BENCHMARK_PROFILE
 
@@ -543,72 +543,74 @@ def test_craigslist_whole_unit_requires_a_clean_detail_check_and_price_floor() -
     assert rejected_result.concern.startswith("Rejected:")
 
 
-def test_facebook_and_craigslist_sublets_need_an_explicit_six_month_term() -> None:
-    profile = load_preferences(BENCHMARK_PROFILE)
-    eligible = ListingCandidate(
-        platform="Facebook Marketplace",
-        source_id="six-month-sublet",
-        title="Noe Valley 1BR sublet",
-        original_url="https://www.facebook.com/marketplace/item/6month/",
-        price=2300,
-        neighborhood="Noe Valley",
-        summary="Entire one-bedroom apartment. Six-month sublease available from August.",
+def test_a_sublet_is_judged_against_the_reader_s_own_lease_minimum() -> None:
+    """Sublet inventory churns, so a default floor is right when nobody has said
+    otherwise. Applying it over an explicit answer is not: this profile accepts
+    three months, and three-month sublets were being refused by a six-month
+    number the reader never chose."""
+    import yaml
+
+    document = yaml.safe_load(BENCHMARK_PROFILE.read_text(encoding="utf-8"))
+    document.setdefault("lease", {})["min_months"] = 3
+    profile = parse_preferences(yaml.safe_dump(document))
+    assert profile.section("lease")["min_months"] == 3
+
+    def sublet(source_id: str, summary: str, platform: str = "Facebook Marketplace") -> ListingCandidate:
+        return ListingCandidate(
+            platform=platform,
+            source_id=source_id,
+            title="Noe Valley 1BR sublet",
+            original_url=f"https://www.facebook.com/marketplace/item/{source_id}/",
+            price=2300,
+            neighborhood="Noe Valley",
+            summary=summary,
+        )
+
+    at_the_line = score_listing(
+        sublet("three", "Entire one-bedroom apartment. Sublet available for 3 months."), profile
     )
-    too_short = ListingCandidate(
-        platform="Facebook Marketplace",
-        source_id="three-month-sublet",
-        title="Noe Valley 1BR sublet",
-        original_url="https://www.facebook.com/marketplace/item/3month/",
-        price=2300,
-        neighborhood="Noe Valley",
-        summary="Entire one-bedroom apartment. Sublet available for 3 months.",
+    below_the_line = score_listing(
+        sublet("two", "Entire one-bedroom apartment. Sublet available for 2 months."), profile
     )
-    unclear = ListingCandidate(
-        platform="Facebook Marketplace",
-        source_id="unclear-sublet",
-        title="Noe Valley 1BR sublet",
-        original_url="https://www.facebook.com/marketplace/item/unclear/",
-        price=2300,
-        neighborhood="Noe Valley",
-        summary="Entire one-bedroom apartment. Flexible sublet, dates to discuss.",
-    )
-    room_too_short = ListingCandidate(
-        platform="Craigslist",
-        source_id="three-month-room-sublet",
-        title="Private room in Noe Valley",
-        original_url="https://sfbay.craigslist.org/sfc/sub/room-3month.html",
-        price=1500,
-        neighborhood="Noe Valley",
-        summary="Private room in a small flat. Sublet for 3 months.",
-    )
-    room_unclear = ListingCandidate(
-        platform="Facebook Groups",
-        source_id="unclear-room-sublet",
-        title="Private room in Noe Valley",
-        original_url="https://www.facebook.com/groups/example/posts/room-unclear/",
-        price=1500,
-        neighborhood="Noe Valley",
-        summary="Private room in a small flat. Flexible sublet; dates to discuss.",
+    unclear = score_listing(
+        sublet("unclear", "Entire one-bedroom apartment. Flexible sublet, dates to discuss."), profile
     )
 
-    eligible_result = score_listing(eligible, profile)
-    too_short_result = score_listing(too_short, profile)
-    unclear_result = score_listing(unclear, profile)
-    room_too_short_result = score_listing(room_too_short, profile)
-    room_unclear_result = score_listing(room_unclear, profile)
+    assert at_the_line.score >= profile.minimum_score, "three months is what this reader asked for"
+    assert below_the_line.score < profile.minimum_score, "two months is not"
+    assert "below the 3-month minimum" in below_the_line.concern
+    # An unstated term is an unknown, named for checking, not a refusal.
+    assert unclear.eligibility != "ineligible"
+    assert any(
+        entry.get("check") in {"lease", "sublet term"} and entry.get("status") == "unknown"
+        for entry in unclear.details.get("hard_constraints", [])
+    ), unclear.details.get("hard_constraints")
 
-    assert eligible_result.score >= profile.minimum_score
-    assert eligible_result.details["sublease"] == {
-        "is_sublease": True,
-        "minimum_months": 6,
-        "main_results_eligible": True,
-    }
-    assert too_short_result.score < profile.minimum_score
-    assert "below the 6-month minimum" in too_short_result.concern
-    assert unclear_result.score < profile.minimum_score
-    assert "explicit 6-month term" in unclear_result.concern
-    assert room_too_short_result.score < profile.minimum_score
-    assert room_unclear_result.score < profile.minimum_score
+
+def test_the_six_month_floor_still_applies_when_no_lease_minimum_is_set() -> None:
+    """The default has to survive: someone who never answered still should not
+    be shown a two-week sublet as a match."""
+    import yaml
+
+    document = yaml.safe_load(BENCHMARK_PROFILE.read_text(encoding="utf-8"))
+    document.get("lease", {}).pop("min_months", None)
+    profile = parse_preferences(yaml.safe_dump(document))
+    assert profile.section("lease").get("min_months") is None
+
+    listing = ListingCandidate(
+        platform="Facebook Marketplace",
+        source_id="four-month",
+        title="Noe Valley 1BR sublet",
+        original_url="https://www.facebook.com/marketplace/item/four/",
+        price=2300,
+        neighborhood="Noe Valley",
+        summary="Entire one-bedroom apartment. Sublet available for 4 months.",
+    )
+
+    result = score_listing(listing, profile)
+
+    assert result.score < profile.minimum_score
+    assert "below the 6-month minimum" in result.concern
 
 
 def test_shared_bathroom_and_one_bedroom_available_copy_are_room_signals() -> None:
@@ -1229,3 +1231,39 @@ def test_a_sublet_that_states_a_short_term_is_still_refused() -> None:
     result = score_listing(classify_listing(listing), preferences)
 
     assert result.eligibility == "ineligible"
+
+
+def test_an_area_matches_however_a_source_punctuates_it() -> None:
+    """Craigslist writes "haight ashbury"; the product calls it
+    "Haight-Ashbury". A literal match meant two of the app's own area names
+    could never match a real listing, so choosing either returned nothing."""
+    from sf_housing.scoring import _contains_location, _normal
+
+    for written, canonical in [
+        ("haight ashbury", "Haight-Ashbury"),
+        ("haight-ashbury", "Haight-Ashbury"),
+        ("st francis wood", "St. Francis Wood"),
+        ("st. francis wood", "St. Francis Wood"),
+        ("north beach / telegraph hill", "North Beach"),
+    ]:
+        assert _contains_location(_normal(written), canonical), f"{written} -> {canonical}"
+
+    # The guard that had to survive: a longer area is not its shorter neighbour.
+    assert not _contains_location(_normal("mission bay"), "Mission District")
+    assert not _contains_location(_normal("outer mission"), "Mission District")
+
+
+def test_every_area_the_form_offers_can_match_a_plainly_written_listing() -> None:
+    """A name nobody can match is a name that quietly returns nothing."""
+    import re
+
+    from sf_housing.deal_profile import SF_NEIGHBORHOODS
+    from sf_housing.scoring import _contains_location, _normal
+
+    unmatchable = [
+        area
+        for area in SF_NEIGHBORHOODS
+        if not _contains_location(_normal(re.sub(r"[^A-Za-z0-9 ]", " ", area)), area)
+    ]
+
+    assert unmatchable == [], f"these areas cannot match a plainly written listing: {unmatchable}"
