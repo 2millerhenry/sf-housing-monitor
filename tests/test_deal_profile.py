@@ -493,7 +493,10 @@ def test_the_shortlist_cut_off_can_be_moved_from_the_deal_page(tmp_path: Path) -
 
     assert load_preferences(settings.preferences_path).minimum_score == 50
     assert 'name="minimum_score"' in page, "the control has to be on the page"
-    assert '<option value="50" selected>' in page, "and has to show what was saved"
+    assert 'type="range"' in page and 'value="50"' in page, "and has to show what was saved"
+    # Dragging must not be the only way to read the number.
+    assert '<output class="cutoff-value"' in page
+    assert ">50</output>" in page
 
 
 def test_lowering_the_cut_off_puts_more_homes_on_the_shortlist(tmp_path: Path) -> None:
@@ -541,6 +544,63 @@ def test_lowering_the_cut_off_puts_more_homes_on_the_shortlist(tmp_path: Path) -
         loose = rows_on_the_shortlist(client)
 
     assert loose > strict, f"a lower line has to show more homes (80 -> {strict}, 40 -> {loose})"
+
+
+def test_the_slider_says_how_many_homes_each_stop_would_show(tmp_path: Path) -> None:
+    """A number on its own is abstract. The counts ride with the control so the
+    readout can answer "and how many is that?" while it is being dragged."""
+    import json
+    import re
+
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    for index, score in enumerate((92, 81, 74, 68, 55, 41, 33)):
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"s{index}",
+                title=f"Room {index}",
+                original_url=f"https://sfbay.craigslist.org/roo/d/x/{index}.html",
+                price=1500,
+                neighborhood="Bernal Heights",
+                listing_type="Room/share",
+                summary="A private room.",
+            ),
+            ScoreResult(score, ["fits"], "check", {}),
+        )
+
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    raw = re.search(r"data-cutoff-counts='([^']*)'", page)
+    assert raw, "the counts have to reach the page"
+    counts = json.loads(raw.group(1))
+
+    assert counts, "and cannot be empty"
+    # Monotonic by construction: a higher bar can never show more homes.
+    stops = sorted(int(key) for key in counts)
+    values = [counts[str(stop)] for stop in stops]
+    assert values == sorted(values, reverse=True)
+    assert counts[str(stops[0])] >= counts[str(stops[-1])]
+
+
+def test_the_cut_off_still_saves_without_javascript(tmp_path: Path) -> None:
+    """The readout needs a script; choosing a value must not."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["minimum_score"] = "70"
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        assert client.post("/preferences/deal", data=form, follow_redirects=False).status_code == 303
+
+    assert load_preferences(settings.preferences_path).minimum_score == 70
 
 
 @pytest.mark.parametrize("requested,expected", [("0", 30), ("999", 95), ("", 60), ("abc", 60), ("55", 55)])

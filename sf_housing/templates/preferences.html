@@ -188,25 +188,26 @@
     {# The shortlist used to cut off at 60 with no way to move the line. Nothing
        is discarded below it -- those homes are in Near matches -- so this only
        decides how much of that you want to see first. #}
-    <div class="match-cutoff">
-      <label for="minimum_score"><strong>How close a match do you want on the shortlist?</strong></label>
-      <select id="minimum_score" name="minimum_score">
-        {% set cutoffs = [
-          (40, '40 and up - show me nearly everything'),
-          (50, '50 and up - cast a wide net'),
-          (60, '60 and up - balanced (default)'),
-          (70, '70 and up - strong matches only'),
-          (80, '80 and up - excellent matches only')
-        ] %}
-        {% for value, label in cutoffs %}
-        <option value="{{ value }}" {% if minimum_score == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-        {% if minimum_score not in cutoffs|map(attribute=0)|list %}
-        <option value="{{ minimum_score }}" selected>{{ minimum_score }} and up - your current setting</option>
-        {% endif %}
-      </select>
-      <p class="field-help">Homes below the line stay in Near matches; they are never thrown away.</p>
+    <div class="match-cutoff" data-cutoff>
+      <div class="cutoff-head">
+        <label for="minimum_score">How close a match do you want on the shortlist?</label>
+        <p class="cutoff-readout">
+          <output class="cutoff-value" id="cutoff-value" for="minimum_score">{{ minimum_score }}</output>
+          <span class="cutoff-count" id="cutoff-count">and up{% if shortlist_counts.get(minimum_score) is not none %} &middot; {{ shortlist_counts[minimum_score] }} home{% if shortlist_counts[minimum_score] != 1 %}s{% endif %}{% endif %}</span>
+        </p>
+      </div>
+      <input class="cutoff-slider" type="range" id="minimum_score" name="minimum_score"
+             min="{{ cutoff_stops|first }}" max="{{ cutoff_stops|last }}" step="5" value="{{ minimum_score }}"
+             data-cutoff-counts='{{ shortlist_counts|tojson }}'
+             aria-describedby="cutoff-help">
+      <div class="cutoff-scale" aria-hidden="true">
+        <span>Nearly everything</span>
+        <span>Balanced</span>
+        <span>Only the best</span>
+      </div>
+      <p class="field-help" id="cutoff-help">Homes below the line stay in Near matches; they are never thrown away.</p>
     </div>
+    <script src="{{ url_for('static', path='cutoff-slider.js') }}?v={{ asset_version() }}" defer></script>
   </section>
 
   <section class="deal-section review-section" aria-labelledby="review-title">

@@ -473,6 +473,12 @@ def _typical_scan_seconds(scans: list[dict[str, object]], trigger: str | None = 
     return max(1, round(median(durations)))
 
 
+# The shortlist cut-off, in the steps the slider offers. Thirty is low enough to
+# be "show me nearly everything" without including homes the deal already ruled
+# out; ninety-five leaves a shortlist that can still have something on it.
+CUTOFF_STOPS = tuple(range(30, 100, 5))
+
+
 def _safe_return(value: str | None) -> str:
     """A redirect target that can only be a page of this app.
 
@@ -1050,6 +1056,10 @@ def create_app(
             "deal_values": values or profile_form_values(preferences.deal_profile),
             "neighborhood_options": SF_NEIGHBORHOODS,
             "minimum_score": preferences.minimum_score,
+            # What each stop on the slider would actually put on the shortlist,
+            # so the number means something while it is being dragged.
+            "shortlist_counts": repository.shortlist_counts(CUTOFF_STOPS),
+            "cutoff_stops": CUTOFF_STOPS,
             "message": message,
             "error": error,
             "welcome": welcome or not preferences.profile_active,

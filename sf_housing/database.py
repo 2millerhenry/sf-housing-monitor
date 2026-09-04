@@ -6,7 +6,8 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from bisect import bisect_left
+from typing import Any, Iterator, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .classification import classify_listing
@@ -537,6 +538,28 @@ class Repository:
                 )
             )
         return items
+
+    def shortlist_counts(self, thresholds: Sequence[int]) -> dict[int, int]:
+        """How many homes each cut-off would put on the shortlist.
+
+        The same predicate the active view uses, so the number under the slider
+        is the number the reader will actually get. One pass over the scores
+        rather than one query per stop.
+        """
+        with self.connection() as connection:
+            scores = [
+                int(row[0])
+                for row in connection.execute(
+                    "SELECT score FROM listings "
+                    "WHERE status IN ('active', 'saved') "
+                    "AND eligibility IN ('eligible', 'needs_verification')"
+                )
+            ]
+        scores.sort()
+        counts: dict[int, int] = {}
+        for threshold in thresholds:
+            counts[int(threshold)] = len(scores) - bisect_left(scores, int(threshold))
+        return counts
 
     def listing(self, listing_id: int) -> dict[str, Any] | None:
         """One listing, shaped exactly as a dashboard row.
