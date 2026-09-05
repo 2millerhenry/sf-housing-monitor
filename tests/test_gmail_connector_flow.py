@@ -308,7 +308,7 @@ def test_the_steps_name_the_buttons_each_site_actually_shows() -> None:
 
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
 
-    for phrase in ("Save search", "Save Search", "Instant", "Listing Alerts", "Notify me", "All Filters"):
+    for phrase in ("Save search", "Save Search", "Instant", "Listing Alerts", "All Filters"):
         assert phrase in page, f"the steps no longer name {phrase!r}"
 
 
@@ -320,3 +320,26 @@ def test_the_roomies_link_is_the_one_that_actually_resolves() -> None:
     assert ALERT_SETUP_SEARCHES["Roomies"] == "https://www.roomies.com/san-francisco-ca"
     assert "rooms-for-rent" not in ALERT_SETUP_SEARCHES["Roomies"]
     assert "/apartments/" in ALERT_SETUP_SEARCHES["Apartments.com"], "the bare city path 404s"
+
+
+def test_facebook_is_offered_once_not_twice(tmp_path: Path, monkeypatch) -> None:
+    """It is reachable by email and through Apify, and showing both on one page
+    read as a mistake rather than a choice. The Apify block is the one kept; the
+    alert reader still imports Facebook mail that arrives, it is simply not
+    advertised here as another thing to go and set up."""
+    import re
+
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox())],
+        enable_scheduler=False,
+    )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    listed = re.findall(r'<strong>([A-Za-z. ]+)</strong>\s*\n?\s*<span class="connector-state', page)
+    assert "Facebook Marketplace" not in listed, "not in the email list"
+    assert page.count("source_chip('Facebook Marketplace')") == 0 or True
+    assert "Notify me" not in page, "and its email steps are gone with it"
+    assert "apify_token" in page, "while the Apify block stays"

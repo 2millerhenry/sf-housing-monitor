@@ -646,7 +646,9 @@ def test_alert_setup_page_explains_local_connection(tmp_path: Path) -> None:
     assert "Mission" in response.text
     assert "Potrero Hill" not in response.text
     assert "3-bed</a>" in response.text, "the split searches are still offered"
-    assert "(3BR)" in response.text
+    # Facebook has its own block further down and is deliberately not offered
+    # here as a second, email-shaped way to reach the same listings.
+    assert "(3BR)" not in response.text
 
 
 def test_alerts_explain_why_a_new_user_returns_to_the_deal(tmp_path: Path) -> None:

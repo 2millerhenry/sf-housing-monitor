@@ -306,24 +306,6 @@ ALERT_SETUP_SEARCHES = {
 }
 
 
-def _prepared_facebook_split_searches(preferences: Preferences) -> list[dict[str, str]]:
-    enabled = set(preferences.deal_profile.enabled_paths)
-    areas = [name for name, _ in _profile_search_areas(preferences)]
-    return [
-        {
-            "name": area,
-            "bedrooms": str(bedrooms),
-            "url": (
-                "https://www.facebook.com/marketplace/114952118516947/search/?"
-                + urlencode({"query": f"{bedrooms} bedroom apartment {area}"})
-            ),
-        }
-        for bedrooms in (2, 3, 4)
-        if BEDROOM_PATHS[bedrooms] in enabled
-        for area in areas[:5]
-    ]
-
-
 def _prepared_facebook_sublet_searches(preferences: Preferences) -> list[dict[str, str]]:
     """Native-alert searches for the long-enough Facebook sublets we admit."""
     areas = [name for name, _ in _profile_search_areas(preferences)]
@@ -1464,6 +1446,12 @@ def create_app(
             if getattr(source, "mode", "") == "automatic"
             and getattr(source, "connector_key", None) != "gmail"
         }
+        # Facebook has its own block further down the page, and appearing in both
+        # places read as a mistake rather than as two routes to the same thing.
+        # The alert reader is untouched: if Facebook's own Notify me mail lands
+        # in a connected mailbox it is still imported. It is simply not offered
+        # here as a thing to go and set up.
+        checked_directly.add("Facebook Marketplace")
         gmail_providers = [
             {
                 "key": key,
@@ -1504,7 +1492,6 @@ def create_app(
                 "zillow_split_searches": _prepared_zillow_split_searches(preferences),
                 "facebook_searches": _prepared_facebook_searches(preferences),
                 "facebook_unit_searches": _prepared_facebook_unit_searches(preferences),
-                "facebook_split_searches": _prepared_facebook_split_searches(preferences),
                 "alert_setup_searches": ALERT_SETUP_SEARCHES,
                 "facebook_sublet_searches": _prepared_facebook_sublet_searches(preferences),
                 "facebook_groups": _prepared_facebook_groups(preferences),

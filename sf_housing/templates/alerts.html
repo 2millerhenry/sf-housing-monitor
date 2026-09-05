@@ -75,7 +75,6 @@
       {% for provider in gmail_providers %}
       <div>
         <strong>{{ provider.name }}</strong>
-        {%- if provider.name == 'Facebook Marketplace' %}<small class="provider-alt">Also available without email, under Two more below.</small>{% endif -%}
         {% if provider.state %}
           <span class="connector-state {{ provider.state.state }}">{{ provider.state.label }}</span>
           <small>{{ provider.state.message }}</small>
@@ -239,16 +238,6 @@
             <p>Only alerts that link to one specific room can be imported; a digest linking to a search page carries nothing to read.</p>
           </details>
 
-          <details class="setup-guide">
-            <summary>{{ source_chip('Facebook Marketplace') }}<span>about 2 minutes</span></summary>
-            <ol>
-              <li>Open a prepared search:
-                <span class="prepared-links">{% for search in facebook_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} ({{ search.bedrooms }}BR)</a>{% endfor %}</span>
-              </li>
-              <li>Press Facebook&rsquo;s own <strong>Notify me</strong> on the results.</li>
-            </ol>
-            <p>No Facebook password or cookies are stored. This is the email route; the Apify route below does the same job without email.</p>
-          </details>
         </div>
 
         <p class="setup-after">{% if email_connected or gmail_connected %}Once any of them sends its first alert, press <strong>Check for alerts now</strong> above and that site turns from waiting to working.{% else %}Connect a mailbox first; these searches will be waiting here afterwards.{% endif %}</p>
@@ -264,7 +253,7 @@
       <span>{{ source_chip('Facebook Marketplace') }}<small>Free to start &middot; about 10 minutes</small></span>
       <span class="connector-state {{ apify_state.state if apify_state else 'not_configured' }}">{{ apify_state.label if apify_state else 'Optional' }}</span>
     </summary>
-    <p class="extra-why">This is the second of two ways to get Facebook: the other is its own alert email, above. Facebook lets no app read Marketplace directly, so this goes through Apify, a service that does the reading and hands back the results. <strong>Your Facebook login is never used or stored.</strong></p>
+    <p class="extra-why">Facebook lets no app read Marketplace directly, so this goes through Apify, a service that does the reading and hands back the results. <strong>Your Facebook login is never used or stored.</strong></p>
     {% if apify_state and apify_state.message %}<p class="connector-message">{{ apify_state.message }}</p>{% endif %}
     <ol class="extra-steps">
       <li>Make a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener noreferrer">console.apify.com</a>. No card is asked for.</li>
