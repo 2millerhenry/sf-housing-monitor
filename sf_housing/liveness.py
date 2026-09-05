@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from .scheduling import PACIFIC, latest_scheduled_time
+from .scheduling import PACIFIC, SCAN_JOB_ID, latest_scheduled_time
 
 
 # Wall-clock hours would drift with daylight saving and with the schedule
@@ -123,7 +123,14 @@ def schedule_health(
     if scheduler is not None:
         try:
             running = bool(getattr(scheduler, "running", False))
-            jobs = list(scheduler.get_jobs())
+            # Only the job that actually scans. The catch-up heartbeat runs
+            # every fifteen minutes, so counting it would make "next check" mean
+            # the watchdog rather than the check, and would let a missing scan
+            # job still look scheduled.
+            jobs = [
+                job for job in scheduler.get_jobs()
+                if getattr(job, "id", "") == SCAN_JOB_ID
+            ]
         except Exception:
             # A scheduler that cannot answer is a scheduler that cannot fire.
             jobs, running = [], False

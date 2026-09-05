@@ -24,6 +24,15 @@ from .sources import ListingSource, facebook_coordinate_neighborhood, visible_sf
 
 LOGGER = logging.getLogger(__name__)
 
+# Which runs the app started by itself. Two places used to spell this set out
+# separately -- which sources a run may touch, and whether a failing source is
+# allowed its cooldown -- so adding a third kind of automatic run meant finding
+# both or silently getting a lesser scan than the one being caught up.
+AUTOMATIC_TRIGGERS = frozenset({"scheduled", "startup_catchup", "catch_up"})
+# A connector test is a person asking, but it still has to reach the sources a
+# schedule would, or the thing they are testing is not the thing that runs.
+FULL_SOURCE_TRIGGERS = AUTOMATIC_TRIGGERS | {"connector_test"}
+
 # Rechecking is bounded by time, not by a count. A fixed six-per-source meant a
 # sixty-home shortlist took days to cycle, so "no stale results" was a direction
 # rather than a promise. The scan finishes well inside its allowance, and the
@@ -110,7 +119,7 @@ class Scanner:
         return snapshot
 
     def _eligible_sources(self, trigger: str) -> list[ListingSource]:
-        include_scheduled_only = trigger in {"scheduled", "startup_catchup", "connector_test"}
+        include_scheduled_only = trigger in FULL_SOURCE_TRIGGERS
         eligible = [
             source
             for source in self.sources
@@ -566,7 +575,7 @@ class Scanner:
                     # automatic cooldown.  This avoids hammering a broken
                     # external page after wake/restart, while an explicit user
                     # check remains an intentional one-time retry.
-                    if trigger in {"scheduled", "startup_catchup"}:
+                    if trigger in AUTOMATIC_TRIGGERS:
                         backoff = source_is_in_backoff(self.repository, source)
                         if backoff is not None:
                             self.repository.finish_source_run(

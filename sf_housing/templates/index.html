@@ -74,10 +74,17 @@
 {% if liveness and not liveness.ok %}
 <p class="liveness-warning" role="status">
   <strong>{% if liveness.state == 'stopped' %}Automatic checking is not running{% else %}Checks are behind schedule{% endif %}</strong>
-  {{ liveness.summary }} <a href="/support">Open Support</a>
+  {{ liveness.summary }}
+  {%- if liveness.state == 'overdue' %}
+  {# Being behind is no longer something to go and fix by hand: a catch-up is
+     already coming. Saying so is the difference between a warning that asks for
+     work and one that explains itself. #}
+  <span class="liveness-behind">This Mac was probably asleep or offline. A catch-up runs on its own within {{ liveness.catch_up_minutes }} minutes; Check for new homes does it now.</span>
+  {%- endif %}
+  <a href="/support">Open Support</a>
 </p>
 {% elif liveness and liveness.state in ['current', 'scanning'] %}
-<p class="liveness-line">Last checked {{ liveness.last_checked }} · next check {{ liveness.next_check }}</p>
+<p class="liveness-line">Last checked {{ liveness.last_checked }} &middot; next check {{ liveness.next_check }}</p>
 {% endif %}
 
 <section class="workflow-bar" aria-label="Listing controls">

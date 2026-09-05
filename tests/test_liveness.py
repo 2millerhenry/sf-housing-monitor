@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from sf_housing.app import create_app
+from sf_housing.scheduling import CATCH_UP_JOB_ID, SCAN_JOB_ID
 from sf_housing.liveness import (
     describe_age,
     last_finished_scan,
@@ -29,8 +30,9 @@ NOW = datetime(2026, 9, 3, 20, 0, tzinfo=UTC)  # 13:00 Pacific, after the 10:00 
 
 
 class FakeJob:
-    def __init__(self, next_run_time):
+    def __init__(self, next_run_time, job_id=SCAN_JOB_ID):
         self.next_run_time = next_run_time
+        self.id = job_id
 
 
 class FakeScheduler:
@@ -316,3 +318,35 @@ def test_the_liveness_line_is_absent_before_the_first_check(tmp_path: pathlib.Pa
 
     assert "behind schedule" not in page
     assert "Automatic checking is not running" not in page
+
+
+# --------------------------------------------------------------------------
+# the catch-up heartbeat must not be mistaken for a check
+# --------------------------------------------------------------------------
+
+
+def test_the_heartbeat_is_not_the_next_check() -> None:
+    """It runs every fifteen minutes. Taking the soonest job would have had the
+    dashboard promising a check at 12:07 when the next one is at 18:00."""
+    scheduler = FakeScheduler(
+        jobs=[
+            FakeJob(NOW + timedelta(minutes=7), CATCH_UP_JOB_ID),
+            FakeJob(NOW + timedelta(hours=5), SCAN_JOB_ID),
+        ]
+    )
+
+    health = schedule_health(scheduler, [scan()], now=NOW)
+
+    assert health.next_run_at == NOW + timedelta(hours=5)
+    assert health.job_count == 1, "the heartbeat is not a scheduled check"
+
+
+def test_a_heartbeat_without_a_scan_job_still_reads_as_stopped() -> None:
+    """The watchdog surviving while the thing it watches is gone is exactly the
+    state that must not look healthy."""
+    scheduler = FakeScheduler(jobs=[FakeJob(NOW + timedelta(minutes=7), CATCH_UP_JOB_ID)])
+
+    health = schedule_health(scheduler, [scan()], now=NOW)
+
+    assert health.state == "stopped"
+    assert health.ok is False

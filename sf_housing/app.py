@@ -66,7 +66,7 @@ from .potrero import (
     shortlist,
 )
 from .scanner import Scanner
-from .scheduling import PACIFIC, build_scheduler, startup_scan_due
+from .scheduling import CATCH_UP_INTERVAL_MINUTES, PACIFIC, build_scheduler, scheduled_scan_due
 from .settings import Settings
 from .sources import (
     FacebookGroupsSource,
@@ -628,7 +628,7 @@ def create_app(
         if enable_scheduler:
             scheduler.start()
             logging.getLogger(__name__).info("Scheduler started for 10:00 and 18:00 America/Los_Angeles")
-            if load_preferences(active_settings.preferences_path).profile_active and startup_scan_due(
+            if load_preferences(active_settings.preferences_path).profile_active and scheduled_scan_due(
                 repository.recent_scans(20)
             ):
                 scanner.start_scan("startup_catchup")
@@ -893,6 +893,7 @@ def create_app(
             "last_checked": describe_age(schedule_state.last_finished_at, datetime.now(UTC)),
             "next_check": next_run_label(schedule_state),
             "ok": schedule_state.ok,
+            "catch_up_minutes": CATCH_UP_INTERVAL_MINUTES,
         }
         return templates.TemplateResponse(
             request=request,
