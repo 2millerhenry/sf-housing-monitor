@@ -586,3 +586,19 @@ def test_the_gmail_steps_lead_with_the_thing_that_blocks_people() -> None:
 
     assert first < steps, "the prerequisite has to come first"
     assert "setup-first" in page
+
+
+def test_no_two_sources_share_a_colour() -> None:
+    """The mark exists so a source can be found at a glance, which two sources
+    in the same colour defeats."""
+    import pathlib
+    import re
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    block = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
+    hues = [int(hue) for _, hue in re.findall(r"\('([^']+)',\s*'(\d+)'\)", block)]
+
+    assert len(hues) == len(set(hues)), "two sources share a hue"
+    ordered = sorted(hues)
+    gaps = [b - a for a, b in zip(ordered, ordered[1:])]
+    assert min(gaps) >= 20, f"two hues are only {min(gaps)} degrees apart"

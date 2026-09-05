@@ -5,16 +5,16 @@
     need. Distinct hues at one lightness read as a family. -#}
 {% set source_marks = {
   'Craigslist':          ('CL', '25'),
-  'SF Housing Portal':   ('SF', '162'),
-  'Zumper':              ('Z',  '300'),
-  'SpareRoom':           ('SR', '195'),
-  'Listings Project':    ('LP', '95'),
   'Abacus':              ('AB', '55'),
+  'Listings Project':    ('LP', '95'),
+  'HotPads':             ('HP', '130'),
+  'SF Housing Portal':   ('SF', '162'),
+  'SpareRoom':           ('SR', '200'),
+  'Roomies':             ('R',  '230'),
   'Zillow':              ('Z',  '255'),
-  'HotPads':             ('HP', '190'),
-  'Apartments.com':      ('A',  '300'),
-  'Roomies':             ('R',  '55'),
-  'Facebook Marketplace':('FB', '265')
+  'Facebook Marketplace':('FB', '285'),
+  'Zumper':              ('Zu', '310'),
+  'Apartments.com':      ('A',  '340')
 } %}
 {% macro source_chip(name) %}
   {%- set mark = source_marks.get(name, (name[0], '162')) -%}
