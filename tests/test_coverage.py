@@ -504,3 +504,63 @@ def test_opening_the_page_fetches_nothing(
     alerts_page(tmp_path, monkeypatch, {"HotPads": 4562})
 
     assert calls == []
+
+
+def test_the_count_is_taken_while_the_scan_client_is_still_open(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This shipped broken once and every test still passed.
+
+    The call sat one indent outside the scan's `with httpx.Client(...)` block,
+    so by the time it ran the client was closed and every request failed with
+    "Cannot send a request, as the client has been closed" -- which fetch_count
+    swallows, making it look identical to a source that simply cannot be
+    counted. Mocking fetch_count hid it, because a mock does not need a live
+    client. So this asserts on the client itself.
+    """
+    repository, scanner = scanner_for(tmp_path)
+    seen: list[bool] = []
+
+    def record_client_state(client, platform, url):
+        seen.append(client.is_closed)
+        return 4562 if platform == "HotPads" else None
+
+    monkeypatch.setattr("sf_housing.scanner.fetch_count", record_client_state)
+
+    scanner.run_scan("scheduled")
+
+    assert seen, "the coverage pass never ran at all"
+    assert not any(seen), "the scan's client was already closed when counting ran"
+    assert repository.source_coverage()["HotPads"]["count"] == 4562
+
+
+def test_a_real_client_lifecycle_reaches_the_store(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same guarantee without mocking fetch_count at all: a real httpx
+    client, a real transport, the real parser, and the real store."""
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scanner import Scanner
+    from tests.conftest import TEST_PREFERENCES
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "hotpads" in str(request.url):
+            return httpx.Response(200, text=fixture("hotpads-200.html"))
+        return httpx.Response(403, text=fixture("roomies-403.html"))
+
+    real_client = httpx.Client
+    transport = httpx.MockTransport(handler)
+
+    def client_with_mock_transport(*args, **kwargs):
+        kwargs["transport"] = transport
+        return real_client(*args, **kwargs)
+
+    monkeypatch.setattr("sf_housing.scanner.httpx.Client", client_with_mock_transport)
+
+    repository = repo(tmp_path)
+    preferences = parse_preferences(TEST_PREFERENCES)
+    Scanner(repository, lambda: preferences, [Room()]).run_scan("scheduled")
+
+    stored = repository.source_coverage()
+    assert stored["HotPads"]["count"] == 4562
+    assert "Roomies" not in stored

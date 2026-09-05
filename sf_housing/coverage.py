@@ -23,6 +23,7 @@ below exists to make that outcome impossible.
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -30,6 +31,8 @@ from datetime import UTC, datetime, timedelta
 import httpx
 
 from .connectors import GMAIL_PROVIDERS
+
+LOGGER = logging.getLogger(__name__)
 
 
 # A page that mentions any of these is a wall, whatever status code it carried.
@@ -129,14 +132,28 @@ def fetch_count(client: httpx.Client, platform: str, url: str) -> int | None:
     it reports.
     """
     if platform != "HotPads" or not url:
+        LOGGER.debug("%s has no verified way to be counted", platform)
         return None
     try:
         response = client.get(url, timeout=20.0)
-    except Exception:
+    except Exception as exc:
+        # Named rather than silent: "could not be counted" covers a refusal, a
+        # timeout and a redesign, and telling them apart is the difference
+        # between a known limit and a bug nobody notices.
+        LOGGER.info("Counting %s failed: %s: %s", platform, type(exc).__name__, exc)
         return None
     if response.status_code != 200:
+        LOGGER.info("Counting %s refused with HTTP %s", platform, response.status_code)
         return None
-    return parse_count(platform, response.text)
+    count = parse_count(platform, response.text)
+    if count is None:
+        LOGGER.info(
+            "Counting %s parsed nothing from %s bytes (blocked=%s)",
+            platform,
+            len(response.text),
+            looks_blocked(response.text),
+        )
+    return count
 
 
 # Where each site's San Francisco search actually lives. Every one of these was

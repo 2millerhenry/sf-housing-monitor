@@ -230,7 +230,7 @@ class Scanner:
         try:
             targets = missing_coverage_targets(self.repository, preferences)
         except Exception:
-            LOGGER.debug("Could not work out which sources to measure", exc_info=True)
+            LOGGER.warning("Could not work out which sources to measure", exc_info=True)
             return
         try:
             stored = self.repository.source_coverage()
@@ -242,10 +242,20 @@ class Scanner:
                 continue
             try:
                 count = fetch_count(client, platform, url)
-                if count is not None:
-                    self.repository.record_source_coverage(platform, count)
             except Exception:
-                LOGGER.debug("Coverage measurement failed for %s", platform, exc_info=True)
+                # A silent failure here would look identical to a source that
+                # simply cannot be counted, which is the one thing that must
+                # stay distinguishable.
+                LOGGER.warning("Could not count %s", platform, exc_info=True)
+                continue
+            if count is None:
+                LOGGER.info("%s could not be counted; showing no figure for it", platform)
+                continue
+            try:
+                self.repository.record_source_coverage(platform, count)
+                LOGGER.info("%s is holding %s listings", platform, count)
+            except Exception:
+                LOGGER.warning("Could not store the %s count", platform, exc_info=True)
 
     def _recheck_absent(
         self,
@@ -917,13 +927,16 @@ class Scanner:
                         sources_failed=sources_failed,
                     )
 
-            # Ask the disconnected sources how much they are holding. This is a
-            # passenger on the scan, not part of it: it runs after every source
-            # has been counted, cannot change the outcome, and cannot fail it.
-            # Any trigger may ask; how often these sites are actually contacted
-            # is bounded by how stale the stored count is, not by which button
-            # was pressed.
-            self._measure_missing_coverage(client, preferences)
+                # Ask the disconnected sources how much they are holding. Inside
+                # the client block on purpose: one line further out and the
+                # client is closed, which fails every request with "Cannot send
+                # a request, as the client has been closed" and looks exactly
+                # like a source that cannot be counted.
+                # A passenger on the scan, not part of it: it runs after every
+                # source, cannot change the outcome and cannot fail it. Any
+                # trigger may ask; how often these sites are really contacted is
+                # bounded by how stale the stored count is.
+                self._measure_missing_coverage(client, preferences)
 
             completed_status = "completed_with_errors" if sources_failed else "completed"
             self.repository.finish_scan(
