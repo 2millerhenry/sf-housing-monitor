@@ -206,3 +206,18 @@ def test_the_close_button_stays_on_screen_on_a_phone() -> None:
 
     assert ".donate-close" in narrow
     assert "top: 10px" in narrow and "right: 10px" in narrow, narrow
+
+
+def test_the_close_button_is_a_circle_not_an_oval() -> None:
+    """The shared button rule sets a 42px min-height and 9px 14px of padding for
+    touch targets. A 32px round icon button inherits both and renders 31x41, so
+    it has to opt out of each explicitly rather than only setting height."""
+    import pathlib
+    import re
+
+    css = pathlib.Path("sf_housing/static/style.css").read_text(encoding="utf-8")
+    rule = re.search(r"^\.donate-close \{([^}]*)\}", css, re.M).group(1)
+
+    for declaration in ("width: 32px", "height: 32px", "min-width: 32px", "min-height: 32px", "padding: 0"):
+        assert declaration in rule, f"{declaration} is missing, so the shared button rule wins"
+    assert "border-radius: 50%" in rule
