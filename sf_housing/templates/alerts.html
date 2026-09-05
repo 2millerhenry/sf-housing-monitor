@@ -4,17 +4,18 @@
     trademarks inside an MIT repository is a liability the project does not
     need. Distinct hues at one lightness read as a family. -#}
 {% set source_marks = {
-  'Craigslist':          ('CL', '25'),
-  'Abacus':              ('AB', '55'),
-  'Listings Project':    ('LP', '95'),
-  'HotPads':             ('HP', '130'),
+  'Roomies':             ('R',  '12'),
+  'Craigslist':          ('CL', '42'),
+  'Abacus':              ('AB', '72'),
+  'Listings Project':    ('LP', '102'),
+  'HotPads':             ('HP', '132'),
   'SF Housing Portal':   ('SF', '162'),
-  'SpareRoom':           ('SR', '200'),
-  'Roomies':             ('R',  '230'),
-  'Zillow':              ('Z',  '255'),
-  'Facebook Marketplace':('FB', '285'),
-  'Zumper':              ('Zu', '310'),
-  'Apartments.com':      ('A',  '340')
+  'SpareRoom':           ('SR', '192'),
+  'Furnished Finder':    ('FF', '222'),
+  'Zillow':              ('Z',  '252'),
+  'Facebook Marketplace':('FB', '282'),
+  'Zumper':              ('Zu', '312'),
+  'Apartments.com':      ('A',  '342')
 } %}
 {% macro source_chip(name) %}
   {%- set mark = source_marks.get(name, (name[0], '162')) -%}

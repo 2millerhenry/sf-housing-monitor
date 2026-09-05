@@ -590,6 +590,24 @@ def test_the_gmail_steps_lead_with_the_thing_that_blocks_people() -> None:
     assert "setup-first" in page
 
 
+def test_every_source_the_page_names_is_in_the_mark_table() -> None:
+    """source_chip falls back to the first letter and one shared hue for a name
+    it does not know, which is how Furnished Finder came to wear an "F" in the
+    housing portal's green. Reading the table alone cannot catch that."""
+    import pathlib
+    import re
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    block = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
+    known = set(re.findall(r"'([^']+)':", block))
+    used = set(re.findall(r"source_chip\('([^']+)'\)", page))
+    # Names passed as a literal list rather than to the macro directly.
+    used |= set(re.findall(r"'([A-Z][A-Za-z. ]+)'", re.search(r"for name in \[(.*?)\]", page, re.S).group(1)))
+
+    missing = sorted(used - known)
+    assert not missing, f"these fall back to a letter and a shared hue: {missing}"
+
+
 def test_no_two_sources_share_a_colour() -> None:
     """The mark exists so a source can be found at a glance, which two sources
     in the same colour defeats."""
