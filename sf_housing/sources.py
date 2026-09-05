@@ -444,13 +444,19 @@ class GmailHousingAlertSource:
         self.empty_result_message = None
         self.last_alert_count = 0
         emails = self.mailbox.messages(query, max_results=50)
-        self.last_alert_count = len(emails)
-        for email in emails:
+        # Mail from the provider is not the same thing as an alert from the
+        # provider. A single "Welcome to Zillow" signup message counted as an
+        # alert that yielded no listings, which reported a parser failure and
+        # told the reader their notification settings needed attention -- when
+        # all that had happened was that they had not saved a search yet.
+        alerts = [email for email in emails if self._is_alert_email(email)]
+        self.last_alert_count = len(alerts)
+        for email in alerts:
             for listing in self._from_email(email, preferences):
                 if listing.source_id not in seen_listing_ids:
                     listings.append(listing)
                     seen_listing_ids.add(listing.source_id)
-        if emails and not listings:
+        if alerts and not listings:
             if self.opaque_alert_message:
                 self.empty_result_message = self.opaque_alert_message
                 return []
@@ -459,6 +465,22 @@ class GmailHousingAlertSource:
                 "The email format or notification settings may need attention."
             )
         return listings
+
+    # Sign-up, verification, receipt and account mail all arrive from the same
+    # address as the alerts. None of it is evidence about whether alerts work,
+    # so it is not counted as one.
+    _NOT_AN_ALERT = re.compile(
+        r"\b(?:welcome|verify|verification|confirm your|activate|password|"
+        r"receipt|invoice|payment|billing|sign(?:ed)?[- ]in|log(?:ged)?[- ]in|"
+        r"security alert|two[- ]factor|terms|privacy policy|survey|"
+        r"tour (?:request|confirmed)|application (?:received|update)|"
+        r"getting started|get started|complete your|finish (?:setting|your))\b",
+        re.IGNORECASE,
+    )
+
+    def _is_alert_email(self, email: Any) -> bool:
+        subject = str(getattr(email, "subject", "") or "")
+        return not self._NOT_AN_ALERT.search(subject)
 
     def enrich(self, client: httpx.Client, listing: ListingCandidate) -> ListingCandidate:
         # The saved-search email is the source of data. We deliberately do not

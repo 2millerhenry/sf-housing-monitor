@@ -417,3 +417,107 @@ def test_mail_body_decode_is_bounded() -> None:
     ).decode()
 
     assert len(gmail_alerts._decode_body(oversized)) == GMAIL_BODY_LIMIT_CHARS
+
+
+# --------------------------------------------------------------------------
+# mail from a provider is not the same thing as an alert from a provider
+# --------------------------------------------------------------------------
+
+
+class Envelope:
+    def __init__(self, subject: str, html: str = ""):
+        self.subject = subject
+        self.html = html
+        self.text = ""
+        self.message_id = subject
+
+
+class Inbox:
+    def __init__(self, emails):
+        self._emails = list(emails)
+        self.is_connected = True
+
+    def messages(self, query, max_results=50):
+        return list(self._emails)[:max_results]
+
+
+def zillow(mailbox):
+    from sf_housing.sources import ZillowAlertSource
+
+    return ZillowAlertSource(mailbox)
+
+
+def test_a_welcome_email_is_not_a_failed_alert() -> None:
+    """The real mailbox held one message from Zillow -- "Welcome to Zillow" --
+    and the page reported a parser failure telling the reader their notification
+    settings needed attention. Nothing was wrong: they had not saved a search."""
+    from sf_housing.preferences import parse_preferences
+    from tests.conftest import TEST_PREFERENCES
+
+    source = zillow(Inbox([Envelope("Welcome to Zillow", "<a href='https://click.mail.zillow.com/x'>Start</a>")]))
+
+    listings = source.search(None, parse_preferences(TEST_PREFERENCES))
+
+    assert listings == []
+    assert source.last_alert_count == 0, "no alert has arrived, so none is counted"
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        "Welcome to Zillow",
+        "Verify your email address",
+        "Your password has been changed",
+        "Receipt for your payment",
+        "New sign-in to your account",
+        "Getting started with Zillow",
+        "Tour request confirmed",
+    ],
+)
+def test_account_mail_never_counts_as_an_alert(subject: str) -> None:
+    source = zillow(Inbox([Envelope(subject)]))
+
+    assert source._is_alert_email(Envelope(subject)) is False, subject
+
+
+@pytest.mark.parametrize(
+    "subject",
+    [
+        "606 Capp St #105 just listed",
+        "New for rent: 1200 Market St, San Francisco",
+        "3 new listings match your saved search",
+        "New rentals in San Francisco",
+    ],
+)
+def test_a_real_alert_still_counts(subject: str) -> None:
+    source = zillow(Inbox([Envelope(subject)]))
+
+    assert source._is_alert_email(Envelope(subject)) is True, subject
+
+
+def test_an_alert_that_cannot_be_parsed_is_still_reported() -> None:
+    """The guarantee that must survive: a genuine alert yielding no listing is a
+    real problem and has to keep saying so."""
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.sources import SourceError
+    from tests.conftest import TEST_PREFERENCES
+
+    source = zillow(Inbox([Envelope("4 new listings match your saved search", "<p>no links</p>")]))
+
+    with pytest.raises(SourceError) as raised:
+        source.search(None, parse_preferences(TEST_PREFERENCES))
+
+    assert "none contained a direct listing link" in str(raised.value)
+    assert source.last_alert_count == 1
+
+
+def test_a_mailbox_with_only_account_mail_reads_as_waiting_not_broken() -> None:
+    """last_alert_count is what decides between "waiting for first alert" and
+    "degraded", so it has to count alerts rather than mail."""
+    from sf_housing.preferences import parse_preferences
+    from tests.conftest import TEST_PREFERENCES
+
+    source = zillow(Inbox([Envelope("Welcome to Zillow"), Envelope("Verify your email address")]))
+    source.search(None, parse_preferences(TEST_PREFERENCES))
+
+    assert source.last_alert_count == 0

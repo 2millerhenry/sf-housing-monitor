@@ -888,6 +888,10 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .support-hero .subtle { margin-bottom: 0; }
 /* The verdict and its evidence sit together: "Everything is working" is a
    claim, and the tally under it is what the claim rests on. */
+/* Facebook is reachable two ways and appeared twice on one page, which read as
+   a mistake rather than a choice. */
+.provider-alt { display: block; margin-top: 2px; color: var(--faint); font-size: 0.7rem; line-height: 1.4; }
+
 .support-tally { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; }
 .tally { padding: 4px 11px; border-radius: 999px; font-size: 0.76rem; font-weight: 620; }
 .tally.ok { background: var(--accent-soft); color: var(--accent-hover); }

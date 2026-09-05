@@ -214,3 +214,46 @@ def test_reconnect_starts_a_fresh_authorization_without_touching_public_state(
     assert response.headers["location"].startswith("https://accounts.google.test/")
     assert gmail is not None and gmail.state == "checking"
     assert public is not None and public.state == "working"
+
+
+def test_a_provider_checked_directly_leaves_the_email_list(tmp_path: Path, monkeypatch) -> None:
+    """Zumper moved to a direct source and kept its row here, so a connected
+    mailbox showed it waiting for an alert nothing would ever send."""
+    import re
+
+    from sf_housing.sources import ZumperSource
+
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox()), ZumperSource()],
+        enable_scheduler=False,
+    )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    listed = re.findall(r'<strong>([A-Za-z. ]+)</strong>\s*\n?\s*<span class="connector-state', page)
+    assert "Zumper" not in listed, "it is read directly, so email adds nothing"
+    assert "Zillow" in listed, "and the ones email really does add have to stay"
+
+
+def test_connecting_a_mailbox_does_not_empty_the_provider_list(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """An alert source reports mode "automatic" the moment a mailbox connects.
+    Filtering the list on mode alone therefore removed every provider exactly
+    when it started working."""
+    import re
+
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox())],
+        enable_scheduler=False,
+    )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    listed = re.findall(r'<strong>([A-Za-z. ]+)</strong>\s*\n?\s*<span class="connector-state', page)
+    assert "Zillow" in listed, listed
+    assert len(listed) >= 5, f"a connected mailbox must not empty the list: {listed}"

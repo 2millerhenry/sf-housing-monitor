@@ -1436,6 +1436,22 @@ def create_app(
                 status_code=303,
             )
         connector_states = repository.connector_states()
+        # A provider that is checked directly does not belong on a list of
+        # things email adds. Zumper moved to a direct source and kept its row
+        # here, so a connected mailbox showed it waiting for an alert that
+        # nothing would ever send. One rule, used by both the connected list and
+        # the invitation below it.
+        # An alert source reports mode "automatic" the moment a mailbox is
+        # connected, so mode alone cannot answer this: filtering on it removed
+        # every provider from the list as soon as it started working. What
+        # matters is whether the platform has a source that reads the site
+        # itself rather than reading mail about it.
+        checked_directly = {
+            source.platform
+            for source in active_sources
+            if getattr(source, "mode", "") == "automatic"
+            and getattr(source, "connector_key", None) != "gmail"
+        }
         gmail_providers = [
             {
                 "key": key,
@@ -1443,6 +1459,7 @@ def create_app(
                 "state": connector_states.get(key),
             }
             for key, name in GMAIL_PROVIDERS
+            if name not in checked_directly
         ]
         return templates.TemplateResponse(
             request=request,
@@ -1466,15 +1483,7 @@ def create_app(
                 # Zumper is checked directly now, so promising that email adds
                 # it would be a lie. Derive the list from what is actually still
                 # email-only rather than from the connector-key constant.
-                "email_providers": [
-                    name
-                    for _, name in GMAIL_PROVIDERS
-                    if name not in {
-                        source.platform
-                        for source in active_sources
-                        if getattr(source, "mode", "") == "automatic"
-                    }
-                ],
+                "email_providers": [provider["name"] for provider in gmail_providers],
                 "apify_state": connector_states.get("apify"),
                 "furnished_finder_state": connector_states.get("furnished_finder"),
                 "bridge_version": FURNISHED_FINDER_BRIDGE_VERSION,

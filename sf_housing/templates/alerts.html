@@ -65,6 +65,7 @@
       {% for provider in gmail_providers %}
       <div>
         <strong>{{ provider.name }}</strong>
+        {%- if provider.name == 'Facebook Marketplace' %}<small class="provider-alt">Also available without email, under Two more below.</small>{% endif -%}
         {% if provider.state %}
           <span class="connector-state {{ provider.state.state }}">{{ provider.state.label }}</span>
           <small>{{ provider.state.message }}</small>
@@ -201,7 +202,7 @@
       <span>{{ source_chip('Facebook Marketplace') }}<small>Free to start &middot; about 10 minutes</small></span>
       <span class="connector-state {{ apify_state.state if apify_state else 'not_configured' }}">{{ apify_state.label if apify_state else 'Optional' }}</span>
     </summary>
-    <p class="extra-why">Facebook lets no app read Marketplace directly, so this goes through Apify, a service that does the reading and hands back the results. <strong>Your Facebook login is never used or stored.</strong></p>
+    <p class="extra-why">This is the second of two ways to get Facebook: the other is its own alert email, above. Facebook lets no app read Marketplace directly, so this goes through Apify, a service that does the reading and hands back the results. <strong>Your Facebook login is never used or stored.</strong></p>
     {% if apify_state and apify_state.message %}<p class="connector-message">{{ apify_state.message }}</p>{% endif %}
     <ol class="extra-steps">
       <li>Make a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener noreferrer">console.apify.com</a>. No card is asked for.</li>
