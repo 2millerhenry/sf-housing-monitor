@@ -116,3 +116,62 @@ def test_the_shipped_donation_url_is_a_real_page_not_a_placeholder() -> None:
     assert SHIPPED.startswith("https://"), SHIPPED
     for placeholder in ("yourname", "example.com", "yourhandle", "username"):
         assert placeholder not in SHIPPED, f"{SHIPPED} still looks like a placeholder"
+
+
+# --------------------------------------------------------------------------
+# the panel
+# --------------------------------------------------------------------------
+
+
+def test_the_panel_fetches_nothing_from_kofi_until_it_is_asked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The footer promises the app runs entirely on this computer. A widget that
+    loads on every page view would tell Ko-fi each time the dashboard was
+    opened, which is the one thing that promise rules out."""
+    monkeypatch.setattr("sf_housing.app.DONATE_URL", DONATE_URL)
+    application = create_app(settings=app_settings(tmp_path), sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    assert 'src="about:blank"' in page, "the frame starts empty"
+    assert f'src="{DONATE_URL}' not in page, "and the embed url is never a src on load"
+    assert "data-donate-embed" in page, "it is held in an attribute until a click"
+    assert "storage.ko-fi.com" not in page, "Ko-fi's own script never runs on this page"
+
+
+def test_the_link_still_works_without_javascript(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The panel is an enhancement. With scripts off, or if it fails to load,
+    clicking has to go to Ko-fi exactly as it did before."""
+    monkeypatch.setattr("sf_housing.app.DONATE_URL", DONATE_URL)
+    application = create_app(settings=app_settings(tmp_path), sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    assert f'href="{DONATE_URL}" target="_blank"' in page
+    assert 'rel="noopener noreferrer external"' in page
+
+
+def test_no_panel_and_no_script_when_no_url_is_configured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("sf_housing.app.DONATE_URL", "")
+    application = create_app(settings=app_settings(tmp_path), sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    assert "donate-dialog" not in page
+    assert "donate-panel.js" not in page
+
+
+def test_the_panel_script_is_served(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sf_housing.app.DONATE_URL", DONATE_URL)
+    application = create_app(settings=app_settings(tmp_path), sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        assert client.get("/static/donate-panel.js").status_code == 200

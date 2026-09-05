@@ -28,12 +28,27 @@
     <div class="footer-inner">
       <p>SF Housing Monitor {{ app_version }} &middot; MIT licensed &middot; runs entirely on this computer</p>
       {% if donate_url %}
+      {# Still a real link to a real page: without JavaScript, or if the panel
+         fails to load, clicking it goes to Ko-fi exactly as before. #}
       <p class="footer-support">
         Free to use.
-        <a href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external">Say thanks</a>
+        <a href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external"
+           data-donate-open data-donate-embed="{{ donate_url }}?hidefeed=true&amp;widget=true&amp;embed=true&amp;preview=true">Say thanks</a>
       </p>
       {% endif %}
     </div>
   </footer>
+  {% if donate_url %}
+  {# The panel is an iframe rather than Ko-fi's own script, so their code never
+     runs on this page, and its src is left empty until somebody clicks: opening
+     the dashboard tells Ko-fi nothing, which is the promise the footer above it
+     makes. #}
+  <dialog class="donate-dialog" data-donate-dialog aria-label="Support this app">
+    <button type="button" class="donate-close" data-donate-close aria-label="Close">&times;</button>
+    <iframe title="Ko-fi donation panel" data-donate-frame src="about:blank"
+            loading="lazy" referrerpolicy="no-referrer"></iframe>
+  </dialog>
+  <script src="{{ url_for('static', path='/donate-panel.js') }}?v={{ asset_version() }}" defer></script>
+  {% endif %}
 </body>
 </html>

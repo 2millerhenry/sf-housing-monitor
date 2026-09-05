@@ -421,8 +421,15 @@ def test_nothing_a_source_wrote_can_become_markup(tmp_path: pathlib.Path) -> Non
     assert soup.find_all("b") == []
     handlers = [tag.name for tag in soup.find_all(True) if any(k.startswith("on") for k in tag.attrs)]
     assert handlers == [], f"an event handler reached the page on {handlers}"
-    scripts = [tag.get("src") or "inline" for tag in soup.find_all("script")]
-    assert scripts == ["http://testserver/static/listing-actions.js?v=" + scripts[0].split("?v=")[1]] if scripts else True
+    # Every script has to be one this app shipped, served from this app. A
+    # names list rather than a count, so adding one of ours does not quietly
+    # widen what the page will run.
+    allowed = {"listing-actions.js", "donate-panel.js"}
+    for tag in soup.find_all("script"):
+        src = tag.get("src")
+        assert src, "no inline script belongs on this page"
+        assert src.startswith("http://testserver/static/"), src
+        assert src.split("/")[-1].split("?")[0] in allowed, src
     assert all("alert" not in (tag.string or "") for tag in soup.find_all("script"))
 
 
