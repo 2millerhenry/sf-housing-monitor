@@ -17,7 +17,7 @@
         <a href="/" {% if request.url.path == '/' and view != 'saved' %}class="active" aria-current="page"{% endif %}>Shortlist</a>
         <a href="/?view=saved&sort=score" {% if request.url.path == '/' and view == 'saved' %}class="active" aria-current="page"{% endif %}>Saved</a>
         {% if request.url.path == '/potrero' %}<a href="/potrero" class="active" aria-current="page">Potrero Hill</a>{% endif %}
-        <a href="/alerts" {% if request.url.path == '/alerts' %}class="active" aria-current="page"{% endif %}>Sources</a>
+        <a href="/alerts" {% if request.url.path == '/alerts' %}class="active" aria-current="page"{% endif %}>Add sources</a>
         <a href="/preferences" {% if request.url.path == '/preferences' %}class="active" aria-current="page"{% endif %}>Your deal</a>
         <a href="/support" {% if request.url.path == '/support' %}class="active" aria-current="page"{% endif %}>Support</a>
       </nav>

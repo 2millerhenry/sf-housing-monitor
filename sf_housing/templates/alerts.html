@@ -22,12 +22,12 @@
   <span class="source-chip"><span class="source-mark" style="--mark-hue: {{ mark[1] }}" aria-hidden="true">{{ mark[0] }}</span>{{ name }}</span>
 {% endmacro %}
 {% extends "base.html" %}
-{% block title %}Sources · SF Housing Monitor{% endblock %}
+{% block title %}Add sources · SF Housing Monitor{% endblock %}
 {% block content %}
 <section class="hero compact">
   <div>
-    <p class="eyebrow">Coverage</p>
-    <h1>{% if email_connected or gmail_connected %}Your coverage{% else %}What you get, and what you can add{% endif %}</h1>
+    <p class="eyebrow">Add sources</p>
+    <h1>{% if email_connected or gmail_connected %}Where your homes come from{% else %}Six sources run already. Here is how to add more.{% endif %}</h1>
   </div>
 </section>
 

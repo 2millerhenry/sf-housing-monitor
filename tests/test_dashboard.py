@@ -1052,3 +1052,31 @@ def test_an_unreadable_setting_falls_back_instead_of_raising() -> None:
     assert setting_int("1200", 800) == 1200
     assert setting_int(1200, 800) == 1200
     assert setting_int(1200.0, 800) == 1200
+
+
+def test_the_nav_asks_for_an_action_not_a_noun(tmp_path: Path) -> None:
+    """"Sources" reads as a status page, and people treated it as one. The tab
+    exists so someone adds a source, so it says that."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    assert '>Add sources</a>' in page
+    assert '>Sources</a>' not in page, "the bare noun is gone from the nav"
+
+
+def test_the_page_it_opens_says_the_same_thing(tmp_path: Path) -> None:
+    """A tab called one thing that opens a page called another is how people
+    decide they are in the wrong place and leave."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert "<title>Add sources" in page
+    assert '<p class="eyebrow">Add sources</p>' in page
