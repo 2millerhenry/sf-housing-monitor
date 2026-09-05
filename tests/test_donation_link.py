@@ -175,3 +175,34 @@ def test_the_panel_script_is_served(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     with TestClient(application) as client:
         assert client.get("/static/donate-panel.js").status_code == 200
+
+
+def test_the_panel_has_one_edge_not_two(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A dialog that stays overflow:visible for its close button cannot clip the
+    frame, so giving both a radius left a hairline of dialog showing at every
+    corner. One surface owns the border, the radius and the clipping."""
+    import pathlib
+    import re
+
+    css = pathlib.Path("sf_housing/static/style.css").read_text(encoding="utf-8")
+    dialog = re.search(r"^\.donate-dialog \{([^}]*)\}", css, re.M).group(1)
+    surface = re.search(r"^\.donate-surface \{([^}]*)\}", css, re.M).group(1)
+    frame = re.search(r"^\.donate-dialog iframe \{([^}]*)\}", css, re.M).group(1)
+
+    assert "border: 0" in dialog and "background: none" in dialog, dialog
+    assert "border-radius" not in dialog, "the dialog is a positioning context, not a surface"
+    assert "overflow: hidden" in surface and "border-radius: 18px" in surface
+    assert "border-radius" not in frame, "the surface clips the frame instead"
+
+
+def test_the_close_button_stays_on_screen_on_a_phone() -> None:
+    """Hung outside the corner of a panel that is 94vw wide, it lands off the
+    edge of a 375px display."""
+    import pathlib
+    import re
+
+    css = pathlib.Path("sf_housing/static/style.css").read_text(encoding="utf-8")
+    narrow = re.search(r"@media \(max-width: 540px\) \{(.*?)\n\}", css, re.S).group(1)
+
+    assert ".donate-close" in narrow
+    assert "top: 10px" in narrow and "right: 10px" in narrow, narrow

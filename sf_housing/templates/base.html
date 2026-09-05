@@ -44,9 +44,14 @@
      the dashboard tells Ko-fi nothing, which is the promise the footer above it
      makes. #}
   <dialog class="donate-dialog" data-donate-dialog aria-label="Support this app">
+    {# The surface is this inner element, not the dialog. A dialog that has to
+       stay overflow:visible for the close button cannot also clip the frame, so
+       giving both a radius left a hairline of dialog showing at every corner. #}
+    <div class="donate-surface">
+      <iframe title="Ko-fi donation panel" data-donate-frame src="about:blank"
+              loading="lazy" referrerpolicy="no-referrer"></iframe>
+    </div>
     <button type="button" class="donate-close" data-donate-close aria-label="Close">&times;</button>
-    <iframe title="Ko-fi donation panel" data-donate-frame src="about:blank"
-            loading="lazy" referrerpolicy="no-referrer"></iframe>
   </dialog>
   <script src="{{ url_for('static', path='/donate-panel.js') }}?v={{ asset_version() }}" defer></script>
   {% endif %}
