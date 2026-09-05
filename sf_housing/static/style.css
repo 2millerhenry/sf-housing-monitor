@@ -1138,6 +1138,30 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-more > details > summary { padding: 11px 2px; cursor: pointer; color: var(--accent-hover); font-size: 0.8rem; font-weight: 650; list-style: none; }
 .connect-more > details > summary::-webkit-details-marker { display: none; }
 
+/* Connecting the mailbox is step 1 of 2, and the page used to imply it was the
+   whole job. This is the correction, so it is stated where it cannot be
+   scrolled past rather than folded away. */
+.half-done { margin: 16px 0 0; padding: 14px 16px; border: 1px solid var(--amber-line); border-radius: 11px; background: var(--amber-soft); }
+.half-done p { max-width: 74ch; margin: 0; color: var(--ink); font-size: 0.85rem; line-height: 1.6; }
+.half-done strong { font-weight: 660; }
+.half-done-do { margin-top: 7px !important; color: var(--muted) !important; font-size: 0.8rem !important; }
+
+/* The second step, open by default, because a closed fold is how the first
+   version of this hid the half of the job nobody knew about. */
+.connect-step { margin-top: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.connect-step > summary { padding: 13px 16px; cursor: pointer; list-style: none; font-size: 0.9rem; font-weight: 640; color: var(--ink); }
+.connect-step > summary::-webkit-details-marker { display: none; }
+.connect-step > summary:hover { background: var(--surface-muted); }
+.connect-step[open] > summary { border-bottom: 1px solid var(--line); background: var(--surface-muted); }
+.connect-step > *:not(summary) { margin-left: 16px; margin-right: 16px; }
+.connect-step > .setup-lede { margin-top: 14px; }
+.connect-step > .setup-guides { margin-bottom: 4px; }
+.connect-step > .setup-after { margin: 0 16px 15px; padding: 0; }
+.setup-guide > summary > span:last-child { margin-left: auto; }
+.prepared-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.prepared-links a { padding: 4px 10px; border: 1px solid var(--accent-line); border-radius: 999px; background: var(--accent-soft); color: var(--accent-hover); font-size: 0.76rem; font-weight: 620; text-decoration: none; }
+.prepared-links a:hover { background: var(--surface); }
+
 /* A mark per source, in this app's own lettering. Nothing is hotlinked, so the
    page still works offline and still tells no third party it was opened. One
    lightness and chroma across the set keeps eleven different hues reading as

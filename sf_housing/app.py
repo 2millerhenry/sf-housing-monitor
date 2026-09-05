@@ -294,6 +294,18 @@ def _prepared_facebook_unit_searches(preferences: Preferences) -> list[dict[str,
     ]
 
 
+# Where each site's San Francisco search actually lives. Every one of these was
+# opened in a browser and checked: hotpads.com/san-francisco-ca/apartments-for-rent
+# and apartments.com/apartments/san-francisco-ca/ both load real results, and
+# roomies.com/rooms-for-rent/san-francisco--ca -- the obvious guess -- returns
+# "We couldn't find what you were looking for", so it is /san-francisco-ca.
+ALERT_SETUP_SEARCHES = {
+    "HotPads": "https://hotpads.com/san-francisco-ca/apartments-for-rent",
+    "Apartments.com": "https://www.apartments.com/apartments/san-francisco-ca/",
+    "Roomies": "https://www.roomies.com/san-francisco-ca",
+}
+
+
 def _prepared_facebook_split_searches(preferences: Preferences) -> list[dict[str, str]]:
     enabled = set(preferences.deal_profile.enabled_paths)
     areas = [name for name, _ in _profile_search_areas(preferences)]
@@ -1493,6 +1505,7 @@ def create_app(
                 "facebook_searches": _prepared_facebook_searches(preferences),
                 "facebook_unit_searches": _prepared_facebook_unit_searches(preferences),
                 "facebook_split_searches": _prepared_facebook_split_searches(preferences),
+                "alert_setup_searches": ALERT_SETUP_SEARCHES,
                 "facebook_sublet_searches": _prepared_facebook_sublet_searches(preferences),
                 "facebook_groups": _prepared_facebook_groups(preferences),
                 "room_min_monthly": setting_int(preferences.section("budget").get("min_monthly"), 800),

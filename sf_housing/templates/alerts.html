@@ -53,8 +53,18 @@
     <p class="connect-lede">
       {% if email_connected %}Reading alert email from <strong>{{ email_address }}</strong>.
       {% else %}Connected with Google sign-in.{% endif %}
-      Each site stays unverified until one of its own alerts actually arrives.
     </p>
+    {# Connecting the mailbox is half the job and the page used to imply it was
+       all of it. These sites send nothing until you save a search on each one
+       and ask for emails, so say that where it cannot be missed. #}
+    {% set waiting = gmail_providers|rejectattr('state')|list
+                     or gmail_providers|selectattr('state')|rejectattr('state.state', 'equalto', 'working')|list %}
+    {% if waiting %}
+    <div class="half-done" role="note">
+      <p><strong>Connecting your email was step 1 of 2.</strong> None of these sites send anything until you go to each one, save a search, and ask it to email you. Until then this page will keep saying &ldquo;waiting for first alert&rdquo;, and it is not a fault.</p>
+      <p class="half-done-do">Below: what to click on each site, in order. About two minutes each.</p>
+    </div>
+    {% endif %}
     <div class="connect-actions">
       <form method="post" action="/alerts/gmail/test"><button class="primary" type="submit">Check for alerts now</button></form>
       <form method="post" action="/alerts/{% if email_connected %}email{% else %}gmail{% endif %}/disconnect">
@@ -159,20 +169,6 @@
         </div>
       </details>
       <details>
-        <summary>After connecting: turn the alert emails on</summary>
-        <p>These sites only email you once you save a search with alerts enabled. Prepared searches, using the budgets from Your deal:</p>
-        <div class="provider-ledger">
-          <section><h3>Zillow</h3><p>Open each prepared search, save it, and choose Instant email.</p><ul>
-            {% for search in zillow_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open prepared {{ search.name }} search</a></li>{% endfor %}
-            {% for search in zillow_unit_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} studio and 1-bedroom search</a></li>{% endfor %}
-            {% for search in zillow_split_searches %}<li><a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">Open {{ search.name }} {{ search.bedrooms }}-bedroom split search</a></li>{% endfor %}
-          </ul></section>
-          <section><h3>HotPads and Apartments.com</h3><p>Save separate studio/1-bedroom, exact 2-bedroom, and exact 3-bedroom SF searches using the maximums from Your deal, then enable email alerts.</p></section>
-          <section><h3>Roomies</h3><p>Turn on Realtime or Daily Listing Alerts for your SF room search. Only stable individual listing links import.</p></section>
-          <section><h3>Facebook email fallback</h3><p>Use Facebook's own Notify Me action for the prepared searches. No Facebook password or cookies are stored.</p><p>{% for search in facebook_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} ({{ search.bedrooms }}BR)</a>{% if not loop.last %} · {% endif %}{% endfor %}</p></section>
-        </div>
-      </details>
-      <details>
         <summary>My account can&rsquo;t make app passwords</summary>
         {% if has_client_secret %}
           <p>Sign in with Google instead. Use this if your account is on Google&rsquo;s Advanced Protection, or your workplace blocks app passwords.</p>
@@ -191,6 +187,72 @@
       </details>
     </div>
   {% endif %}
+      <details class="connect-step" open>
+        <summary>{% if email_connected or gmail_connected %}Step 2: turn the alert emails on &mdash; do this once per site{% else %}After you connect: turn the alert emails on{% endif %}</summary>
+        <p class="setup-lede">Each site is separate, and none of them will email you until you ask. The searches below already carry the budgets and areas from Your deal, so you only have to save them.</p>
+
+        <div class="setup-guides">
+          <details class="setup-guide" open>
+            <summary>{{ source_chip('Zillow') }}<span>about 2 minutes</span></summary>
+            <ol>
+              <li>Open a prepared search:
+                <span class="prepared-links">
+                {% for search in zillow_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} rooms</a>{% endfor %}
+                {% for search in zillow_unit_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} studio &amp; 1-bed</a>{% endfor %}
+                {% for search in zillow_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} {{ search.bedrooms }}-bed</a>{% endfor %}
+                </span>
+              </li>
+              <li>Sign in to Zillow if it asks. A saved search needs an account.</li>
+              <li>Press <strong>Save search</strong>, near the top of the results.</li>
+              <li>When it asks how often to email you, choose <strong>Instant</strong>. Daily works too, but you will hear about homes a day later.</li>
+              <li>Repeat for each link above that matters to you. Zillow emails one alert per saved search.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary>{{ source_chip('HotPads') }}<span>about 2 minutes</span></summary>
+            <ol>
+              <li>Open <a href="{{ alert_setup_searches['HotPads'] }}" target="_blank" rel="noopener noreferrer">HotPads&rsquo; San Francisco rentals</a>.</li>
+              <li>Set the price and bedrooms you want using <strong>All filters</strong>, so the alert matches your deal.</li>
+              <li>Press <strong>Save search</strong> and sign in if it asks.</li>
+              <li>Make sure email notifications are on for that saved search.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary>{{ source_chip('Apartments.com') }}<span>about 2 minutes</span></summary>
+            <ol>
+              <li>Open <a href="{{ alert_setup_searches['Apartments.com'] }}" target="_blank" rel="noopener noreferrer">Apartments.com&rsquo;s San Francisco rentals</a>.</li>
+              <li>Set your price and bedrooms with <strong>All Filters</strong>.</li>
+              <li>Press <strong>Save Search</strong> at the top of the results and sign in if asked.</li>
+              <li>Choose to be emailed about new matches.</li>
+            </ol>
+          </details>
+
+          <details class="setup-guide">
+            <summary>{{ source_chip('Roomies') }}<span>about 2 minutes</span></summary>
+            <ol>
+              <li>Open <a href="{{ alert_setup_searches['Roomies'] }}" target="_blank" rel="noopener noreferrer">Roomies&rsquo; San Francisco rooms</a>.</li>
+              <li>Sign in, then set your budget and move-in dates.</li>
+              <li>Turn on <strong>Listing Alerts</strong> and choose <strong>Realtime</strong> or <strong>Daily</strong>.</li>
+            </ol>
+            <p>Only alerts that link to one specific room can be imported; a digest linking to a search page carries nothing to read.</p>
+          </details>
+
+          <details class="setup-guide">
+            <summary>{{ source_chip('Facebook Marketplace') }}<span>about 2 minutes</span></summary>
+            <ol>
+              <li>Open a prepared search:
+                <span class="prepared-links">{% for search in facebook_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} ({{ search.bedrooms }}BR)</a>{% endfor %}</span>
+              </li>
+              <li>Press Facebook&rsquo;s own <strong>Notify me</strong> on the results.</li>
+            </ol>
+            <p>No Facebook password or cookies are stored. This is the email route; the Apify route below does the same job without email.</p>
+          </details>
+        </div>
+
+        <p class="setup-after">{% if email_connected or gmail_connected %}Once any of them sends its first alert, press <strong>Check for alerts now</strong> above and that site turns from waiting to working.{% else %}Connect a mailbox first; these searches will be waiting here afterwards.{% endif %}</p>
+      </details>
 </section>
 
 <section class="extras" aria-labelledby="extras-title">

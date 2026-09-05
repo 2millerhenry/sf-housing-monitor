@@ -498,7 +498,9 @@ def test_every_auto_detected_provider_has_its_own_steps() -> None:
     from sf_housing.imap_alerts import KNOWN_HOSTS
 
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
-    guides = re.search(r'<div class="setup-guides">(.*?)</div>', page, re.S).group(1)
+    # The app-password guides, not the alert-setup ones further down the page.
+    start = page.index("How do I get an app password?")
+    guides = page[start : page.index("Using a different provider?", start)]
 
     for domain in KNOWN_HOSTS:
         assert domain in guides, f"{domain} is auto-detected but has no instructions"

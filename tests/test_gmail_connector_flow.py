@@ -257,3 +257,66 @@ def test_connecting_a_mailbox_does_not_empty_the_provider_list(
     listed = re.findall(r'<strong>([A-Za-z. ]+)</strong>\s*\n?\s*<span class="connector-state', page)
     assert "Zillow" in listed, listed
     assert len(listed) >= 5, f"a connected mailbox must not empty the list: {listed}"
+
+
+def test_a_connected_mailbox_says_it_is_only_half_the_job(tmp_path: Path, monkeypatch) -> None:
+    """Connecting reads mail; it does not ask any site to send any. The page
+    implied connecting was the whole job, so a reader watched five providers sit
+    at "waiting for first alert" with nothing telling them why."""
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox())],
+        enable_scheduler=False,
+    )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert "step 1 of 2" in page
+    assert "Step 2: turn the alert emails on" in page
+    assert "it is not a fault" in page
+
+
+def test_every_provider_gets_a_link_to_the_page_it_is_set_up_on(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """"Save separate studio/1-bedroom, exact 2-bedroom and exact 3-bedroom SF
+    searches" was the whole instruction for two of these, with no link at all."""
+    from sf_housing.app import ALERT_SETUP_SEARCHES
+
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox())],
+        enable_scheduler=False,
+    )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    # Named rather than looped, so deleting an entry deletes a passing test
+    # rather than the assertion that would have caught it.
+    for platform in ("HotPads", "Apartments.com", "Roomies"):
+        assert platform in ALERT_SETUP_SEARCHES, f"{platform} lost its setup link"
+        assert ALERT_SETUP_SEARCHES[platform] in page, f"{platform}'s link is not on the page"
+    assert "zillow.com" in page and "facebook.com" in page
+
+
+def test_the_steps_name_the_buttons_each_site_actually_shows() -> None:
+    """Checked in a browser: HotPads says "Save search", Apartments.com says
+    "Save Search", Zillow offers Instant, Roomies calls them Listing Alerts."""
+    import pathlib
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+    for phrase in ("Save search", "Save Search", "Instant", "Listing Alerts", "Notify me", "All Filters"):
+        assert phrase in page, f"the steps no longer name {phrase!r}"
+
+
+def test_the_roomies_link_is_the_one_that_actually_resolves() -> None:
+    """rooms-for-rent/san-francisco--ca was the obvious guess and returns
+    "We couldn't find what you were looking for"."""
+    from sf_housing.app import ALERT_SETUP_SEARCHES
+
+    assert ALERT_SETUP_SEARCHES["Roomies"] == "https://www.roomies.com/san-francisco-ca"
+    assert "rooms-for-rent" not in ALERT_SETUP_SEARCHES["Roomies"]
+    assert "/apartments/" in ALERT_SETUP_SEARCHES["Apartments.com"], "the bare city path 404s"

@@ -639,10 +639,13 @@ def test_alert_setup_page_explains_local_connection(tmp_path: Path) -> None:
     # The promise, not the sentence: whatever the wording, the page has to say
     # the Facebook login is never involved.
     assert "Facebook login is never used or stored" in response.text
-    assert "Open prepared NOPA search" in response.text
+    # The prepared searches themselves, not the words wrapped around them: a
+    # link built from this deal's own areas, and none built from areas it does
+    # not want.
+    assert "zillow.com/nopa-san-francisco-ca/rentals/" in response.text
     assert "Mission" in response.text
     assert "Potrero Hill" not in response.text
-    assert "3-bedroom split search" in response.text
+    assert "3-bed</a>" in response.text, "the split searches are still offered"
     assert "(3BR)" in response.text
 
 
