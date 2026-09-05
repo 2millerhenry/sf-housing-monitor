@@ -1,3 +1,25 @@
+{#- One mark per source. Deliberately this app's own lettering rather than
+    the companies' logos: the page has to work offline and tell no third party
+    it was opened, so nothing may be hotlinked, and shipping other people's
+    trademarks inside an MIT repository is a liability the project does not
+    need. Distinct hues at one lightness read as a family. -#}
+{% set source_marks = {
+  'Craigslist':          ('CL', '25'),
+  'SF Housing Portal':   ('SF', '162'),
+  'Zumper':              ('Z',  '300'),
+  'SpareRoom':           ('SR', '195'),
+  'Listings Project':    ('LP', '95'),
+  'Abacus':              ('AB', '55'),
+  'Zillow':              ('Z',  '255'),
+  'HotPads':             ('HP', '190'),
+  'Apartments.com':      ('A',  '300'),
+  'Roomies':             ('R',  '55'),
+  'Facebook Marketplace':('FB', '265')
+} %}
+{% macro source_chip(name) %}
+  {%- set mark = source_marks.get(name, (name[0], '162')) -%}
+  <span class="source-chip"><span class="source-mark" style="--mark-hue: {{ mark[1] }}" aria-hidden="true">{{ mark[0] }}</span>{{ name }}</span>
+{% endmacro %}
 {% extends "base.html" %}
 {% block title %}Sources · SF Housing Monitor{% endblock %}
 {% block content %}
@@ -15,7 +37,9 @@
   <div class="already-mark" aria-hidden="true">✓</div>
   <div>
     <h2 id="already-title">Six sources already work</h2>
-    <p class="already-list">Craigslist · SF Housing Portal · Zumper · SpareRoom · Listings Project · Abacus</p>
+    <p class="already-list">
+      {% for name in ['Craigslist', 'SF Housing Portal', 'Zumper', 'SpareRoom', 'Listings Project', 'Abacus'] %}{{ source_chip(name) }}{% endfor %}
+    </p>
     <p>They run on their own twice a day. No account, no setup, nothing on this page is required.</p>
   </div>
 </section>
@@ -53,7 +77,8 @@
     </div>
   {% else %}
     <h2 id="gmail-title">Want more? Connect your email</h2>
-    <p class="connect-lede">{{ email_providers|join(', ') }} never let an app check them directly. They only send new listings to you by email, so connecting one account is the single way to get them, and it turns on all {{ email_providers|length }} at once.</p>
+    <p class="connect-lede">These never let an app check them directly. They only send new listings to you by email, so connecting one account is the single way to get them, and it turns on all {{ email_providers|length }} at once.</p>
+    <p class="connect-sources">{% for name in email_providers %}{{ source_chip(name) }}{% endfor %}</p>
     <form class="connect-form" method="post" action="/alerts/email/connect">
       <label class="connect-field">
         <span>Email address</span>
@@ -74,14 +99,14 @@
         <div class="setup-guides">
           <details class="setup-guide" open>
             <summary><strong>Gmail</strong> <span>gmail.com, googlemail.com</span></summary>
+            <p class="setup-first">First, check one thing: app passwords do not exist until 2-Step Verification is on. Open <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">myaccount.google.com/security</a> and look for <strong>2-Step Verification</strong>. If it says Off, turn it on and finish the phone setup before going on.</p>
             <ol>
-              <li>Open <a href="https://myaccount.google.com/security" target="_blank" rel="noopener noreferrer">myaccount.google.com/security</a> and sign in.</li>
-              <li>Find <strong>2-Step Verification</strong>. If it says Off, turn it on and finish the phone setup. Google will not offer app passwords until this is on, so this step is not optional.</li>
-              <li>Now open <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a>. If it asks you to sign in again, do that.</li>
-              <li>In the box marked <strong>App name</strong>, type anything you will recognise later. <em>Housing Monitor</em> is fine. Press <strong>Create</strong>.</li>
-              <li>A yellow box shows <strong>16 letters in four groups</strong>, like <code>abcd efgh ijkl mnop</code>. Copy them.</li>
-              <li>Paste them into <strong>App password</strong> above. The spaces do not matter, and you will never see this code again once you close the box, which is fine because you can always make another.</li>
+              <li>Open <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer">myaccount.google.com/apppasswords</a> and sign in again if asked.</li>
+              <li>In <strong>App name</strong>, type something you will recognise later &mdash; <em>Housing Monitor</em> is fine &mdash; then press <strong>Create</strong>.</li>
+              <li>Google shows <strong>16 letters in four groups</strong>. Copy them.<span class="setup-sample" aria-hidden="true">abcd efgh ijkl mnop</span></li>
+              <li>Paste them into <strong>App password</strong> at the top of this page and press <strong>Connect</strong>.</li>
             </ol>
+            <p class="setup-after">Google will not show you that code again. That is normal, and it costs nothing: if you lose it, come back and make another.</p>
           </details>
 
           <details class="setup-guide">

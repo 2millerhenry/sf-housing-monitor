@@ -543,3 +543,46 @@ def test_the_other_provider_form_is_not_a_second_copy_of_the_first() -> None:
 
     assert "Using a different provider?" in page
     assert 'name="host"' in page, "and it is the one that asks for a mail server"
+
+
+def test_every_named_source_carries_a_mark(tmp_path) -> None:
+    """A page that lists eleven service names as running text is a wall. Each
+    one gets a mark so it can be found at a glance."""
+    import pathlib
+    import re
+
+    from sf_housing.connectors import GMAIL_PROVIDERS
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    marks = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
+
+    for _, name in GMAIL_PROVIDERS:
+        assert f"'{name}'" in marks, f"{name} is offered on this page but has no mark"
+    for name in ("Craigslist", "SF Housing Portal", "SpareRoom", "Listings Project", "Abacus"):
+        assert f"'{name}'" in marks, f"{name} runs for free but has no mark"
+
+
+def test_no_source_mark_reaches_outside_this_computer() -> None:
+    """The page must keep working offline and must tell no third party it was
+    opened, so a mark can never be a remote image."""
+    import pathlib
+    import re
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    chip = re.search(r'<span class="source-chip">.*?</span>\s*\{% endmacro %\}', page, re.S).group(0)
+
+    assert "<img" not in chip and "http" not in chip, chip
+
+
+def test_the_gmail_steps_lead_with_the_thing_that_blocks_people() -> None:
+    """2-Step Verification is the actual obstacle: without it the app-password
+    page does not offer what the steps promise. It comes before step one, not
+    buried inside it."""
+    import pathlib
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    first = page.index("app passwords do not exist until 2-Step Verification")
+    steps = page.index("myaccount.google.com/apppasswords")
+
+    assert first < steps, "the prerequisite has to come first"
+    assert "setup-first" in page

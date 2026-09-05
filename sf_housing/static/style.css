@@ -1148,6 +1148,15 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-more > details { border-bottom: 1px solid var(--line); }
 .connect-more > details > summary { padding: 11px 2px; cursor: pointer; color: var(--accent-hover); font-size: 0.8rem; font-weight: 650; list-style: none; }
 .connect-more > details > summary::-webkit-details-marker { display: none; }
+/* A mark per source, in this app's own lettering. Nothing is hotlinked, so the
+   page still works offline and still tells no third party it was opened. One
+   lightness and chroma across the set keeps eleven different hues reading as
+   one family rather than eleven decisions. */
+.source-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.8rem; font-weight: 600; color: var(--ink); }
+.source-mark { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: oklch(52% 0.13 var(--mark-hue)); color: oklch(99% 0.004 var(--mark-hue)); font-size: 0.62rem; font-weight: 760; letter-spacing: -0.01em; }
+.already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
+.connect-sources { margin: 12px 0 18px; }
+
 /* Setting up an app password is the one place in this app where somebody is
    following instructions on a different website. Numbered steps, one provider
    at a time, and the provider's own words for the buttons they will be
@@ -1167,6 +1176,10 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .setup-guide ol code, .setup-other code { padding: 1px 5px; border-radius: 5px; background: var(--surface-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82em; }
 .setup-guide ol a { color: var(--accent); text-underline-offset: 2px; }
 .setup-guide > p { margin: 0; padding: 14px 16px; max-width: 68ch; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.setup-first { margin: 0; padding: 13px 16px; border-bottom: 1px solid var(--line); background: var(--amber-soft); color: var(--ink); font-size: 0.83rem; line-height: 1.6; }
+.setup-first strong { font-weight: 640; }
+.setup-sample { display: block; margin-top: 6px; padding: 7px 11px; border: 1px dashed var(--line-strong); border-radius: 7px; background: var(--surface-muted); color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; letter-spacing: 0.06em; }
+.setup-after { margin: 0; padding: 0 16px 15px; max-width: 62ch; color: var(--muted); font-size: 0.79rem; line-height: 1.55; }
 .setup-other { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .setup-other h3 { margin: 0 0 5px; font-size: 0.92rem; font-weight: 640; }
 .setup-other p { max-width: 68ch; margin: 0 0 13px; color: var(--muted); font-size: 0.83rem; line-height: 1.6; }
