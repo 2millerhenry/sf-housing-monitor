@@ -140,6 +140,11 @@ CREATE TABLE IF NOT EXISTS source_initializations (
     message TEXT
 );
 
+CREATE TABLE IF NOT EXISTS source_coverage (
+    platform TEXT PRIMARY KEY,
+    listing_count INTEGER NOT NULL,
+    taken_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS connector_states (
     connector_key TEXT PRIMARY KEY,
     state TEXT NOT NULL,
@@ -1032,6 +1037,42 @@ class Repository:
                 (source_key, utc_now(), status, message),
             )
             connection.commit()
+
+    def record_source_coverage(self, platform: str, count: int) -> None:
+        """Store how many homes a disconnected source is holding.
+
+        Its own table rather than connector metadata, because this is derived,
+        disposable and refreshed on a different rhythm to a connector's state.
+        Keeping them apart means a count can never overwrite the answer to "is
+        this connector working", and a state write can never silently drop a
+        count.
+        """
+        if count <= 0:
+            return
+        with self.connection() as connection:
+            connection.execute(
+                """INSERT INTO source_coverage(platform, listing_count, taken_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(platform) DO UPDATE SET
+                     listing_count = excluded.listing_count,
+                     taken_at = excluded.taken_at""",
+                (str(platform), int(count), utc_now()),
+            )
+            connection.commit()
+
+    def source_coverage(self) -> dict[str, dict[str, Any]]:
+        """Every stored count, by platform, with the moment it was taken."""
+        with self.connection() as connection:
+            rows = connection.execute(
+                "SELECT platform, listing_count, taken_at FROM source_coverage"
+            ).fetchall()
+        return {
+            str(row["platform"]): {
+                "count": int(row["listing_count"]),
+                "taken_at": str(row["taken_at"]),
+            }
+            for row in rows
+        }
 
     def set_connector_state(
         self,

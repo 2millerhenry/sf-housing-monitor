@@ -89,6 +89,14 @@
         {% else %}
           <span class="connector-state configured_unverified">Ready to test</span>
         {% endif %}
+        {#- A number only where one was really read from that site. Most of
+            these cannot be counted at all, and an invitation without a figure
+            is the honest version rather than a missing feature. -#}
+        {% if waiting and provider.coverage and provider.coverage.count %}
+        <small class="provider-cost">{{ "{:,}".format(provider.coverage.count) }} homes listed there
+          <span title="Counted from {{ provider.name }}'s own page on {{ provider.coverage.taken_at|pacific_datetime }}">as of {{ provider.coverage.taken_at|compact_pacific_date }}</span>
+        </small>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -97,6 +105,18 @@
     <h2 id="gmail-title">Want more? Connect your email</h2>
     <p class="connect-lede">These never let an app check them directly. They only send new listings to you by email, so connecting one account is the single way to get them, and it turns on all {{ email_providers|length }} at once.</p>
     <p class="connect-sources">{% for name in email_providers %}{{ source_chip(name) }}{% endfor %}</p>
+    {#- The number does its work here more than anywhere: this is the moment
+        somebody decides whether the setup is worth five minutes. Only sources
+        that could really be counted appear, so this line is often absent, and
+        that is the honest state rather than a gap. -#}
+    {% set counted = gmail_providers|selectattr('coverage')|list %}
+    {% if counted %}
+    <p class="connect-cost">
+      Not connected, so you are not seeing
+      {% for provider in counted %}<strong>{{ "{:,}".format(provider.coverage.count) }}</strong> on {{ provider.name }}{% if not loop.last %}, {% endif %}{% endfor %}
+      <span title="Counted from each site's own page">as of {{ counted[0].coverage.taken_at|compact_pacific_date }}</span>.
+    </p>
+    {% endif %}
     <form class="connect-form" method="post" action="/alerts/email/connect">
       <label class="connect-field">
         <span>Email address</span>

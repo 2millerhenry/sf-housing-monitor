@@ -13,6 +13,7 @@ import httpx
 
 from .classification import classify_listing
 from .connectors import GMAIL_PROVIDERS, aggregate_gmail_status, connector_state_for_error
+from .coverage import fetch_count, missing_coverage_targets
 from .database import Repository, utc_now
 from .filelock import release as release_file_lock, try_acquire as try_acquire_file_lock
 from .freshness import source_is_in_backoff, source_key as watchdog_source_key
@@ -211,6 +212,33 @@ class Scanner:
         if published.tzinfo is None:
             published = published.replace(tzinfo=UTC)
         return published >= (now or datetime.now(UTC)) - INITIAL_DISCOVERY_WINDOW
+
+    def _measure_missing_coverage(
+        self, client: httpx.Client, preferences: Preferences
+    ) -> None:
+        """Record how many homes each disconnected source is holding.
+
+        "Waiting for first alert" never says what the missing setup costs, so
+        the chore has no stated payoff. A real number gives it one -- and only a
+        real one: everything here answers None rather than guess, and a count
+        that cannot be taken simply is not stored, leaving the page to show its
+        invitation without one.
+
+        Every failure is swallowed. This runs inside a scan whose job is
+        collecting homes, and must never be the reason one fails.
+        """
+        try:
+            targets = missing_coverage_targets(self.repository, preferences)
+        except Exception:
+            LOGGER.debug("Could not work out which sources to measure", exc_info=True)
+            return
+        for platform, url in targets:
+            try:
+                count = fetch_count(client, platform, url)
+                if count is not None:
+                    self.repository.record_source_coverage(platform, count)
+            except Exception:
+                LOGGER.debug("Coverage measurement failed for %s", platform, exc_info=True)
 
     def _recheck_absent(
         self,
@@ -881,6 +909,12 @@ class Scanner:
                         listings_added=total_added,
                         sources_failed=sources_failed,
                     )
+
+            # Ask the disconnected sources how much they are holding. This is a
+            # passenger on the scan, not part of it: it runs after every source
+            # has been counted, cannot change the outcome, and cannot fail it.
+            if trigger in AUTOMATIC_TRIGGERS:
+                self._measure_missing_coverage(client, preferences)
 
             completed_status = "completed_with_errors" if sources_failed else "completed"
             self.repository.finish_scan(

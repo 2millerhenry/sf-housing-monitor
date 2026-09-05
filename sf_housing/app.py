@@ -23,6 +23,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .apify import ApifyTokenError, ApifyTokenStore
 from . import DONATE_URL, __version__
+from .coverage import ALERT_SETUP_SEARCHES
 from .connectors import GMAIL_PROVIDERS, ConnectorStatus
 from .database import DatabaseUnreadableError, Repository
 from .deal_profile import (
@@ -294,16 +295,6 @@ def _prepared_facebook_unit_searches(preferences: Preferences) -> list[dict[str,
     ]
 
 
-# Where each site's San Francisco search actually lives. Every one of these was
-# opened in a browser and checked: hotpads.com/san-francisco-ca/apartments-for-rent
-# and apartments.com/apartments/san-francisco-ca/ both load real results, and
-# roomies.com/rooms-for-rent/san-francisco--ca -- the obvious guess -- returns
-# "We couldn't find what you were looking for", so it is /san-francisco-ca.
-ALERT_SETUP_SEARCHES = {
-    "HotPads": "https://hotpads.com/san-francisco-ca/apartments-for-rent",
-    "Apartments.com": "https://www.apartments.com/apartments/san-francisco-ca/",
-    "Roomies": "https://www.roomies.com/san-francisco-ca",
-}
 
 
 def _prepared_facebook_sublet_searches(preferences: Preferences) -> list[dict[str, str]]:
@@ -1454,11 +1445,18 @@ def create_app(
         # in a connected mailbox it is still imported. It is simply not offered
         # here as a thing to go and set up.
         checked_directly.add("Facebook Marketplace")
+        # A count is shown only where one was really taken. Of the four
+        # providers, only HotPads answers a script at all: Apartments.com and
+        # Roomies refuse outright, and Zillow returns a normal-looking page
+        # reading "0 Rentals" from behind a captcha. The rest show their
+        # invitation with no number, which is the honest state and not a gap.
+        coverage = repository.source_coverage()
         gmail_providers = [
             {
                 "key": key,
                 "name": name,
                 "state": connector_states.get(key),
+                "coverage": coverage.get(name),
             }
             for key, name in GMAIL_PROVIDERS
             if name not in checked_directly

@@ -1243,6 +1243,9 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .source-mark { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: oklch(52% 0.13 var(--mark-hue)); color: oklch(99% 0.004 var(--mark-hue)); font-size: 0.62rem; font-weight: 760; letter-spacing: -0.01em; }
 .already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
 .connect-sources { margin: 12px 0 18px; }
+.connect-cost { max-width: 68ch; margin: -8px 0 18px; color: var(--muted); font-size: 0.83rem; line-height: 1.55; }
+.connect-cost strong { color: var(--accent-hover); font-weight: 660; }
+.connect-cost span { color: var(--faint); }
 
 /* Setting up an app password is the one place in this app where somebody is
    following instructions on a different website. Numbered steps, one provider
@@ -1280,6 +1283,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .provider-status { margin-top: 20px; padding-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 14px 18px; border-top: 1px solid var(--line); }
 .provider-status > div { display: grid; gap: 4px; align-content: start; }
 .provider-status strong { color: var(--ink); font-size: 0.82rem; font-weight: 650; }
+.provider-cost { color: var(--accent-hover); font-weight: 620; }
+.provider-cost span { color: var(--faint); font-weight: 450; }
 .provider-status small { color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
 .provider-status .connector-state { justify-self: start; }
 
