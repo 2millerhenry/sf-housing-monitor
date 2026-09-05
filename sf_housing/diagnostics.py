@@ -1061,5 +1061,17 @@ def run_diagnostics(
     )
 
 
+# The one place the support contact is configured.
+#
+# A failing check states its own next step, but some problems are not on that
+# list, and a support page with no way to ask anybody anything is a dead end.
+# Put your own address here when you fork this; leave it empty and the contact
+# block does not render at all, so a release can never ship somebody else's
+# inbox.
+_DEFAULT_SUPPORT_EMAIL = "henrymil@usc.edu"
+
+SUPPORT_EMAIL = os.environ.get("SF_HOUSING_SUPPORT_EMAIL", _DEFAULT_SUPPORT_EMAIL).strip()
+
+
 def report_json(report: DiagnosticReport) -> str:
     return json.dumps(report.to_dict(), indent=2, ensure_ascii=False)

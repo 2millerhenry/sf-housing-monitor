@@ -34,7 +34,7 @@ from .deal_profile import (
     deal_profile_from_form,
     profile_form_values,
 )
-from .diagnostics import report_json, run_diagnostics
+from .diagnostics import SUPPORT_EMAIL, report_json, run_diagnostics
 from .freshness import evaluate_source_freshness
 from .furnished_finder_bridge import (
     BRIDGE_VERSION as FURNISHED_FINDER_BRIDGE_VERSION,
@@ -1523,6 +1523,7 @@ def create_app(
                 "report_json": report_json(report),
                 "message": message,
                 "connectivity_checked": bool(probe),
+                "support_email": SUPPORT_EMAIL,
             },
         )
 

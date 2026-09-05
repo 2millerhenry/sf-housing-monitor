@@ -56,7 +56,8 @@ def test_blank_ready_check_is_healthy_but_requires_the_deal(tmp_path: Path) -> N
     checks = {check["key"]: check for check in payload["checks"]}
     assert page.status_code == 200
     assert "Finish Your deal" in page.text
-    assert "Copy redacted report" in page.text
+    assert "Copy the report" in page.text
+    assert "no passwords" in page.text, "and says what the report leaves out"
     assert payload["overall"] == "setup_incomplete"
     assert checks["database"]["status"] == "pass"
     assert checks["deal_profile"]["status"] == "attention"
@@ -473,3 +474,75 @@ def test_diagnostic_order_is_stable(tmp_path: Path) -> None:
     second = run_diagnostics(settings, repository, scanner, mailbox, apify)
 
     assert [item.key for item in first.checks] == [item.key for item in second.checks]
+
+
+# --------------------------------------------------------------------------
+# the support page as somebody actually uses it
+# --------------------------------------------------------------------------
+
+
+def test_the_verdict_carries_the_evidence_for_itself(tmp_path: Path) -> None:
+    """"Everything is working" is a claim. The counts it rests on belong beside
+    it, not at the bottom of the page."""
+    import re
+
+    settings = settings_for(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/support").text
+
+    hero = re.search(r'<section class="hero compact support-hero">(.*?)</section>', page, re.S)
+    assert hero, "the verdict block is gone"
+    assert "working</span>" in hero.group(1), "the tally sits with the verdict"
+
+
+def test_the_page_says_how_to_reach_a_person(tmp_path: Path) -> None:
+    """A failing check states its own next step, but some problems are not on
+    that list, and a page with no way to ask anybody anything is a dead end."""
+    from sf_housing.diagnostics import SUPPORT_EMAIL
+
+    settings = settings_for(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/support").text
+
+    assert SUPPORT_EMAIL in page
+    assert f"mailto:{SUPPORT_EMAIL}" in page, "and makes it one click"
+    assert "Still not right?" in page
+
+
+def test_an_empty_contact_renders_no_contact_block(tmp_path: Path) -> None:
+    """A fork must never ship somebody else's inbox."""
+    import re
+
+    settings = settings_for(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/support").text
+    page = re.sub(r"mailto:[^\"]+", "", page)  # sanity: the assertion below is about rendering
+
+    from sf_housing.app import create_app as build
+    import sf_housing.app as app_module
+
+    original = app_module.SUPPORT_EMAIL
+    app_module.SUPPORT_EMAIL = ""
+    try:
+        blank = build(settings=settings, sources=[], enable_scheduler=False)
+        with TestClient(blank) as client:
+            without = client.get("/support").text
+    finally:
+        app_module.SUPPORT_EMAIL = original
+
+    assert "mailto:" not in without, "no address configured means no mail link"
+    assert "Copy the report" in without, "but the report is still offered"
+
+
+def test_only_the_connection_test_reaches_the_internet(tmp_path: Path) -> None:
+    """Opening Support must tell nobody it was opened."""
+    settings = settings_for(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/support").text
+
+    assert "only thing on this page that reaches the internet" in page
+    assert "/support?probe=1" in page, "and it is opt-in"

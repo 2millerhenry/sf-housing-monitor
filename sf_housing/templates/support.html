@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Is everything working? · SF Housing Monitor{% endblock %}
 {% block content %}
-<section class="hero compact">
+<section class="hero compact support-hero">
   <div>
     <p class="eyebrow">Support</p>
     <h1>
@@ -10,6 +10,13 @@
       {% else %}Something needs a look{% endif %}
     </h1>
     <p class="subtle">{{ report.summary }}</p>
+    {# The counts belong beside the verdict, not at the bottom of the page:
+       "17 working" is the evidence for the sentence above it. #}
+    <p class="support-tally">
+      {% if report.action_checks %}<span class="tally attention">{{ report.action_checks|length }} to fix</span>{% endif %}
+      <span class="tally ok">{{ report.passing_checks|length }} working</span>
+      {% if report.optional_checks %}<span class="tally quiet">{{ report.optional_checks|length }} optional, not set up</span>{% endif %}
+    </p>
   </div>
 </section>
 
@@ -31,10 +38,11 @@
 </section>
 {% endif %}
 
-<section class="support-quiet">
+<section class="support-quiet" aria-labelledby="checked-title">
+  <h2 id="checked-title" class="support-quiet-title">What was checked</h2>
   <details class="support-fold">
     <summary>
-      <span><strong>{{ report.passing_checks|length }} check{% if report.passing_checks|length != 1 %}s{% endif %} passed</strong></span>
+      <span><strong>{{ report.passing_checks|length }} working</strong><small>Nothing to do about these</small></span>
       <span class="disclosure-action">Show</span>
     </summary>
     <ul class="check-list">
@@ -61,12 +69,36 @@
   {% endif %}
 </section>
 
-<div class="support-tools">
-  <a class="button" href="/support">Check again</a>
-  <a class="button" href="/support?probe=1">{% if connectivity_checked %}Connections checked{% else %}Test connections{% endif %}</a>
-  <button type="button" data-copy-report>Copy redacted report</button>
-  <p>Nothing here includes passwords, tokens, email contents, or your notes. Generated {{ report.generated_at }} UTC.</p>
-</div>
+<section class="support-help" aria-labelledby="help-title">
+  <h2 id="help-title">Still not right?</h2>
+  <ol class="help-steps">
+    <li>
+      <strong>Run the checks again.</strong> They are worked out fresh each time, so a problem that has fixed itself disappears.
+      <span class="help-actions">
+        <a class="button" href="/support">Check again</a>
+        <a class="button" href="/support?probe=1">{% if connectivity_checked %}Connections checked{% else %}Test the connections{% endif %}</a>
+      </span>
+      <small>Testing connections is the only thing on this page that reaches the internet. Nothing else here does.</small>
+    </li>
+    {% if support_email %}
+    <li>
+      <strong>Send what this page knows.</strong> Copy the report, then paste it into an email. It is the fastest way for somebody to see what went wrong without asking you twenty questions.
+      <span class="help-actions">
+        <button type="button" data-copy-report>Copy the report</button>
+        <a class="button" href="mailto:{{ support_email }}?subject=SF%20Housing%20Monitor">Email {{ support_email }}</a>
+      </span>
+      <small>The report holds the {{ report.checks|length }} check results and this app&rsquo;s version. It contains no passwords, no tokens, no email contents, and none of your notes or saved homes.</small>
+    </li>
+    {% else %}
+    <li>
+      <strong>Send what this page knows.</strong> Copy the report and include it wherever you are asking for help.
+      <span class="help-actions"><button type="button" data-copy-report>Copy the report</button></span>
+      <small>No passwords, tokens, email contents, notes or saved homes are included.</small>
+    </li>
+    {% endif %}
+  </ol>
+  <p class="support-generated">Checked {{ report.generated_at }} UTC.</p>
+</section>
 
 <script src="{{ url_for('static', path='/support.js') }}?v={{ asset_version() }}" defer></script>
 {% endblock %}
