@@ -25,12 +25,18 @@ def app_settings(tmp_path: Path) -> Settings:
     )
 
 
-def test_an_unconfigured_donation_url_renders_no_link_at_all(tmp_path: Path) -> None:
-    """The shipped default is empty, and empty has to mean silent.
+def test_an_unconfigured_donation_url_renders_no_link_at_all(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Empty has to mean silent.
 
-    A placeholder that reaches a release would put a dead link on every page of
-    an app whose whole promise is that it does not send you anywhere.
+    This repository now ships a real donation page, so the guarantee is no
+    longer about the default being blank; it is about what happens to anyone who
+    clears it, which is what a fork does first. A placeholder or an empty string
+    must never put a dead link on every page of an app whose whole promise is
+    that it does not send you anywhere.
     """
+    monkeypatch.setattr("sf_housing.app.DONATE_URL", "")
     application = create_app(
         settings=app_settings(tmp_path), sources=[], enable_scheduler=False
     )
@@ -98,3 +104,15 @@ def test_the_support_page_asks_only_once_everything_is_working(
     assert page.status_code == 200
     ready = "Everything is working" in page.text
     assert ("Keeping this working" in page.text) == ready
+
+
+def test_the_shipped_donation_url_is_a_real_page_not_a_placeholder() -> None:
+    """The opposite failure: a default nobody replaced. ko-fi.com/millerhenry
+    was opened in a browser, logged out, and serves "Buy Henry Miller a Coffee"."""
+    from sf_housing import DONATE_URL as SHIPPED
+
+    if not SHIPPED:
+        return  # a fork that cleared it is covered by the test above
+    assert SHIPPED.startswith("https://"), SHIPPED
+    for placeholder in ("yourname", "example.com", "yourhandle", "username"):
+        assert placeholder not in SHIPPED, f"{SHIPPED} still looks like a placeholder"

@@ -10,6 +10,6 @@ __version__ = "0.3.9"
 # actually collect money with — and a quiet line appears in the dashboard
 # footer and on the Support page. Leave it empty and nothing is rendered at
 # all, so a release can never ship a donate link that goes nowhere.
-_DEFAULT_DONATE_URL = ""  # e.g. "https://ko-fi.com/yourname"
+_DEFAULT_DONATE_URL = "https://ko-fi.com/millerhenry"
 
 DONATE_URL = os.environ.get("SF_HOUSING_DONATE_URL", _DEFAULT_DONATE_URL).strip()
