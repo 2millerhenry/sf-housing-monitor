@@ -636,7 +636,9 @@ def test_alert_setup_page_explains_local_connection(tmp_path: Path) -> None:
     assert "nothing on this page is required" in response.text
     assert "Before you can connect Gmail" in response.text
     assert "Google OAuth Web client JSON" in response.text
-    assert "Automate Facebook without your Facebook login" in response.text
+    # The promise, not the sentence: whatever the wording, the page has to say
+    # the Facebook login is never involved.
+    assert "Facebook login is never used or stored" in response.text
     assert "Open prepared NOPA search" in response.text
     assert "Mission" in response.text
     assert "Potrero Hill" not in response.text
@@ -713,9 +715,11 @@ def test_apify_token_can_be_connected_from_alerts(tmp_path: Path) -> None:
         page = client.get("/alerts")
 
     assert saved.status_code == 303
-    assert "Facebook automation is configured" in page.text
+    assert "called Working only after a real bounded check succeeds" in page.text, (
+        "a saved token is not a working connection, and the page has to say so"
+    )
     assert 'name="apify_token"' in page.text
-    assert "Replace Apify API token" in page.text
+    assert "Replace the token" in page.text, "and offers a way to change it"
 
 
 def test_plain_language_deal_form_updates_profile_and_preserves_advanced_settings(tmp_path: Path) -> None:

@@ -194,41 +194,29 @@
 
 <section class="extras" aria-labelledby="extras-title">
   <h2 id="extras-title" class="extras-title">Two more, only if you want them</h2>
+  <p class="extras-lede">Neither is needed. The six free sources keep running whether you set these up or not.</p>
 
   <details class="extra">
     <summary>
-      <span><strong>Furnished Finder</strong><small>Free, needs a Chrome extension</small></span>
-      <span class="connector-state {{ furnished_finder_state.state if furnished_finder_state else 'not_configured' }}">{{ furnished_finder_state.label if furnished_finder_state else 'Optional' }}</span>
-    </summary>
-    <p>The bridge reads cards already visible in your own Chrome session and sends only listing facts here. It stores no Furnished Finder password.</p>
-    {% if furnished_finder_state and furnished_finder_state.message %}<p class="connector-message">{{ furnished_finder_state.message }}</p>{% endif %}
-    <div class="connect-actions">
-      <form method="post" action="/alerts/furnished-finder/show-folder"><button type="submit">Show extension folder</button></form>
-      <a class="button" href="/alerts/furnished-finder-bridge.zip">Download bridge {{ bridge_version }}</a>
-      <form method="post" action="/alerts/furnished-finder/test"><button type="submit">Test bridge</button></form>
-    </div>
-    <ol class="extra-steps">
-      <li>Choose <strong>Show extension folder</strong>.</li>
-      <li>Open <code>chrome://extensions</code> and turn on Developer mode.</li>
-      <li>Choose <strong>Load unpacked</strong> and select that folder.</li>
-      <li>Open a Furnished Finder SF search, click the extension, and choose <strong>Save this search &amp; sync</strong>.</li>
-    </ol>
-  </details>
-
-  <details class="extra">
-    <summary>
-      <span><strong>Facebook Marketplace and Groups</strong><small>Needs a paid Apify account</small></span>
+      <span>{{ source_chip('Facebook Marketplace') }}<small>Free to start &middot; about 10 minutes</small></span>
       <span class="connector-state {{ apify_state.state if apify_state else 'not_configured' }}">{{ apify_state.label if apify_state else 'Optional' }}</span>
     </summary>
-    <p>Automate Facebook without your Facebook login. The token stays local, every run is bounded, and an allowance or Actor failure affects only Facebook.</p>
+    <p class="extra-why">Facebook lets no app read Marketplace directly, so this goes through Apify, a service that does the reading and hands back the results. <strong>Your Facebook login is never used or stored.</strong></p>
     {% if apify_state and apify_state.message %}<p class="connector-message">{{ apify_state.message }}</p>{% endif %}
+    <ol class="extra-steps">
+      <li>Make a free account at <a href="https://console.apify.com/sign-up" target="_blank" rel="noopener noreferrer">console.apify.com</a>. No card is asked for.</li>
+      <li>In the Apify console, open <strong>Settings</strong> &rsaquo; <strong>API &amp; Integrations</strong>.</li>
+      <li>Copy your <strong>Personal API token</strong>. It begins with <code>apify_api_</code>.</li>
+      <li>Paste it below and save. It is written to a private file on this Mac and sent nowhere else.</li>
+    </ol>
+    <p class="extra-cost">Apify includes a small monthly credit, and this app is built to stay inside it: at most <strong>60 runs</strong> and <strong>300 group posts</strong> a month, counted here and stopped on reaching them, so it cannot quietly run up a bill.</p>
     {% if apify_configured %}
-      <p class="connection-good">Facebook automation is configured, but it is labeled Working only after a real bounded check succeeds.</p>
+      <p class="connection-good">Saved. It is called Working only after a real bounded check succeeds.</p>
       <div class="connect-actions">
         <form method="post" action="/alerts/apify/test"><button type="submit">Test Facebook connection</button></form>
       </div>
       <form class="upload-form" method="post" action="/alerts/apify/token">
-        <label>Replace Apify API token <input type="password" name="apify_token" autocomplete="off" placeholder="apify_api_…" required></label>
+        <label>Replace the token <input type="password" name="apify_token" autocomplete="off" placeholder="apify_api_…" required></label>
         <button type="submit">Save replacement</button>
       </form>
     {% else %}
@@ -238,8 +226,8 @@
       </form>
     {% endif %}
     <details class="nested-detail">
-      <summary>Public Facebook groups</summary>
-      <p>Only public housing-offer posts are supported. Private groups, Messenger, WhatsApp, wanted ads, and known non-SF posts are excluded.</p>
+      <summary>Also watch public Facebook groups</summary>
+      <p>Public housing-offer posts only. Private groups, Messenger, WhatsApp, wanted ads and posts outside SF are all left out.</p>
       {% if facebook_groups %}<ul class="saved-source-list">{% for group in facebook_groups %}<li><a href="{{ group.url }}" target="_blank" rel="noopener noreferrer">{{ group.name }}</a><form method="post" action="/alerts/facebook-groups/remove"><input type="hidden" name="group_url" value="{{ group.url }}"><button type="submit">Remove</button></form></li>{% endfor %}</ul>{% endif %}
       <form class="upload-form" method="post" action="/alerts/facebook-groups">
         <label>Public Facebook group URL <input type="url" name="group_url" placeholder="https://www.facebook.com/groups/…/" required></label>
@@ -247,6 +235,29 @@
       </form>
       {% if apify_configured and facebook_groups %}<form method="post" action="/alerts/apify/groups/test"><button type="submit">Test public groups</button></form>{% endif %}
     </details>
+  </details>
+
+  <details class="extra">
+    <summary>
+      <span>{{ source_chip('Furnished Finder') }}<small>Free &middot; needs Chrome &middot; about 5 minutes</small></span>
+      <span class="connector-state {{ furnished_finder_state.state if furnished_finder_state else 'not_configured' }}">{{ furnished_finder_state.label if furnished_finder_state else 'Optional' }}</span>
+    </summary>
+    <p class="extra-why">Furnished Finder shows its listings only to a signed-in browser, so nothing can read it from outside. A small Chrome add-on reads the cards <em>already on your screen</em> and passes the facts to this app. <strong>No Furnished Finder password is asked for or stored.</strong></p>
+    {% if furnished_finder_state and furnished_finder_state.message %}<p class="connector-message">{{ furnished_finder_state.message }}</p>{% endif %}
+    <ol class="extra-steps">
+      <li>Press <strong>Show extension folder</strong> below. A Finder window opens on the folder you will need in step 4.</li>
+      <li>In Chrome, open a new tab and go to <code>chrome://extensions</code>.</li>
+      <li>Turn on <strong>Developer mode</strong> with the switch at the top right.</li>
+      <li>Press <strong>Load unpacked</strong> at the top left and choose the folder from step 1.</li>
+      <li>Open <a href="https://www.furnishedfinder.com/housing/San-Francisco--CA" target="_blank" rel="noopener noreferrer">Furnished Finder&rsquo;s San Francisco listings</a> and let the results load.</li>
+      <li>Click the extension&rsquo;s icon in the Chrome toolbar, then <strong>Save this search &amp; sync</strong>.</li>
+    </ol>
+    <p class="extra-cost">The add-on runs only on Furnished Finder housing pages, and only while you have one open. Chrome marks anything loaded this way as a developer extension; that is expected, and it is the same folder you can read yourself at any time.</p>
+    <div class="connect-actions">
+      <form method="post" action="/alerts/furnished-finder/show-folder"><button type="submit">Show extension folder</button></form>
+      <a class="button" href="/alerts/furnished-finder-bridge.zip">Download bridge {{ bridge_version }}</a>
+      <form method="post" action="/alerts/furnished-finder/test"><button type="submit">Test bridge</button></form>
+    </div>
   </details>
 </section>
 {% endblock %}

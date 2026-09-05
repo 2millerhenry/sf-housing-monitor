@@ -602,3 +602,58 @@ def test_no_two_sources_share_a_colour() -> None:
     ordered = sorted(hues)
     gaps = [b - a for a, b in zip(ordered, ordered[1:])]
     assert min(gaps) >= 20, f"two hues are only {min(gaps)} degrees apart"
+
+
+# --------------------------------------------------------------------------
+# the two optional connectors
+# --------------------------------------------------------------------------
+
+
+def alerts_markup() -> str:
+    import pathlib
+
+    return pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+
+def test_facebook_comes_before_furnished_finder() -> None:
+    """The one most people would want is the one they should meet first."""
+    page = alerts_markup()
+
+    assert page.index("Facebook Marketplace')") < page.index("Furnished Finder')")
+
+
+def test_both_optional_connectors_say_what_they_cost() -> None:
+    """"Needs a paid Apify account" was not true: the runs are bounded to stay
+    inside the free monthly credit, and the numbers are in the code."""
+    page = alerts_markup()
+
+    assert "60 runs" in page and "300 group posts" in page, "state the real caps"
+    assert "paid Apify account" not in page, "it was never true"
+    assert "No card is asked for" in page
+
+
+def test_both_optional_connectors_say_what_they_never_touch() -> None:
+    page = alerts_markup()
+
+    assert "Facebook login is never used or stored" in page
+    assert "No Furnished Finder password is asked for or stored" in page
+
+
+def test_the_furnished_finder_steps_match_what_the_extension_can_do() -> None:
+    """The add-on only runs on Furnished Finder housing pages, so the steps have
+    to send someone to one."""
+    import json
+    import pathlib
+
+    manifest = json.loads(
+        pathlib.Path("furnished_finder_chrome_bridge/manifest.json").read_text(encoding="utf-8")
+    )
+    matches = manifest["content_scripts"][0]["matches"]
+    assert any("/housing/" in pattern for pattern in matches), matches
+
+    page = alerts_markup()
+    assert "furnishedfinder.com/housing/" in page, "send them to a page the add-on runs on"
+    assert "chrome://extensions" in page
+    assert "Developer mode" in page
+    assert "Load unpacked" in page
+    assert "Save this search &amp; sync" in page, "the button the popup actually shows"

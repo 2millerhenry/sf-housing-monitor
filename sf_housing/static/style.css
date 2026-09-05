@@ -1199,6 +1199,18 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 .extras { margin-top: 22px; }
 .extras-title { margin: 0 0 10px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.015em; }
+.extras-lede { max-width: 66ch; margin: 0 0 12px; color: var(--muted); font-size: 0.82rem; line-height: 1.55; }
+/* The summary now carries a source chip rather than bare bold text, so the two
+   halves need to sit on the chip's baseline rather than the text's. */
+.extra > summary > span:first-child { display: grid; gap: 5px; justify-items: start; }
+.extra-why { max-width: 68ch; color: var(--ink); font-size: 0.84rem; line-height: 1.6; }
+.extra-why strong { font-weight: 640; }
+.extra-why em { font-style: normal; color: var(--accent-hover); font-weight: 600; }
+/* What it costs and what it is allowed to touch: the two questions somebody
+   actually has before installing a thing, answered in place rather than in a
+   paragraph they have to parse. */
+.extra-cost { max-width: 68ch; margin: 12px 0 0; padding: 10px 13px; border-radius: 9px; background: var(--surface-muted); color: var(--muted); font-size: 0.79rem; line-height: 1.55; }
+.extra-cost strong { color: var(--ink); font-weight: 640; }
 .extra { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .extra + .extra { margin-top: 10px; }
 .extra > summary { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; cursor: pointer; list-style: none; }
