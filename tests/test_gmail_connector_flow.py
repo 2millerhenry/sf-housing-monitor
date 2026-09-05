@@ -273,7 +273,9 @@ def test_a_connected_mailbox_says_it_is_only_half_the_job(tmp_path: Path, monkey
         page = client.get("/alerts").text
 
     assert "step 1 of 2" in page
-    assert "Step 2: turn the alert emails on" in page
+    # The number lives in the eyebrow now rather than in the sentence.
+    assert "Turn the alert emails on" in page
+    assert 'class="step-number">2</span>' in page
     assert "it is not a fault" in page
 
 
@@ -343,3 +345,52 @@ def test_facebook_is_offered_once_not_twice(tmp_path: Path, monkeypatch) -> None
     assert page.count("source_chip('Facebook Marketplace')") == 0 or True
     assert "Notify me" not in page, "and its email steps are gone with it"
     assert "apify_token" in page, "while the Apify block stays"
+
+
+def test_the_page_does_not_repeat_the_same_sentence_per_provider(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Four providers each saying "No X saved-search alert has arrived yet" is
+    the banner above, repeated four times. The sentence earns its place only
+    when a provider has something of its own to report."""
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox())],
+        enable_scheduler=False,
+    )
+    # Put every provider in the state this is about, so the assertion has
+    # something to catch.
+    for key in ("gmail:zillow", "gmail:hotpads", "gmail:apartments-com", "gmail:roomies"):
+        application.state.repository.set_connector_state(
+            key,
+            "waiting_first_alert",
+            message="No saved-search alert has arrived yet.",
+        )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert page.count("saved-search alert has arrived yet") == 0, (
+        "the waiting state is said once, in the banner"
+    )
+    assert page.count("Waiting for first alert") >= 4, "the label itself still shows per provider"
+    assert "step 1 of 2" in page, "and the banner is where the explanation lives"
+
+
+def test_a_provider_with_real_news_still_says_it(tmp_path: Path, monkeypatch) -> None:
+    """Suppressing the default message must not suppress a real one."""
+    connect_mailbox_properties(monkeypatch)
+    application = create_app(
+        settings=settings_for(tmp_path),
+        sources=[ZillowAlertSource(FixtureMailbox())],
+        enable_scheduler=False,
+    )
+    application.state.repository.set_connector_state(
+        "gmail:hotpads",
+        "degraded",
+        message="HotPads alerts arrived but nothing could be read.",
+    )
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert "HotPads alerts arrived but nothing could be read." in page

@@ -44,10 +44,13 @@
   </div>
 </section>
 
-<section class="connect-panel" aria-labelledby="gmail-title">
+<section class="connect-panel" aria-labelledby="{% if email_connected or gmail_connected %}gmail-connected-title{% else %}gmail-title{% endif %}">
   {% if email_connected or gmail_connected %}
     <header class="connect-head">
-      <div><h2 id="gmail-title">Email listings</h2></div>
+      <div>
+        <p class="step-eyebrow"><span class="step-number is-done">&#10003;</span> Step 1 &middot; email connected</p>
+        <h2 id="gmail-connected-title">Email listings</h2>
+      </div>
       <span class="connector-state {{ gmail_state.state if gmail_state else 'not_configured' }}">{{ gmail_state.label if gmail_state else 'Optional' }}</span>
     </header>
     <p class="connect-lede">
@@ -72,20 +75,24 @@
       </form>
     </div>
     <div class="provider-status" aria-label="Saved-search provider status">
+      {# Four providers all saying "No X saved-search alert has arrived yet" is
+         the banner above repeated four times. The sentence earns its place only
+         when a provider has something of its own to report. #}
       {% for provider in gmail_providers %}
+      {% set waiting = not provider.state or provider.state.state == 'waiting_first_alert' %}
       <div>
         <strong>{{ provider.name }}</strong>
         {% if provider.state %}
           <span class="connector-state {{ provider.state.state }}">{{ provider.state.label }}</span>
-          <small>{{ provider.state.message }}</small>
+          {% if not waiting %}<small>{{ provider.state.message }}</small>{% endif %}
         {% else %}
           <span class="connector-state configured_unverified">Ready to test</span>
-          <small>Turn on this site&rsquo;s alert email, then check again. No alert yet is not an error.</small>
         {% endif %}
       </div>
       {% endfor %}
     </div>
   {% else %}
+    <p class="step-eyebrow"><span class="step-number">1</span> Connect your email</p>
     <h2 id="gmail-title">Want more? Connect your email</h2>
     <p class="connect-lede">These never let an app check them directly. They only send new listings to you by email, so connecting one account is the single way to get them, and it turns on all {{ email_providers|length }} at once.</p>
     <p class="connect-sources">{% for name in email_providers %}{{ source_chip(name) }}{% endfor %}</p>
@@ -187,7 +194,10 @@
     </div>
   {% endif %}
       <details class="connect-step" open>
-        <summary>{% if email_connected or gmail_connected %}Step 2: turn the alert emails on &mdash; do this once per site{% else %}After you connect: turn the alert emails on{% endif %}</summary>
+        <summary>
+          <span class="step-eyebrow"><span class="step-number">2</span> Turn the alert emails on</span>
+          <small>{% if email_connected or gmail_connected %}Once per site &middot; about 2 minutes each{% else %}What you will do after connecting{% endif %}</small>
+        </summary>
         <p class="setup-lede">Each site is separate, and none of them will email you until you ask. The searches below already carry the budgets and areas from Your deal, so you only have to save them.</p>
 
         <div class="setup-guides">
@@ -245,7 +255,8 @@
 </section>
 
 <section class="extras" aria-labelledby="extras-title">
-  <h2 id="extras-title" class="extras-title">Two more, only if you want them</h2>
+  <p class="step-eyebrow"><span class="step-number is-optional">+</span> Optional</p>
+  <h2 id="extras-title">Two more, only if you want them</h2>
   <p class="extras-lede">Neither is needed. The six free sources keep running whether you set these up or not.</p>
 
   <details class="extra">

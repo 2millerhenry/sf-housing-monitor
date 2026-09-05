@@ -1117,7 +1117,17 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 }
 
 /* ---- Sources page: one visible action, everything else one click away ---- */
-.connect-panel { margin-top: 14px; padding: 22px 24px 24px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); }
+/* The page is a sequence -- connect, then turn the alerts on, then two things
+   nobody has to do -- and it used to read as four unrelated panels. One eyebrow
+   shape carries the number, so the order is visible without reading a word. */
+.step-eyebrow { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.02em; text-transform: uppercase; }
+.step-eyebrow .step-number { width: 19px; height: 19px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--surface); font-size: 0.66rem; font-weight: 760; letter-spacing: 0; text-transform: none; }
+.step-eyebrow .step-number.is-done { background: var(--accent); }
+.step-eyebrow .step-number.is-optional { background: var(--surface-muted); color: var(--muted); border: 1px solid var(--line-strong); }
+.connect-step > summary .step-eyebrow { margin: 0; }
+.connect-step > summary small { display: block; margin-top: 3px; margin-left: 27px; color: var(--muted); font-size: 0.76rem; font-weight: 450; letter-spacing: 0; text-transform: none; }
+
+.connect-panel { margin-top: 26px; padding: 24px 26px 26px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); }
 .connect-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .connect-head h2 { margin: 2px 0 0; font-size: 1.0625rem; font-weight: 680; letter-spacing: -0.014em; }
 .connect-lede { margin: 10px 0 0; max-width: 62ch; color: var(--muted); font-size: 0.86rem; line-height: 1.5; }
@@ -1204,14 +1214,14 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-more ul strong, .extra-steps strong { color: var(--ink); }
 .connect-more .connect-form { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
 
-.provider-status { margin-top: 18px; padding-top: 14px; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; border-top: 1px solid var(--line); }
+.provider-status { margin-top: 20px; padding-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 14px 18px; border-top: 1px solid var(--line); }
 .provider-status > div { display: grid; gap: 4px; align-content: start; }
 .provider-status strong { color: var(--ink); font-size: 0.82rem; font-weight: 650; }
 .provider-status small { color: var(--muted); font-size: 0.72rem; line-height: 1.4; }
 .provider-status .connector-state { justify-self: start; }
 
-.extras { margin-top: 22px; }
-.extras-title { margin: 0 0 10px; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.015em; }
+.extras { margin-top: 26px; }
+#extras-title { margin: 0 0 4px; font-size: 1.0625rem; font-weight: 680; letter-spacing: -0.014em; }
 .extras-lede { max-width: 66ch; margin: 0 0 12px; color: var(--muted); font-size: 0.82rem; line-height: 1.55; }
 /* The summary now carries a source chip rather than bare bold text, so the two
    halves need to sit on the chip's baseline rather than the text's. */
@@ -1245,7 +1255,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 /* "You already have this" reads first, so it is a quiet statement of fact
    rather than another panel competing with the one action on the page. */
-.already { margin-top: 14px; padding: 18px 22px; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 14px; align-items: start; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--accent-soft); }
+.already { margin-top: 18px; padding: 18px 22px; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 14px; align-items: start; border: 1px solid var(--accent-line); border-radius: 14px; background: var(--accent-soft); }
 .already-mark { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 999px; background: var(--accent); color: var(--surface); font-size: 0.8rem; font-weight: 700; }
 .already h2 { margin: 2px 0 0; font-size: 1rem; font-weight: 680; letter-spacing: -0.012em; }
 .already-list { margin: 7px 0 0; color: var(--ink); font-size: 0.83rem; font-weight: 620; line-height: 1.5; }
