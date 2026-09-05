@@ -546,3 +546,21 @@ def test_only_the_connection_test_reaches_the_internet(tmp_path: Path) -> None:
 
     assert "only thing on this page that reaches the internet" in page
     assert "/support?probe=1" in page, "and it is opt-in"
+
+
+def test_every_class_the_support_page_uses_is_actually_styled() -> None:
+    """The committed repository shipped a Support page whose own stylesheet had
+    none of its rules: fix-list, fix-row, support-fold and support-tools existed
+    in the template and nowhere else, so a fresh clone rendered it unstyled.
+    Template and stylesheet have to travel together."""
+    import re
+    from pathlib import Path as _Path
+
+    markup = _Path("sf_housing/templates/support.html").read_text(encoding="utf-8")
+    css = _Path("sf_housing/static/style.css").read_text(encoding="utf-8")
+
+    used = set(re.findall(r'class="([^"{}]+)"', markup))
+    names = {name for group in used for name in group.split() if not name.startswith("{")}
+    missing = sorted(name for name in names if f".{name}" not in css)
+
+    assert not missing, f"styled nowhere: {missing}"

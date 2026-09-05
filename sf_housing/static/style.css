@@ -3,6 +3,9 @@
   --canvas: oklch(97.5% 0.006 85);
   --surface: oklch(99.2% 0.004 85);
   --surface-muted: oklch(95.5% 0.008 100);
+  /* One step below a surface, for banding long forms. Subtle on purpose:
+     it groups the sections without turning them into stacked cards. */
+  --band: oklch(97.3% 0.006 95);
   --ink: oklch(21% 0.018 160);
   --muted: oklch(48% 0.014 150);
   --faint: oklch(62% 0.012 150);
@@ -15,7 +18,6 @@
      lightness: legible as a group when rows stack up, invisible as a colour. */
   --visited: oklch(97.9% 0.011 158);
   --visited-hover: oklch(95.9% 0.021 158);
-
   --accent-line: oklch(80% 0.04 155);
   --amber: oklch(51% 0.11 73);
   --amber-soft: oklch(96% 0.035 82);
@@ -104,6 +106,14 @@ button:focus-visible, .button:focus-visible, a:focus-visible, select:focus-visib
 .site-header nav a.active { color: var(--ink); background: var(--surface-muted); font-weight: 680; }
 
 main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
+
+/* A quiet standing line rather than a banner: the funding ask should be
+   findable on every page without ever competing with the listings. */
+
+@media (max-width: 760px) {
+}
+@media (max-width: 520px) {
+}
 .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 28px; }
 .hero.compact { align-items: center; }
 .hero h1 { margin: 5px 0 9px; font-size: 2.25rem; line-height: 1.08; letter-spacing: -0.038em; font-weight: 730; }
@@ -388,6 +398,7 @@ button.row-action { display: inline-flex; }
 .note-form button { min-height: 34px; margin-top: 6px; padding: 6px 10px; font-size: 0.75rem; }
 .empty { text-align: center; padding: 72px 20px; }
 .empty-mark { width: 44px; height: 44px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 14px; background: var(--surface-muted); color: var(--muted); font-size: 1.3rem; }
+
 /* The same answer for a shortlist that is merely short. Folded, because it is
    context rather than a problem. */
 .why-short { margin: 14px 0 0; padding: 12px 16px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
@@ -409,12 +420,12 @@ button.row-action { display: inline-flex; }
 .empty h3 { margin: 0 0 7px; font-size: 1.05rem; }
 .empty p { color: var(--muted); margin: 0; }
 
-.system-disclosure, .advanced-preferences { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); overflow: hidden; }
-.system-disclosure > summary, .advanced-preferences > summary { min-height: 66px; padding: 13px 18px; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-.system-disclosure > summary::-webkit-details-marker, .advanced-preferences > summary::-webkit-details-marker { display: none; }
-.system-disclosure > summary:hover, .advanced-preferences > summary:hover { background: var(--surface-muted); }
-.system-disclosure summary span:first-child, .advanced-preferences summary span:first-child { display: grid; gap: 3px; }
-.system-disclosure summary small, .advanced-preferences summary small { color: var(--muted); font-size: 0.78rem; font-weight: 450; }
+.system-disclosure, .advanced-preferences, .support-fold { margin-top: 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); overflow: hidden; }
+.system-disclosure > summary, .advanced-preferences > summary, .support-fold > summary { min-height: 66px; padding: 13px 18px; cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+.system-disclosure > summary::-webkit-details-marker, .advanced-preferences > summary::-webkit-details-marker, .support-fold > summary::-webkit-details-marker { display: none; }
+.system-disclosure > summary:hover, .advanced-preferences > summary:hover, .support-fold > summary:hover { background: var(--surface-muted); }
+.system-disclosure summary span:first-child, .advanced-preferences summary span:first-child, .support-fold summary span:first-child { display: grid; gap: 3px; }
+.system-disclosure summary small, .advanced-preferences summary small, .support-fold summary small { color: var(--muted); font-size: 0.78rem; font-weight: 450; }
 .disclosure-action { color: var(--accent); font-size: 0.8rem; font-weight: 650; white-space: nowrap; }
 details[open] > summary .disclosure-action { font-size: 0; }
 details[open] > summary .disclosure-action::after { content: "Hide details"; font-size: 0.8rem; }
@@ -467,9 +478,6 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    control on the page sits on --surface, so each one lifts off its band. */
 .deal-form > .deal-section:nth-of-type(even) { background: var(--band); }
 .deal-form > .deal-section:last-of-type { border-bottom: 0; }
-/* The copy rail used to take 40% of every section to hold three lines of text
-   beside a very tall control column. A full-width header returns that space to
-   the controls, which is where the work actually happens. */
 /* The copy rail used to take 40% of every section to hold three lines of text
    beside a very tall control column. A full-width header returns that space to
    the controls, which is where the work actually happens. */
@@ -666,6 +674,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .path-row select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .choice-row { min-height: 54px; padding: 10px 12px; display: flex; align-items: center; gap: 11px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; }
 .choice-row:hover { border-color: var(--line-strong); background: var(--surface-muted); }
+.deal-section .choice-row:hover { background: var(--surface-muted); }
 .choice-row:has(input:checked) { border-color: var(--accent-line); background: var(--accent-soft); }
 .choice-row input { width: 18px; height: 18px; accent-color: var(--accent); }
 .choice-row span { display: grid; gap: 2px; }
@@ -868,108 +877,90 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .coverage-ledger dd { margin: 0; color: var(--muted); font-size: 0.69rem; line-height: 1.42; }
 .methodology .coverage-note { margin-bottom: 0; color: var(--amber); }
 
-.support-hero { align-items: center; }
-.readiness-badge {
-  min-height: 42px;
-  padding: 10px 15px;
-  display: inline-flex;
-  align-items: center;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 0.82rem;
-  font-weight: 720;
-  white-space: nowrap;
-}
-.readiness-badge.ready { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-hover); }
-.readiness-badge.setup_incomplete { border-color: var(--amber-line); background: var(--amber-soft); color: var(--amber); }
-.readiness-badge.needs_attention { border-color: var(--red-line); background: var(--red-soft); color: var(--red); }
+/* ---- Support page: the machinery, kept quiet ---- */
 .support-copy-result { margin-top: -8px; }
-.support-surface, .support-optional, .support-actions {
+
+/* Things to fix come first and are the only part of this page allowed to look
+   urgent. Every row spells out its own next action, so nothing here needs
+   colour to carry a severity the markup does not also state. */
+/* The tally sits inside the hero now, so the hero carries the gap that used to
+   come from the section after it. */
+.support-hero .subtle { margin-bottom: 0; }
+/* The verdict and its evidence sit together: "Everything is working" is a
+   claim, and the tally under it is what the claim rests on. */
+.support-tally { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0 0; }
+.tally { padding: 4px 11px; border-radius: 999px; font-size: 0.76rem; font-weight: 620; }
+.tally.ok { background: var(--accent-soft); color: var(--accent-hover); }
+.tally.attention { background: var(--amber-soft); color: var(--amber); }
+.tally.quiet { background: var(--surface-muted); color: var(--muted); }
+.support-quiet-title { margin: 26px 0 0; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.015em; }
+
+/* Getting help is a sequence, not a row of buttons: try again, then send what
+   the page already knows. Numbering it says which to do first. */
+.support-help { margin-top: 26px; padding: 20px 22px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.support-help h2 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em; }
+.help-steps { margin: 0; padding-left: 20px; display: grid; gap: 18px; }
+.help-steps li { max-width: 72ch; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.help-steps strong { color: var(--ink); font-weight: 640; }
+.help-steps small { display: block; margin-top: 7px; color: var(--faint); font-size: 0.76rem; line-height: 1.5; }
+.help-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 11px; }
+.help-actions .button, .help-actions button { min-height: 38px; padding: 0 15px; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.82rem; font-weight: 620; cursor: pointer; text-decoration: none; }
+.help-actions .button:hover, .help-actions button:hover { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-hover); }
+.support-generated { margin: 18px 0 0; padding-top: 13px; border-top: 1px solid var(--line); color: var(--faint); font-size: 0.74rem; }
+
+.fix-list { margin-top: 22px; display: grid; gap: 10px; }
+.fix-list > h2 { margin: 0 0 2px; font-size: 1.05rem; letter-spacing: -0.012em; }
+.fix-row {
+  padding: 15px 17px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.6fr);
+  align-items: start;
+  gap: 12px 22px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-low);
+}
+.fix-row h3 { margin: 0 0 4px; font-size: 0.94rem; letter-spacing: -0.008em; }
+.fix-row > div > p { max-width: 72ch; margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
+.fix-do { margin: 0; font-size: 0.8rem; line-height: 1.5; }
+.fix-do > span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 0.68rem; font-weight: 680; }
+
+/* The passed and optional folds reuse .system-disclosure's card and summary
+   treatment, so only what genuinely differs from it belongs here. */
+.support-quiet { display: block; }
+.support-fold[open] > summary { border-bottom: 1px solid var(--line); }
+.support-fold[open] > summary .disclosure-action::after { content: "Hide"; }
+.support-fold .check-list { margin: 0; padding: 2px 18px 6px; list-style: none; }
+.support-fold .check-list li { padding: 11px 0; display: grid; gap: 3px; }
+.support-fold .check-list li + li { border-top: 1px solid var(--line); }
+.support-fold .check-list strong { font-size: 0.86rem; letter-spacing: -0.006em; }
+.support-fold .check-list span { max-width: 78ch; color: var(--muted); font-size: 0.78rem; line-height: 1.48; }
+
+.support-tools {
   margin-top: 18px;
-  overflow: hidden;
+  padding: 15px 17px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--shadow-low);
 }
-.support-section-heading {
-  min-height: 66px;
-  padding: 14px 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  border-bottom: 1px solid var(--line);
+.support-tools .button, .support-tools button { min-height: 38px; }
+.support-tools > p {
+  flex-basis: 100%;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
-.support-section-heading h2 { margin: 2px 0 0; font-size: 1.05rem; letter-spacing: -0.012em; }
-.support-section-heading > span { color: var(--muted); font-size: 0.75rem; }
-.diagnostic-list { display: grid; }
-.diagnostic-row {
-  min-height: 104px;
-  padding: 16px 18px;
-  display: grid;
-  grid-template-columns: 118px minmax(0, 1fr) minmax(180px, 0.7fr);
-  align-items: start;
-  gap: 18px;
-  border-bottom: 1px solid var(--line);
-}
-.diagnostic-row:last-child { border-bottom: 0; }
-.diagnostic-row.attention { background: var(--amber-soft); }
-.diagnostic-row.blocked { background: var(--red-soft); }
-.diagnostic-state {
-  min-height: 30px;
-  width: fit-content;
-  padding: 5px 9px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 0.69rem;
-  font-weight: 720;
-  text-transform: capitalize;
-}
-.diagnostic-row.pass .diagnostic-state { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-hover); }
-.diagnostic-row.attention .diagnostic-state { border-color: var(--amber-line); color: var(--amber); }
-.diagnostic-row.blocked .diagnostic-state { border-color: var(--red-line); color: var(--red); }
-.diagnostic-copy { max-width: 72ch; }
-.diagnostic-category { margin: 0 0 3px; color: var(--muted); font-size: 0.68rem; font-weight: 680; }
-.diagnostic-copy h3 { margin: 0 0 5px; font-size: 0.94rem; letter-spacing: -0.008em; }
-.diagnostic-copy > p:last-child { margin: 0; color: var(--muted); font-size: 0.8rem; line-height: 1.48; }
-.diagnostic-action { display: grid; gap: 5px; }
-.diagnostic-action span { color: var(--muted); font-size: 0.66rem; font-weight: 680; }
-.diagnostic-action strong { font-size: 0.76rem; line-height: 1.45; }
-.diagnostic-list.compact .diagnostic-row { min-height: 88px; }
-.support-optional > summary {
-  min-height: 66px;
-  padding: 14px 18px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  cursor: pointer;
-  list-style: none;
-}
-.support-optional > summary::-webkit-details-marker { display: none; }
-.support-optional > summary strong, .support-optional > summary small { display: block; }
-.support-optional > summary strong { font-size: 0.94rem; }
-.support-optional > summary small { margin-top: 4px; color: var(--muted); font-size: 0.72rem; }
-.support-optional[open] > summary { border-bottom: 1px solid var(--line); }
-.support-actions { padding: 18px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 24px; align-items: center; }
-.support-actions h2 { margin: 0 0 5px; font-size: 1rem; }
-.support-actions p { max-width: 70ch; margin: 0; color: var(--muted); font-size: 0.76rem; line-height: 1.48; }
-.support-button-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
-.support-actions .support-time { grid-column: 1 / -1; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.68rem; }
-.support-shortcuts { margin-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); overflow: hidden; }
-.support-shortcuts a { min-height: 76px; padding: 15px 17px; display: grid; align-content: center; gap: 4px; color: var(--ink); text-decoration: none; }
-.support-shortcuts a + a { border-left: 1px solid var(--line); }
-.support-shortcuts a:hover { background: var(--surface-muted); }
-.support-shortcuts strong { font-size: 0.82rem; }
-.support-shortcuts span { color: var(--muted); font-size: 0.7rem; line-height: 1.4; }
+
 
 @media (max-width: 1560px) {
   /* Posted is the column people scan for; it stays. The source is already
@@ -1009,10 +1000,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .potrero-table .potrero-home, .potrero-table .potrero-total { display: none; }
   .potrero-rule { flex-direction: column; }
   .potrero-rule details { flex-basis: auto; max-width: 70ch; }
-  .diagnostic-row { grid-template-columns: 104px minmax(0, 1fr); }
-  .diagnostic-action { grid-column: 2; }
-  .support-actions { grid-template-columns: 1fr; }
-  .support-button-row { justify-content: flex-start; }
+  .fix-row { grid-template-columns: 1fr; }
+  .fix-do { padding-top: 10px; border-top: 1px solid var(--line); }
 }
 
 @media (max-width: 760px) {
@@ -1077,13 +1066,9 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .coverage-ledger { grid-template-columns: 1fr; }
   .coverage-ledger div:nth-child(even) { border-left: 0; }
   .coverage-ledger div + div { border-top: 1px solid var(--line); }
-  .support-hero { align-items: flex-start; }
-  .diagnostic-row { grid-template-columns: 1fr; gap: 10px; }
-  .diagnostic-action { grid-column: auto; padding-top: 9px; border-top: 1px solid var(--line); }
-  .support-section-heading { align-items: flex-start; flex-direction: column; gap: 5px; }
-  .support-button-row > * { width: 100%; }
-  .support-shortcuts { grid-template-columns: 1fr; }
-  .support-shortcuts a + a { border-left: 0; border-top: 1px solid var(--line); }
+  .fix-row, .support-tools { padding: 14px; }
+  .support-tools .button, .support-tools button { flex: 1 1 100%; }
+  .support-fold .check-list { padding-inline: 14px; }
   .source-order { grid-template-columns: 1fr; gap: 13px; }
   .source-order ol { grid-template-columns: 1fr; gap: 9px; }
   .source-order li { padding: 3px 0 3px 27px; }
@@ -1112,7 +1097,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .onboarding-intro { align-items: flex-start; flex-direction: column; }
   .onboarding-intro span + span::before { display: none; }
   .source-checklist > header { align-items: flex-start; flex-direction: column; gap: 10px; }
-  .system-disclosure > summary, .advanced-preferences > summary { align-items: flex-start; }
+  .system-disclosure > summary, .advanced-preferences > summary, .support-fold > summary { align-items: flex-start; }
   .potrero-summary dt { font-size: 0.59rem; }
   .potrero-summary dd { font-size: 1.1rem; }
   .potrero-picks li { grid-template-columns: 28px minmax(0, 1fr); }
@@ -1148,6 +1133,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .connect-more > details { border-bottom: 1px solid var(--line); }
 .connect-more > details > summary { padding: 11px 2px; cursor: pointer; color: var(--accent-hover); font-size: 0.8rem; font-weight: 650; list-style: none; }
 .connect-more > details > summary::-webkit-details-marker { display: none; }
+
 /* A mark per source, in this app's own lettering. Nothing is hotlinked, so the
    page still works offline and still tells no third party it was opened. One
    lightness and chroma across the set keeps eleven different hues reading as
@@ -1183,7 +1169,6 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .setup-other { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
 .setup-other h3 { margin: 0 0 5px; font-size: 0.92rem; font-weight: 640; }
 .setup-other p { max-width: 68ch; margin: 0 0 13px; color: var(--muted); font-size: 0.83rem; line-height: 1.6; }
-
 .connect-more > details > summary::before { content: "＋"; margin-right: 8px; color: var(--faint); font-weight: 600; }
 .connect-more > details[open] > summary::before { content: "－"; }
 .connect-more > details > *:not(summary) { margin-bottom: 12px; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
