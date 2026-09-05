@@ -109,10 +109,26 @@ main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
 
 /* A quiet standing line rather than a banner: the funding ask should be
    findable on every page without ever competing with the listings. */
+.site-footer { border-top: 1px solid var(--line); background: var(--surface); }
+.footer-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 28px 26px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px 24px;
+}
+.footer-inner p { margin: 0; color: var(--faint); font-size: 0.78rem; }
+.footer-support { color: var(--muted); }
+.footer-support a { color: var(--accent); font-weight: 560; }
 
 @media (max-width: 760px) {
+  .footer-inner { padding-inline: 16px; }
 }
 @media (max-width: 520px) {
+  .footer-inner { padding-inline: 10px; flex-direction: column; align-items: flex-start; }
 }
 .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 28px; }
 .hero.compact { align-items: center; }
@@ -965,6 +981,17 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   line-height: 1.45;
 }
 
+.support-donate {
+  margin-top: 18px;
+  padding: 19px 21px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-low);
+}
+.support-donate h2 { margin: 0 0 6px; font-size: 1rem; letter-spacing: -0.012em; }
+.support-donate p { max-width: 62ch; margin: 0 0 14px; color: var(--muted); font-size: 0.88rem; line-height: 1.55; }
+.support-donate .button { min-height: 38px; }
 
 @media (max-width: 1560px) {
   /* Posted is the column people scan for; it stays. The source is already
@@ -1070,7 +1097,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .coverage-ledger { grid-template-columns: 1fr; }
   .coverage-ledger div:nth-child(even) { border-left: 0; }
   .coverage-ledger div + div { border-top: 1px solid var(--line); }
-  .fix-row, .support-tools { padding: 14px; }
+  .fix-row, .support-tools, .support-donate { padding: 14px; }
   .support-tools .button, .support-tools button { flex: 1 1 100%; }
   .support-fold .check-list { padding-inline: 14px; }
   .source-order { grid-template-columns: 1fr; gap: 13px; }

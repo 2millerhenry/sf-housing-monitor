@@ -24,5 +24,16 @@
     </div>
   </header>
   <main>{% block content %}{% endblock %}</main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>SF Housing Monitor {{ app_version }} &middot; MIT licensed &middot; runs entirely on this computer</p>
+      {% if donate_url %}
+      <p class="footer-support">
+        Free to use.
+        <a href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external">Say thanks</a>
+      </p>
+      {% endif %}
+    </div>
+  </footer>
 </body>
 </html>

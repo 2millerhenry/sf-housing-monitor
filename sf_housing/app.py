@@ -22,7 +22,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .apify import ApifyTokenError, ApifyTokenStore
-from . import __version__
+from . import DONATE_URL, __version__
 from .connectors import GMAIL_PROVIDERS, ConnectorStatus
 from .database import DatabaseUnreadableError, Repository
 from .deal_profile import (
@@ -690,6 +690,7 @@ def create_app(
     application.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
     templates.env.globals["app_version"] = __version__
+    templates.env.globals["donate_url"] = DONATE_URL
 
     def asset_version() -> str:
         """Bust the cache when a static file actually changes.

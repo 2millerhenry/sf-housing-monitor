@@ -69,6 +69,14 @@
   {% endif %}
 </section>
 
+{% if donate_url and report.overall == 'ready' %}
+<aside class="support-donate" aria-labelledby="support-donate-title">
+  <h2 id="support-donate-title">Keeping this working</h2>
+  <p>Nothing here is hosted or funded. When the listing sites change, someone has to fix the readers.</p>
+  <a class="button" href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external">Say thanks</a>
+</aside>
+{% endif %}
+
 <section class="support-help" aria-labelledby="help-title">
   <h2 id="help-title">Still not right?</h2>
   <ol class="help-steps">

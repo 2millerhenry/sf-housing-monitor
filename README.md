@@ -167,6 +167,22 @@ access may conflict with those sites' terms of service, and their terms can chan
 You are responsible for deciding what you point it at and for complying with the rules of the
 sites you use. It is provided as-is, with no warranty — see [LICENSE](LICENSE).
 
+## Keeping it working
+
+The app is free, runs entirely on your own machine, and collects nothing. What it costs is
+maintenance: the sites it reads change their pages without warning, and each change has to be
+found and fixed before that source goes quiet.
+
+If it helped you find somewhere to live, a one-off contribution is welcome and entirely
+optional. Nothing in the app is gated, degraded, or nagged behind it — there is one line in the
+dashboard footer, and that is the whole of the ask.
+
+Set your donation page in two places to turn it on:
+
+- `_DEFAULT_DONATE_URL` in [`sf_housing/__init__.py`](sf_housing/__init__.py) — controls the
+  footer line and the Support page note. Empty means nothing is shown.
+- [`.github/FUNDING.yml`](.github/FUNDING.yml) — controls the Sponsor button on this repository.
+
 ## License
 
 [MIT](LICENSE).
