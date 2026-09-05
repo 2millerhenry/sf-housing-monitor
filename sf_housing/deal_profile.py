@@ -514,13 +514,23 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
     result["private_room"] = "private_room" in profile.enabled_paths and profile.private_room_required
     if room:
         ideal = room.ideal_monthly or room.maximum_monthly
+        # The sweet spot runs up to the ideal, not at it. Setting both ends to
+        # the same number meant only a home priced at exactly $2,500 counted as
+        # ideal; $2,499 scored the same 0.72 as one at the very top of the
+        # budget, and a genuinely cheap room was never treated as a find. Below
+        # the stated floor a home is already out of range, so the floor is the
+        # bottom of the band and nothing below it is silently promoted.
         result["budget"] = {
-            "ideal_monthly": ideal,
             "max_monthly": room.maximum_monthly,
-            "sweet_spot_min": room.preferred_minimum or ideal,
+            "sweet_spot_min": room.preferred_minimum or room.minimum_monthly or 1,
             "sweet_spot_max": room.preferred_maximum or ideal,
             "flexible_margin_percent": 0.05,
         }
+        # Only an ideal the reader actually named. Falling back to the maximum
+        # let the page tell them $3,500 was "exactly your ideal price" when
+        # $3,500 was the most they were willing to pay.
+        if room.ideal_monthly is not None:
+            result["budget"]["ideal_monthly"] = room.ideal_monthly
         # Only a minimum the user actually stated, and the key is left out
         # entirely rather than set to None, because every reader of it does
         # .get("min_monthly", <default>) and a present-but-None key defeats the

@@ -37,7 +37,7 @@
           <span>Home type</span>
           <span class="is-optional">Least you would pay</span>
           <span>Monthly maximum</span>
-          <span class="is-optional">Ideal target</span>
+          <span>Ideal target</span>
           <span>Sharing with</span>
         </div>
       {% set path_options = [
@@ -75,11 +75,14 @@
                      aria-label="{{ label }}{% if split %} maximum per person{% else %} monthly maximum{% endif %}">
             </span>
           </div>
-          <div class="money-cell is-optional">
-            <span class="cell-label" aria-hidden="true">Optional</span>
+          {# Not a refinement: a home at or under this scores full marks on price
+             where one merely inside the budget does not, so it decides order. #}
+          <div class="money-cell">
+            <span class="cell-label" aria-hidden="true">Ideal</span>
             <span class="money-field">
               <span aria-hidden="true">$</span>
               <input type="number" name="{{ key }}_ideal" min="1" max="30000" value="{{ budget.get('ideal', '') }}" inputmode="numeric"
+                     placeholder="Optional"
                      aria-label="{{ label }} ideal target, optional">
             </span>
           </div>
@@ -101,6 +104,7 @@
       </div>
       <p class="field-help">
         Tick a home type to use its budget. Untouched rows are ignored entirely.
+        A home at or under your ideal ranks above one that merely fits the maximum; leave it blank and only the maximum is used.
         <button type="button" class="link-button" data-ranges-toggle aria-expanded="{{ 'true' if ranges_in_use else 'false' }}">
           {% if ranges_in_use %}Hide price ranges{% else %}Add a price range{% endif %}
         </button>

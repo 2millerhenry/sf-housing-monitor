@@ -363,8 +363,17 @@ def _monthly_price(listing: ListingCandidate, preferences: Preferences) -> Crite
     )
     if in_sweet_spot:
         price_value = 1.0
-        if ideal is not None and listing.price == int(ideal):
+        if ideal is None:
+            # Nobody named an ideal, so there is no sweet spot to praise; the
+            # home is simply inside the budget.
+            positive = f"${listing.price:,}/month is within your {bounds} budget."
+        elif listing.price == int(ideal):
             positive = f"${listing.price:,}/month is exactly your ideal price."
+        elif low is None or int(sweet_low) <= 1:
+            # No floor was stated, so the band has no meaningful bottom and
+            # naming one reads as "$1-$2,500". What the reader cares about is
+            # that it lands at or under the number they called ideal.
+            positive = f"${listing.price:,}/month is at or below your ${int(sweet_high):,} ideal."
         else:
             positive = (
                 f"${listing.price:,}/month is in your "

@@ -807,3 +807,139 @@ def test_the_slider_count_matches_the_rows_the_tabs_will_show(tmp_path: Path) ->
         f"slider says {counts[str(cutoff)]}, the tab shows {rows}"
     )
     assert counts[str(cutoff)] == 4, "the three whole units are not on this deal's tabs"
+
+
+# --------------------------------------------------------------------------
+# the ideal target, and what it is worth
+# --------------------------------------------------------------------------
+
+
+def test_the_ideal_target_is_on_the_form_without_being_asked_for(tmp_path: Path) -> None:
+    """It changes the order of results, so it is a column rather than something
+    folded away with the refinements."""
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/preferences?welcome=1").text
+
+    assert 'name="private_room_ideal"' in page
+    ideal = page[page.index('name="private_room_ideal"') - 400 : page.index('name="private_room_ideal"')]
+    assert "is-optional" not in ideal, "the ideal is not hidden behind the price-range toggle"
+    assert "Ideal target" in page
+
+
+def test_a_home_at_the_ideal_outranks_one_that_merely_fits(tmp_path: Path) -> None:
+    """The whole reason the field exists."""
+    import yaml
+
+    from sf_housing.models import ListingCandidate
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scoring import score_listing
+
+    document = {
+        "profile_version": 1,
+        "profile": {
+            "state": "active",
+            "enabled_paths": ["private_room"],
+            "budgets": {"private_room": {"maximum_monthly": 3500, "ideal_monthly": 2500}},
+            "geography": {"anywhere_in_sf": True},
+            "room_household": {"private_room_required": True},
+        },
+    }
+    preferences = parse_preferences(yaml.safe_dump(document))
+
+    def score(price: int) -> int:
+        return score_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=str(price),
+                title="Private room",
+                original_url=f"https://sfbay.craigslist.org/x/{price}.html",
+                price=price,
+                neighborhood="NOPA",
+                listing_type="Room/share",
+                summary="A private room in a shared home.",
+            ),
+            preferences,
+        ).score
+
+    assert score(2400) > score(3400), "at or under the ideal has to rank higher"
+    assert score(2500) > score(2600)
+
+
+def test_the_sweet_spot_is_a_band_not_a_single_price(tmp_path: Path) -> None:
+    """Both ends used to be the ideal itself, so only a home priced at exactly
+    $2,500 counted, and $2,499 scored the same as one at the top of the
+    budget."""
+    from sf_housing.deal_profile import DealProfile, legacy_view
+
+    profile = DealProfile.from_dict(
+        {
+            "state": "active",
+            "enabled_paths": ["private_room"],
+            "budgets": {"private_room": {"maximum_monthly": 3500, "ideal_monthly": 2500}},
+            "geography": {"anywhere_in_sf": True},
+        }
+    )
+    budget = legacy_view(profile, {})["budget"]
+
+    assert budget["sweet_spot_max"] == 2500
+    assert budget["sweet_spot_min"] < 2500, "the band has to have room in it"
+
+
+def test_a_stated_floor_becomes_the_bottom_of_the_band() -> None:
+    """Nothing below a floor is silently promoted into the sweet spot."""
+    from sf_housing.deal_profile import DealProfile, legacy_view
+
+    profile = DealProfile.from_dict(
+        {
+            "state": "active",
+            "enabled_paths": ["private_room"],
+            "budgets": {
+                "private_room": {
+                    "maximum_monthly": 3500,
+                    "ideal_monthly": 2500,
+                    "minimum_monthly": 1500,
+                }
+            },
+            "geography": {"anywhere_in_sf": True},
+        }
+    )
+    budget = legacy_view(profile, {})["budget"]
+
+    assert budget["sweet_spot_min"] == 1500
+    assert budget["sweet_spot_max"] == 2500
+
+
+def test_no_ideal_is_never_invented_from_the_maximum() -> None:
+    """The page told people $3,500 was "exactly your ideal price" when $3,500
+    was the most they were willing to pay."""
+    from sf_housing.deal_profile import DealProfile, legacy_view
+
+    profile = DealProfile.from_dict(
+        {
+            "state": "active",
+            "enabled_paths": ["private_room"],
+            "budgets": {"private_room": {"maximum_monthly": 3500}},
+            "geography": {"anywhere_in_sf": True},
+        }
+    )
+    budget = legacy_view(profile, {})["budget"]
+
+    assert "ideal_monthly" not in budget
+
+
+def test_an_ideal_above_the_maximum_is_refused(tmp_path: Path) -> None:
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    form = valid_form()
+    form["private_room_ideal"] = "99000"
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        response = client.post("/preferences/deal", data=form, follow_redirects=True)
+
+    assert "cannot exceed its maximum" in response.text
