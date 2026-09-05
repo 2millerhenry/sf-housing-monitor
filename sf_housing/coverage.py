@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 
 import httpx
 
@@ -49,6 +50,17 @@ BLOCK_SIGNALS = (
 # Above this, a "count" is a page number, a phone number or a price that
 # happened to sit next to the word "rentals". Below one, see the docstring.
 MAXIMUM_CREDIBLE_COUNT = 200_000
+
+# How long a count stays good enough to show. This is the real limit on how
+# often these sites are asked -- twice a day at most, however many times
+# somebody presses Check for new homes -- and it is expressed as staleness
+# rather than as which trigger is running, because the constraint that matters
+# is requests per day, not which button caused them.
+COVERAGE_REFRESH_AFTER = timedelta(hours=11)
+
+# Past this a stored count is not shown at all. A figure from last month is not
+# a fact about today, and dating it is not enough to make it one.
+COVERAGE_STALE_AFTER = timedelta(days=8)
 
 # Only sources whose count has actually been verified against a real response.
 # A provider absent from here shows its invitation with no number, which is the
@@ -160,3 +172,30 @@ def missing_coverage_targets(repository, preferences) -> list[tuple[str, str]]:
             continue
         targets.append((platform, url))
     return targets
+
+
+def coverage_is_fresh(taken_at: object, *, now: datetime | None = None) -> bool:
+    """Was this count taken recently enough to be worth asking again around?"""
+    moment = _parse_moment(taken_at)
+    if moment is None:
+        return False
+    return (now or datetime.now(UTC)) - moment < COVERAGE_REFRESH_AFTER
+
+
+def coverage_is_showable(taken_at: object, *, now: datetime | None = None) -> bool:
+    """Is this count recent enough to put in front of somebody at all?"""
+    moment = _parse_moment(taken_at)
+    if moment is None:
+        return False
+    return (now or datetime.now(UTC)) - moment < COVERAGE_STALE_AFTER
+
+
+def _parse_moment(value: object) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)

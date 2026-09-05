@@ -23,7 +23,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .apify import ApifyTokenError, ApifyTokenStore
 from . import DONATE_URL, __version__
-from .coverage import ALERT_SETUP_SEARCHES
+from .coverage import ALERT_SETUP_SEARCHES, coverage_is_showable
 from .connectors import GMAIL_PROVIDERS, ConnectorStatus
 from .database import DatabaseUnreadableError, Repository
 from .deal_profile import (
@@ -1450,7 +1450,11 @@ def create_app(
         # Roomies refuse outright, and Zillow returns a normal-looking page
         # reading "0 Rentals" from behind a captcha. The rest show their
         # invitation with no number, which is the honest state and not a gap.
-        coverage = repository.source_coverage()
+        coverage = {
+            platform: entry
+            for platform, entry in repository.source_coverage().items()
+            if coverage_is_showable(entry.get("taken_at"))
+        }
         gmail_providers = [
             {
                 "key": key,

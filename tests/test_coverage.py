@@ -353,22 +353,81 @@ def test_a_real_count_reaches_the_store_during_a_scan(
     assert "Roomies" not in stored, "only what could actually be counted is stored"
 
 
-def test_a_manual_scan_does_not_go_counting(
+def test_a_fresh_count_is_not_fetched_again(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Pressing Check for new homes is about homes. Four extra requests every
-    time somebody is impatient is not politeness."""
+    """This is the real limit on how often these sites are asked: twice a day at
+    most, however many times somebody presses Check for new homes."""
     repository, scanner = scanner_for(tmp_path)
+    repository.record_source_coverage("HotPads", 4562)
     calls: list[str] = []
     monkeypatch.setattr(
         "sf_housing.scanner.fetch_count",
-        lambda client, platform, url: calls.append(platform) or 4562,
+        lambda client, platform, url: calls.append(platform) or 9999,
     )
 
     scanner.run_scan("manual")
+    scanner.run_scan("manual")
+    scanner.run_scan("scheduled")
 
-    assert calls == []
-    assert repository.source_coverage() == {}
+    assert "HotPads" not in calls, "a recent count is not asked for again"
+    assert repository.source_coverage()["HotPads"]["count"] == 4562
+
+
+def test_a_stale_count_is_refreshed(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    repository, scanner = scanner_for(tmp_path)
+    repository.record_source_coverage("HotPads", 4000)
+    old = (datetime.now(UTC) - timedelta(hours=20)).isoformat()
+    with repository.connection() as connection:
+        connection.execute("UPDATE source_coverage SET taken_at = ?", (old,))
+        connection.commit()
+
+    monkeypatch.setattr(
+        "sf_housing.scanner.fetch_count",
+        lambda client, platform, url: 4562 if platform == "HotPads" else None,
+    )
+    scanner.run_scan("scheduled")
+
+    assert repository.source_coverage()["HotPads"]["count"] == 4562
+
+
+def test_a_count_from_last_month_is_not_shown_at_all(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Dating a figure does not make an old one a fact about today."""
+    from datetime import UTC, datetime, timedelta
+
+    from fastapi.testclient import TestClient
+
+    from sf_housing.app import create_app
+    from sf_housing.settings import Settings
+    from tests.conftest import TEST_PREFERENCES
+
+    data = tmp_path / "data"
+    data.mkdir(parents=True, exist_ok=True)
+    preferences_path = tmp_path / "preferences.yaml"
+    preferences_path.write_text(TEST_PREFERENCES, encoding="utf-8")
+    settings = Settings(
+        data_dir=data,
+        preferences_path=preferences_path,
+        database_path=data / "housing.sqlite3",
+        log_path=data / "test.log",
+    )
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    repository.record_source_coverage("HotPads", 4562)
+    ancient = (datetime.now(UTC) - timedelta(days=40)).isoformat()
+    with repository.connection() as connection:
+        connection.execute("UPDATE source_coverage SET taken_at = ?", (ancient,))
+        connection.commit()
+
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert "4,562" not in page
+    assert "not seeing" not in page
 
 
 # --------------------------------------------------------------------------

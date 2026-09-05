@@ -13,7 +13,7 @@ import httpx
 
 from .classification import classify_listing
 from .connectors import GMAIL_PROVIDERS, aggregate_gmail_status, connector_state_for_error
-from .coverage import fetch_count, missing_coverage_targets
+from .coverage import coverage_is_fresh, fetch_count, missing_coverage_targets
 from .database import Repository, utc_now
 from .filelock import release as release_file_lock, try_acquire as try_acquire_file_lock
 from .freshness import source_is_in_backoff, source_key as watchdog_source_key
@@ -232,7 +232,14 @@ class Scanner:
         except Exception:
             LOGGER.debug("Could not work out which sources to measure", exc_info=True)
             return
+        try:
+            stored = self.repository.source_coverage()
+        except Exception:
+            stored = {}
         for platform, url in targets:
+            existing = stored.get(platform) or {}
+            if coverage_is_fresh(existing.get("taken_at")):
+                continue
             try:
                 count = fetch_count(client, platform, url)
                 if count is not None:
@@ -913,8 +920,10 @@ class Scanner:
             # Ask the disconnected sources how much they are holding. This is a
             # passenger on the scan, not part of it: it runs after every source
             # has been counted, cannot change the outcome, and cannot fail it.
-            if trigger in AUTOMATIC_TRIGGERS:
-                self._measure_missing_coverage(client, preferences)
+            # Any trigger may ask; how often these sites are actually contacted
+            # is bounded by how stale the stored count is, not by which button
+            # was pressed.
+            self._measure_missing_coverage(client, preferences)
 
             completed_status = "completed_with_errors" if sources_failed else "completed"
             self.repository.finish_scan(
