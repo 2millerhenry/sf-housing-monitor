@@ -26,6 +26,27 @@ from sf_housing.scoring import score_listing
 from sf_housing.settings import Settings
 from tests.conftest import TEST_PREFERENCES
 
+def already_works_headline(html: str) -> str:
+    """The page's own claim about how many sources need no setup, checked
+    against the chips it actually renders beside it.
+
+    The sentence used to be a literal that said "six" while seven sources ran.
+    Counting the chips is what makes the claim true for whatever list the app
+    was built with, rather than true only for the default one."""
+    import re as _re
+
+    from sf_housing.app import spelled_count
+
+    headline = _re.search(r"<h2 id=\"already-title\">([^<]+)</h2>", html)
+    assert headline, "the page no longer states what already works"
+    section = html[html.index('id="already-title"') : html.index("</section>", html.index('id="already-title"'))]
+    chips = _re.findall(r'class="source-chip"', section)
+    assert headline.group(1) == f"{spelled_count(len(chips))} sources already work", (
+        f"headline {headline.group(1)!r} disagrees with the {len(chips)} sources listed beside it"
+    )
+    return headline.group(1)
+
+
 
 class WaitingDashboardSource:
     platform = "Waiting source"
@@ -632,7 +653,7 @@ def test_alert_setup_page_explains_local_connection(tmp_path: Path) -> None:
         response = client.get("/alerts")
 
     assert response.status_code == 200
-    assert "Six sources already work" in response.text
+    assert already_works_headline(response.text) in response.text
     assert "nothing on this page is required" in response.text
     assert "Before you can connect Gmail" in response.text
     assert "Google OAuth Web client JSON" in response.text

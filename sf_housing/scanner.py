@@ -142,6 +142,8 @@ class Scanner:
         # search alerts from running inside the shared time budget.
         priority = {
             "Craigslist": 10,
+            # One public JSON call, so it costs almost nothing to run early.
+            "SF Housing Portal": 12,
             "Listings Project": 15,
             "Abacus (small buildings)": 20,
             "SpareRoom": 25,
@@ -149,7 +151,13 @@ class Scanner:
             "HotPads": 35,
             "Apartments.com": 40,
             "Zumper": 45,
+            "Redfin": 47,
             "Roomies": 50,
+            # A search page plus a detail page per building, like Rent.com.
+            "Apartment List": 52,
+            # Heaviest of the direct sources: a search page plus a detail page
+            # per building, so it runs after the ones that read a single page.
+            "Rent.com": 55,
             "Furnished Finder": 60,
             "Facebook Marketplace": 70,
             "Facebook Groups": 80,
@@ -694,6 +702,12 @@ class Scanner:
                                     and listing.housing_kind == "whole_unit"
                                     and stored_metadata.get("craigslist_detail_checked") is not True
                                 )
+                                # The general form of the clause above: a source
+                                # whose card is only a pointer says so, and keeps
+                                # saying so until a detail page answers. Without
+                                # it one rate-limited fetch strands the home with
+                                # whatever thin card it arrived on.
+                                or stored_metadata.get("detail_pending") is True
                             )
                             # Scored against a merged copy so an already-enriched
                             # listing is ranked on what is actually known about it.

@@ -457,7 +457,26 @@ def _scan_check(repository: Repository, scanner: Scanner, now: datetime) -> Diag
     )
 
 
-def _source_check(repository: Repository) -> DiagnosticCheck:
+def _no_account_sources(sources: Iterable[ListingSource]) -> str:
+    """Name the sources that need no account, read from the list itself.
+
+    Written by hand this sentence named four while seven ran, on the one screen
+    a new install reads first.
+    """
+    names = [
+        str(getattr(source, "platform", ""))
+        for source in sources
+        if getattr(source, "mode", "setup") == "automatic"
+        and not getattr(source, "connector_key", None)
+    ]
+    if not names:
+        return "The sources that need no account will be checked first."
+    if len(names) == 1:
+        return f"{names[0]} does not require an account."
+    return f"{', '.join(names[:-1])} and {names[-1]} do not require an account."
+
+
+def _source_check(repository: Repository, sources: Iterable[ListingSource] = ()) -> DiagnosticCheck:
     runs = repository.latest_source_runs()
     if not runs:
         return _check(
@@ -465,7 +484,7 @@ def _source_check(repository: Repository) -> DiagnosticCheck:
             "Sources",
             "not_applicable",
             "Public sources are ready for the first check",
-            "Craigslist, Listings Project, Abacus, and SpareRoom do not require an account.",
+            _no_account_sources(sources),
             "Finish Your deal to start the first check.",
             owner="You",
         )
@@ -1003,7 +1022,7 @@ def run_diagnostics(
         action="Run Repair, then retry the Ready Check.",
     )
     append_guarded(
-        lambda: _source_check(repository),
+        lambda: _source_check(repository, source_list),
         key="public_sources",
         category="Sources",
         label="Public-source history could not be verified",

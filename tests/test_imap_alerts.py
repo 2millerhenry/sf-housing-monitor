@@ -28,6 +28,27 @@ from sf_housing.imap_alerts import (
 )
 from sf_housing.sources import ZillowAlertSource
 
+def already_works_headline(html: str) -> str:
+    """The page's own claim about how many sources need no setup, checked
+    against the chips it actually renders beside it.
+
+    The sentence used to be a literal that said "six" while seven sources ran.
+    Counting the chips is what makes the claim true for whatever list the app
+    was built with, rather than true only for the default one."""
+    import re as _re
+
+    from sf_housing.app import spelled_count
+
+    headline = _re.search(r"<h2 id=\"already-title\">([^<]+)</h2>", html)
+    assert headline, "the page no longer states what already works"
+    section = html[html.index('id="already-title"') : html.index("</section>", html.index('id="already-title"'))]
+    chips = _re.findall(r'class="source-chip"', section)
+    assert headline.group(1) == f"{spelled_count(len(chips))} sources already work", (
+        f"headline {headline.group(1)!r} disagrees with the {len(chips)} sources listed beside it"
+    )
+    return headline.group(1)
+
+
 
 NOW = datetime(2026, 9, 3, tzinfo=UTC)
 
@@ -464,7 +485,7 @@ def test_the_alerts_page_asks_for_a_password_not_a_cloud_project(tmp_path: Path,
     assert "App password" in page.text
     # Google Cloud must not be the first thing a stranger is asked for, and the
     # page must lead with what already works rather than with a setup request.
-    assert page.text.index("Six sources already work") < page.text.index("App password")
+    assert page.text.index(already_works_headline(page.text)) < page.text.index("App password")
     assert page.text.index("App password") < page.text.index("can&rsquo;t make app passwords")
 
 
@@ -548,19 +569,32 @@ def test_the_other_provider_form_is_not_a_second_copy_of_the_first() -> None:
 
 
 def test_every_named_source_carries_a_mark(tmp_path) -> None:
-    """A page that lists eleven service names as running text is a wall. Each
-    one gets a mark so it can be found at a glance."""
+    """A page that lists a dozen service names as running text is a wall. Each
+    one gets a mark so it can be found at a glance.
+
+    The free sources are read from ``default_sources`` rather than named here,
+    because the page renders that same list: a source added to the app but not
+    to the mark table would otherwise ship wearing its first letter in another
+    source's colour, and a hardcoded list here could not notice."""
     import pathlib
     import re
 
     from sf_housing.connectors import GMAIL_PROVIDERS
+    from sf_housing.sources import default_sources
 
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
     marks = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
 
     for _, name in GMAIL_PROVIDERS:
         assert f"'{name}'" in marks, f"{name} is offered on this page but has no mark"
-    for name in ("Craigslist", "SF Housing Portal", "SpareRoom", "Listings Project", "Abacus"):
+    free = [
+        source.platform
+        for source in default_sources()
+        if getattr(source, "mode", "") == "automatic"
+        and not getattr(source, "connector_key", None)
+    ]
+    assert len(free) >= 9, "the page's own free-source list should not have shrunk"
+    for name in free:
         assert f"'{name}'" in marks, f"{name} runs for free but has no mark"
 
 
@@ -597,15 +631,29 @@ def test_every_source_the_page_names_is_in_the_mark_table() -> None:
     import pathlib
     import re
 
+    from sf_housing.sources import default_sources
+
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
     block = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
     known = set(re.findall(r"'([^']+)':", block))
     used = set(re.findall(r"source_chip\('([^']+)'\)", page))
-    # Names passed as a literal list rather than to the macro directly.
-    used |= set(re.findall(r"'([A-Z][A-Za-z. ]+)'", re.search(r"for name in \[(.*?)\]", page, re.S).group(1)))
+    # The free sources reach the macro through a context variable, so the names
+    # cannot be read out of the markup. They come from the same call the page
+    # renders from.
+    used |= {
+        source.platform
+        for source in default_sources()
+        if getattr(source, "mode", "") == "automatic"
+        and not getattr(source, "connector_key", None)
+    }
 
     missing = sorted(used - known)
     assert not missing, f"these fall back to a letter and a shared hue: {missing}"
+
+    # The fallback hue must belong to no source, or an unlisted name would be
+    # indistinguishable from a listed one rather than merely plain.
+    fallback = re.search(r"source_marks\.get\(name, \(name\[0\], '(\d+)'\)\)", page).group(1)
+    assert fallback not in re.findall(r"\('[^']+',\s*'(\d+)'\)", block)
 
 
 def test_no_two_sources_share_a_colour() -> None:

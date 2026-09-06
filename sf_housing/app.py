@@ -85,6 +85,22 @@ FACEBOOK_GROUP_NAMES = {
 }
 
 
+# Small counts read as words in prose and as digits in a table. Only the range
+# a source list can plausibly reach is spelled; anything larger stays a numeral
+# rather than growing a number-to-words dependency for a page that counts to
+# fifteen.
+_SPELLED = (
+    "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
+    "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen",
+    "Sixteen", "Seventeen", "Eighteen", "Nineteen", "Twenty",
+)
+
+
+def spelled_count(value: int) -> str:
+    """A small count written out, capitalised for the start of a sentence."""
+    return _SPELLED[value] if 0 <= value < len(_SPELLED) else str(value)
+
+
 def _reveal_folder(folder: Path) -> bool:
     """Open a folder in the platform file manager.
 
@@ -1443,6 +1459,17 @@ def create_app(
             if getattr(source, "mode", "") == "automatic"
             and getattr(source, "connector_key", None) != "gmail"
         }
+        # The page's own claim about what already works, counted rather than
+        # written out. It said "six" while seven sources ran, and every source
+        # added since would have widened that gap. Facebook is excluded here
+        # even though checked_directly names it: it reads a mailbox or an Apify
+        # actor, so it is setup, not one of the ones that just run.
+        no_setup_sources = [
+            source.platform
+            for source in active_sources
+            if getattr(source, "mode", "") == "automatic"
+            and not getattr(source, "connector_key", None)
+        ]
         # Facebook has its own block further down the page, and appearing in both
         # places read as a mistake rather than as two routes to the same thing.
         # The alert reader is untouched: if Facebook's own Notify me mail lands
@@ -1500,6 +1527,8 @@ def create_app(
                 # it would be a lie. Derive the list from what is actually still
                 # email-only rather than from the connector-key constant.
                 "email_providers": [provider["name"] for provider in gmail_providers],
+                "no_setup_sources": no_setup_sources,
+                "no_setup_count_word": spelled_count(len(no_setup_sources)),
                 "apify_state": connector_states.get("apify"),
                 "furnished_finder_state": connector_states.get("furnished_finder"),
                 "bridge_version": FURNISHED_FINDER_BRIDGE_VERSION,

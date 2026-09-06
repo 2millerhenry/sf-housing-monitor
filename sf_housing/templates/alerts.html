@@ -2,20 +2,25 @@
     the companies' logos: the page has to work offline and tell no third party
     it was opened, so nothing may be hotlinked, and shipping other people's
     trademarks inside an MIT repository is a liability the project does not
-    need. Distinct hues at one lightness read as a family. -#}
+    need. Distinct hues at one lightness read as a family, re-spaced to
+    twenty-four degrees so all fifteen names fit and none collides with the
+    hue an unlisted name falls back to. -#}
 {% set source_marks = {
-  'Roomies':             ('R',  '12'),
-  'Craigslist':          ('CL', '42'),
-  'Abacus':              ('AB', '72'),
-  'Listings Project':    ('LP', '102'),
-  'HotPads':             ('HP', '132'),
-  'SF Housing Portal':   ('SF', '162'),
-  'SpareRoom':           ('SR', '192'),
-  'Furnished Finder':    ('FF', '222'),
-  'Zillow':              ('Z',  '252'),
-  'Facebook Marketplace':('FB', '282'),
-  'Zumper':              ('Zu', '312'),
-  'Apartments.com':      ('A',  '342')
+  'Roomies':                 ('R',  '2'),
+  'Craigslist':              ('CL', '26'),
+  'Abacus (small buildings)':('AB', '50'),
+  'Listings Project':        ('LP', '74'),
+  'HotPads':                 ('HP', '98'),
+  'Redfin':                  ('Rf', '122'),
+  'SF Housing Portal':       ('SF', '146'),
+  'SpareRoom':               ('SR', '170'),
+  'Apartment List':          ('AL', '194'),
+  'Furnished Finder':        ('FF', '218'),
+  'Zillow':                  ('Z',  '242'),
+  'Facebook Marketplace':    ('FB', '266'),
+  'Zumper':                  ('Zu', '290'),
+  'Apartments.com':          ('A',  '314'),
+  'Rent.com':                ('Rc', '338')
 } %}
 {% macro source_chip(name) %}
   {%- set mark = source_marks.get(name, (name[0], '162')) -%}
@@ -27,7 +32,7 @@
 <section class="hero compact">
   <div>
     <p class="eyebrow">Add sources</p>
-    <h1>{% if email_connected or gmail_connected %}Where your homes come from{% else %}Six sources run already. Here is how to add more.{% endif %}</h1>
+    <h1>{% if email_connected or gmail_connected %}Where your homes come from{% else %}{{ no_setup_count_word }} sources run already. Here is how to add more.{% endif %}</h1>
   </div>
 </section>
 
@@ -37,9 +42,9 @@
 <section class="already" aria-labelledby="already-title">
   <div class="already-mark" aria-hidden="true">✓</div>
   <div>
-    <h2 id="already-title">Six sources already work</h2>
+    <h2 id="already-title">{{ no_setup_count_word }} sources already work</h2>
     <p class="already-list">
-      {% for name in ['Craigslist', 'SF Housing Portal', 'Zumper', 'SpareRoom', 'Listings Project', 'Abacus'] %}{{ source_chip(name) }}{% endfor %}
+      {% for name in no_setup_sources %}{{ source_chip(name) }}{% endfor %}
     </p>
     <p>They run on their own twice a day. No account, no setup, nothing on this page is required.</p>
   </div>
@@ -204,7 +209,7 @@
 
           <details class="setup-guide">
             <summary><strong>Outlook.com, Hotmail, Live</strong> <span>not supported</span></summary>
-            <p>Microsoft has switched personal Outlook.com mail to sign-in-only access and no longer issues app passwords that can read mail this way. There is no step here that will work. Your options are to use a different mailbox for housing alerts, or to leave the six free sources running on their own.</p>
+            <p>Microsoft has switched personal Outlook.com mail to sign-in-only access and no longer issues app passwords that can read mail this way. There is no step here that will work. Your options are to use a different mailbox for housing alerts, or to leave the {{ no_setup_count_word|lower }} free sources running on their own.</p>
           </details>
         </div>
 
@@ -302,7 +307,7 @@
 <section class="extras" aria-labelledby="extras-title">
   <p class="step-eyebrow"><span class="step-number is-optional">+</span> Optional</p>
   <h2 id="extras-title">Two more, only if you want them</h2>
-  <p class="extras-lede">Neither is needed. The six free sources keep running whether you set these up or not.</p>
+  <p class="extras-lede">Neither is needed. The {{ no_setup_count_word|lower }} free sources keep running whether you set these up or not.</p>
 
   <details class="extra">
     <summary>
