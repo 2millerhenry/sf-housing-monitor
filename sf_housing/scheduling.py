@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -36,6 +37,15 @@ CATCH_UP_INTERVAL_MINUTES = 15
 SCAN_JOB_ID = "housing-scans-pacific"
 CATCH_UP_JOB_ID = "housing-catch-up"
 
+# How far back the schedule reports on itself. A week is long enough to expose a
+# pattern and short enough that a fault shows up while it still matters.
+COVERAGE_WINDOW = timedelta(days=7)
+
+# A slot that has only just passed is not yet a miss: the cron fires on the hour
+# and the catch-up follows within its interval, so a page loaded at 10:02 must
+# not accuse the app of missing a check it is in the middle of running.
+SLOT_GRACE = timedelta(minutes=CATCH_UP_INTERVAL_MINUTES + 10)
+
 
 def latest_scheduled_time(now: datetime | None = None) -> datetime:
     """Return the most recent 10:00/18:00 Pacific slot at or before ``now``."""
@@ -47,6 +57,121 @@ def latest_scheduled_time(now: datetime | None = None) -> datetime:
         for hour in SCHEDULE_HOURS
     ]
     return max(candidate for candidate in candidates if candidate <= current)
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleCoverage:
+    """How many due checks actually happened, over a recent window.
+
+    "Every due slot gets served" was a claim about wall-clock time that nobody
+    could see, so a schedule quietly running half the time looked exactly like
+    one running properly. This makes it a number on a page.
+    """
+
+    due: int
+    served: int
+    missed: tuple[datetime, ...]
+    since: datetime
+
+    @property
+    def complete(self) -> bool:
+        return self.due > 0 and self.served == self.due
+
+    @property
+    def measurable(self) -> bool:
+        """False on a fresh install, where there is nothing to report on yet."""
+        return self.due > 0
+
+    def summary(self) -> str:
+        if not self.measurable:
+            return "Not enough history yet to report on the schedule."
+        if self.complete:
+            return f"Every one of the last {self.due} scheduled checks ran."
+        return f"{self.served} of the last {self.due} scheduled checks ran."
+
+
+def scheduled_slots(start: datetime, end: datetime) -> list[datetime]:
+    """Every 10:00/18:00 Pacific slot in ``[start, end]``, oldest first."""
+    first = start.astimezone(PACIFIC)
+    last = end.astimezone(PACIFIC)
+    slots: list[datetime] = []
+    day = first.date() - timedelta(days=1)
+    while day <= last.date():
+        for hour in SCHEDULE_HOURS:
+            slot = datetime.combine(day, time(hour), tzinfo=PACIFIC)
+            if first <= slot <= last:
+                slots.append(slot)
+        day += timedelta(days=1)
+    return sorted(slots)
+
+
+def schedule_coverage(
+    scans: list[dict],
+    *,
+    now: datetime | None = None,
+    window: timedelta = COVERAGE_WINDOW,
+) -> ScheduleCoverage:
+    """Count the slots that were due against the ones a scan actually served.
+
+    A slot counts as served by any completed scan that started between it and
+    the next slot, whatever triggered it: the question is whether checking
+    happened, not whether cron was the thing that caused it. A scan run by hand
+    at 10:05 genuinely served the ten o'clock check.
+
+    Slots before the app's own history begins are not counted, so a fresh
+    install does not accuse itself of missing a week of checks it could not
+    have run.
+    """
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    completed = sorted(
+        moment
+        for moment in (
+            _scan_started(scan)
+            for scan in scans
+            if str(scan.get("status")) in {"completed", "completed_with_errors"}
+        )
+        if moment is not None
+    )
+    if not completed:
+        return ScheduleCoverage(0, 0, (), current.astimezone(PACIFIC))
+
+    # Never report on time before this app was doing anything -- but floor to
+    # the slot that first scan belongs to, not to its clock time. A scan at
+    # 10:05 served the ten o'clock check, and flooring at 10:05 would put that
+    # slot outside the window and score its own scan as serving nothing.
+    since = max(current - window, latest_scheduled_time(completed[0]).astimezone(UTC))
+    slots = [
+        slot
+        for slot in scheduled_slots(since, current)
+        # The newest slot is still in flight until the catch-up has had its turn.
+        if current - slot.astimezone(UTC) >= SLOT_GRACE
+    ]
+    if not slots:
+        return ScheduleCoverage(0, 0, (), since.astimezone(PACIFIC))
+
+    missed: list[datetime] = []
+    served = 0
+    for index, slot in enumerate(slots):
+        opens = slot.astimezone(UTC)
+        closes = (
+            slots[index + 1].astimezone(UTC) if index + 1 < len(slots) else current
+        )
+        if any(opens <= moment < closes for moment in completed):
+            served += 1
+        else:
+            missed.append(slot)
+    return ScheduleCoverage(len(slots), served, tuple(missed), since.astimezone(PACIFIC))
+
+
+def _scan_started(scan: dict) -> datetime | None:
+    text = str(scan.get("started_at") or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
 def scheduled_scan_due(recent_scans: list[dict], now: datetime | None = None) -> bool:

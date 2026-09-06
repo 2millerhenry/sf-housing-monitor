@@ -21,6 +21,7 @@ from .freshness import evaluate_source_freshness, source_key as freshness_source
 from .gmail_alerts import GmailAlertMailbox
 from .preferences import PreferenceError, load_preferences
 from .scanner import Scanner
+from .scheduling import schedule_coverage
 from .settings import Settings
 from .sources import ListingSource
 
@@ -302,14 +303,25 @@ def _schedule_check(
     keeping it, which meant a scheduler that died at start-up looked identical to
     a healthy one. This reads the same observation the dashboard shows.
     """
+    # A week of slots needs a week of history, not the eight rows the state
+    # check reads. Both come from one fetch so the two answers on this page can
+    # never be computed from different facts.
+    recent = repository.recent_scans(200)
     health = schedule_health(
         scheduler,
-        repository.recent_scans(8),
+        recent[:8],
         scan_running=scanner.is_running,
         managed=managed,
         now=now,
     )
+    coverage = schedule_coverage(recent, now=now)
     metadata = health.as_dict()
+    metadata["coverage"] = {
+        "due": coverage.due,
+        "served": coverage.served,
+        "missed": [slot.isoformat() for slot in coverage.missed],
+        "since": coverage.since.isoformat(),
+    }
     if health.state == "unmanaged":
         return _check(
             "schedule", "Scanning", "not_applicable",
@@ -343,10 +355,26 @@ def _schedule_check(
             "Nothing to do.",
             owner="App", metadata=metadata,
         )
+    # The schedule reports on itself rather than asking to be trusted. A run of
+    # missed slots is the fault this whole mechanism exists to catch, and it is
+    # invisible in "last checked an hour ago".
+    if coverage.measurable and not coverage.complete:
+        missed = ", ".join(slot.strftime("%-I%p %a").lower() for slot in coverage.missed[:3])
+        more = f" and {len(coverage.missed) - 3} more" if len(coverage.missed) > 3 else ""
+        return _check(
+            "schedule", "Scanning", "attention",
+            "Some scheduled checks did not run",
+            f"{coverage.summary()} Missed: {missed}{more}. "
+            "This Mac was probably asleep or offline at those times.",
+            "Nothing, if the Mac is often closed: a catch-up runs when it wakes. "
+            "If it keeps happening while the Mac is awake, double-click Repair.",
+            owner="You", metadata=metadata,
+        )
     return _check(
         "schedule", "Scanning", "pass",
         "Checking on schedule",
-        f"{health.summary} The next check runs at {next_run_label(health)}.",
+        f"{health.summary} The next check runs at {next_run_label(health)}."
+        + (f" {coverage.summary()}" if coverage.measurable else ""),
         "Nothing to do.",
         owner="App", metadata=metadata,
     )
