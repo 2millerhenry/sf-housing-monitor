@@ -101,12 +101,20 @@ def test_a_home_already_passed_on_is_not_offered_as_evidence(repository: Reposit
 
 
 def test_a_published_rent_is_offered_before_a_missing_one(repository: Repository) -> None:
-    """It is the reason the reader opened the page."""
-    subject = store(repository, platform="Redfin", address="800 Indiana St", price=None, slug="a")
-    store(repository, platform="Zumper", address="800 Indiana St", price=None, slug="b")
-    store(repository, platform="Rent.com", address="800 Indiana St", price=4350, slug="c")
+    """It is the reason the reader opened the page.
 
-    assert [item["platform"] for item in repository.corroborations(subject)] == ["Rent.com", "Zumper"]
+    The priced source is named last alphabetically on purpose: ordered by name
+    the answer would come out the same, and the test would pass whether or not
+    anything looked at the rent at all."""
+    subject = store(repository, platform="Redfin", address="800 Indiana St", price=None, slug="a")
+    store(repository, platform="Apartment List", address="800 Indiana St", price=None, slug="b")
+    store(repository, platform="Rent.com", address="800 Indiana St", price=None, slug="c")
+    store(repository, platform="Zumper", address="800 Indiana St", price=4350, slug="d")
+
+    ordered = [item["platform"] for item in repository.corroborations(subject)]
+
+    assert ordered == ["Zumper", "Apartment List", "Rent.com"]
+    assert ordered[0] != sorted(ordered)[0], "name order and rent order must disagree here"
 
 
 def test_a_listing_with_no_address_asks_nothing(repository: Repository) -> None:
