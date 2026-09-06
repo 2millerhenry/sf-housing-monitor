@@ -435,7 +435,9 @@ def test_a_count_from_last_month_is_not_shown_at_all(
 # --------------------------------------------------------------------------
 
 
-def alerts_page(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, coverage=None):
+def alerts_page(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, coverage=None, delivered=False
+):
     from fastapi.testclient import TestClient
 
     from sf_housing.app import create_app
@@ -455,28 +457,46 @@ def alerts_page(tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, coverag
     application = create_app(settings=settings, sources=[], enable_scheduler=False)
     for platform, count in (coverage or {}).items():
         application.state.repository.record_source_coverage(platform, count)
+    if delivered:
+        # The page's argument now rests on what working sources actually
+        # brought in, so a fixture with an empty board says nothing at all.
+        from sf_housing.models import ListingCandidate, ScoreResult
+
+        for index in range(3):
+            application.state.repository.upsert_listing(
+                ListingCandidate(
+                    platform="Craigslist",
+                    source_id=f"d{index}",
+                    title=f"Room {index}",
+                    original_url=f"https://sfbay.craigslist.org/roo/d/x/{index}.html",
+                    price=1500,
+                    neighborhood="NOPA",
+                    listing_type="Room/share",
+                    summary="A private room.",
+                ),
+                ScoreResult(80, ["fits"], "", {}),
+            )
     with TestClient(application) as client:
         return client.get("/alerts").text
 
 
-def test_a_counted_source_says_what_it_is_holding(
+def test_a_scraped_count_is_shown_as_a_bonus_when_a_site_answers(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    page = alerts_page(tmp_path, monkeypatch, {"HotPads": 4562})
+    """Kept, but no longer the thing the page depends on."""
+    page = alerts_page(tmp_path, monkeypatch, {"HotPads": 4562}, delivered=True)
 
     assert "4,562" in page
-    assert "not seeing" in page, "it has to say what the number means"
-    assert "as of" in page, "a number with no date cannot be read honestly"
+    assert "HotPads alone lists" in page
 
 
-def test_a_source_that_could_not_be_counted_shows_no_number(
+def test_a_source_that_could_not_be_counted_shows_no_scraped_figure(
     tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The honest state, and the one three of the four are always in."""
-    page = alerts_page(tmp_path, monkeypatch, {"HotPads": 4562})
+    """The state three of the four are permanently in."""
+    page = alerts_page(tmp_path, monkeypatch, {"HotPads": 4562}, delivered=True)
 
-    assert "on HotPads" in page
-    assert "on Roomies" not in page, "only what could really be counted gets a figure"
+    assert "Roomies alone lists" not in page
     assert "Roomies" in page, "but every source still gets its invitation"
 
 
@@ -564,3 +584,173 @@ def test_a_real_client_lifecycle_reaches_the_store(
     stored = repository.source_coverage()
     assert stored["HotPads"]["count"] == 4562
     assert "Roomies" not in stored
+
+
+# --------------------------------------------------------------------------
+# the value must not depend on a third party answering
+# --------------------------------------------------------------------------
+
+
+def test_the_page_makes_its_case_with_nothing_scraped_at_all(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The state the app is in today: HotPads rate-limited, the other two refuse
+    outright, Zillow lies. The argument for connecting has to survive that,
+    because otherwise a company's mood decides whether this feature has value."""
+    page = alerts_page(tmp_path, monkeypatch, coverage={}, delivered=True)
+
+    assert "brought you" in page
+    assert "brought <strong>none</strong>" in page
+    assert "alone lists" not in page, "nothing was scraped, and nothing is claimed"
+
+
+def test_the_case_is_built_from_the_app_s_own_record(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Three homes seeded, three homes claimed. No estimate, no extrapolation."""
+    import re
+
+    page = alerts_page(tmp_path, monkeypatch, coverage={}, delivered=True)
+
+    match = re.search(r"brought you\s*<strong>([\d,]+) homes</strong>", page)
+    assert match, "the figure has to be on the page"
+    assert match.group(1) == "3"
+
+
+def test_an_empty_board_claims_nothing(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fresh install has delivered nothing, so it says nothing rather than
+    "0 homes", which reads as a broken app rather than a new one."""
+    page = alerts_page(tmp_path, monkeypatch, coverage={}, delivered=False)
+
+    assert "brought you" not in page
+    assert "0 homes" not in page
+    for platform in ("Zillow", "HotPads", "Apartments.com", "Roomies"):
+        assert platform in page, "every source still gets its invitation"
+
+
+def test_a_disconnected_source_says_it_brought_nothing(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On the connected page each provider states its own record, so a source
+    that is set up but silent is distinguishable from one that is working. The
+    invitation page carries the argument; this carries the per-source truth."""
+    from fastapi.testclient import TestClient
+
+    from sf_housing.app import create_app
+    from sf_housing.settings import Settings
+    from tests.conftest import TEST_PREFERENCES
+    from tests.test_gmail_connector_flow import connect_mailbox_properties
+
+    connect_mailbox_properties(monkeypatch)
+    data = tmp_path / "data"
+    data.mkdir(parents=True, exist_ok=True)
+    preferences_path = tmp_path / "preferences.yaml"
+    preferences_path.write_text(TEST_PREFERENCES, encoding="utf-8")
+    settings = Settings(
+        data_dir=data,
+        preferences_path=preferences_path,
+        database_path=data / "housing.sqlite3",
+        log_path=data / "test.log",
+    )
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    application.state.repository.record_source_coverage("HotPads", 4562)
+
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert "No homes yet" in page, "a silent source says so rather than leaving it to a badge"
+    assert "lists 4,562" in page, "and a scraped figure rides along where one exists"
+
+
+def test_the_delivery_figure_counts_only_the_window(tmp_path: pathlib.Path) -> None:
+    """A source that worked last month and stopped must not still be credited."""
+    from datetime import UTC, datetime, timedelta
+
+    from sf_housing.models import ListingCandidate, ScoreResult
+
+    repository = repo(tmp_path)
+    listing_id, _ = repository.upsert_listing(
+        ListingCandidate(
+            platform="Craigslist",
+            source_id="old",
+            title="Room",
+            original_url="https://sfbay.craigslist.org/roo/d/x/old.html",
+            price=1500,
+            neighborhood="NOPA",
+            listing_type="Room/share",
+            summary="A private room.",
+        ),
+        ScoreResult(80, ["fits"], "", {}),
+    )
+    long_ago = (datetime.now(UTC) - timedelta(days=40)).isoformat()
+    with repository.connection() as connection:
+        connection.execute("UPDATE listings SET first_found = ? WHERE id = ?", (long_ago, listing_id))
+        connection.commit()
+
+    recent = repository.delivery_since(datetime.now(UTC) - timedelta(days=7))
+
+    assert recent == {}, "an old arrival is not this week's evidence"
+
+
+def test_the_page_credits_only_the_recent_window(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A source that worked last month and stopped must not still be counted as
+    what the app is bringing in today."""
+    import re
+    from datetime import UTC, datetime, timedelta
+
+    from fastapi.testclient import TestClient
+
+    from sf_housing.app import DELIVERY_WINDOW, create_app
+    from sf_housing.models import ListingCandidate, ScoreResult
+    from sf_housing.settings import Settings
+    from tests.conftest import TEST_PREFERENCES
+
+    data = tmp_path / "data"
+    data.mkdir(parents=True, exist_ok=True)
+    preferences_path = tmp_path / "preferences.yaml"
+    preferences_path.write_text(TEST_PREFERENCES, encoding="utf-8")
+    settings = Settings(
+        data_dir=data,
+        preferences_path=preferences_path,
+        database_path=data / "housing.sqlite3",
+        log_path=data / "test.log",
+    )
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+
+    ids = []
+    for index in range(4):
+        listing_id, _ = repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"w{index}",
+                title=f"Room {index}",
+                original_url=f"https://sfbay.craigslist.org/roo/d/x/w{index}.html",
+                price=1500,
+                neighborhood="NOPA",
+                listing_type="Room/share",
+                summary="A private room.",
+            ),
+            ScoreResult(80, ["fits"], "", {}),
+        )
+        ids.append(listing_id)
+
+    # Three of the four arrived well before the window opens.
+    stale = (datetime.now(UTC) - DELIVERY_WINDOW - timedelta(days=3)).isoformat()
+    with repository.connection() as connection:
+        for listing_id in ids[:3]:
+            connection.execute(
+                "UPDATE listings SET first_found = ? WHERE id = ?", (stale, listing_id)
+            )
+        connection.commit()
+
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    match = re.search(r"brought you\s*<strong>([\d,]+) homes</strong>", page)
+    assert match, "the figure has to be on the page"
+    assert match.group(1) == "1", f"only the one inside the window counts, got {match.group(1)}"

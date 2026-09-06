@@ -1038,6 +1038,24 @@ class Repository:
             )
             connection.commit()
 
+    def delivery_since(self, moment: datetime) -> dict[str, int]:
+        """How many homes each source has actually brought in since ``moment``.
+
+        The honest, unblockable version of "what is this source worth". A count
+        scraped from a third party can be refused, rate-limited or faked; this
+        is the app's own record of what arrived, and no company can take it
+        away or lie about it.
+        """
+        with self.connection() as connection:
+            rows = connection.execute(
+                """SELECT platform, COUNT(*) AS delivered
+                     FROM listings
+                    WHERE first_found >= ?
+                 GROUP BY platform""",
+                (moment.astimezone(UTC).isoformat(),),
+            ).fetchall()
+        return {str(row["platform"]): int(row["delivered"]) for row in rows}
+
     def record_source_coverage(self, platform: str, count: int) -> None:
         """Store how many homes a disconnected source is holding.
 

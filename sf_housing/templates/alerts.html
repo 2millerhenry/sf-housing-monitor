@@ -92,9 +92,15 @@
         {#- A number only where one was really read from that site. Most of
             these cannot be counted at all, and an invitation without a figure
             is the honest version rather than a missing feature. -#}
-        {% if waiting and provider.coverage and provider.coverage.count %}
-        <small class="provider-cost">{{ "{:,}".format(provider.coverage.count) }} homes listed there
-          <span title="Counted from {{ provider.name }}'s own page on {{ provider.coverage.taken_at|pacific_datetime }}">as of {{ provider.coverage.taken_at|compact_pacific_date }}</span>
+        {#- What this source has really brought in, which for a disconnected one
+            is always none. Said plainly rather than left to be inferred from a
+            status badge. -#}
+        {% if waiting %}
+        <small class="provider-cost">
+          {% if provider.delivered %}{{ "{:,}".format(provider.delivered) }} homes in {{ delivery_days }} days{% else %}No homes yet{% endif %}
+          {%- if provider.coverage and provider.coverage.count %}
+          <span title="Counted from {{ provider.name }}'s own page on {{ provider.coverage.taken_at|pacific_datetime }}">&middot; lists {{ "{:,}".format(provider.coverage.count) }}</span>
+          {%- endif %}
         </small>
         {% endif %}
       </div>
@@ -109,12 +115,19 @@
         somebody decides whether the setup is worth five minutes. Only sources
         that could really be counted appear, so this line is often absent, and
         that is the honest state rather than a gap. -#}
-    {% set counted = gmail_providers|selectattr('coverage')|list %}
-    {% if counted %}
+    {#- The argument for spending five minutes, built from this app's own record
+        rather than from a number a third party may refuse to give. A scraped
+        count is added where a site will still answer, but nothing depends on
+        one. -#}
+    {% if delivered_total %}
     <p class="connect-cost">
-      Not connected, so you are not seeing
-      {% for provider in counted %}<strong>{{ "{:,}".format(provider.coverage.count) }}</strong> on {{ provider.name }}{% if not loop.last %}, {% endif %}{% endfor %}
-      <span title="Counted from each site's own page">as of {{ counted[0].coverage.taken_at|compact_pacific_date }}</span>.
+      The {{ delivering_sources }} sources that run on their own brought you
+      <strong>{{ "{:,}".format(delivered_total) }} homes</strong> in the last {{ delivery_days }} days.
+      These {{ email_providers|length }} brought <strong>none</strong>, because they are not connected.
+      {%- set counted = gmail_providers|selectattr('coverage')|list %}
+      {%- if counted %}
+      {% for provider in counted %}{{ provider.name }} alone lists {{ "{:,}".format(provider.coverage.count) }} right now{% if not loop.last %}; {% endif %}{% endfor %}.
+      {%- endif %}
     </p>
     {% endif %}
     <form class="connect-form" method="post" action="/alerts/email/connect">

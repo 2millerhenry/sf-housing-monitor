@@ -464,6 +464,10 @@ def _typical_scan_seconds(scans: list[dict[str, object]], trigger: str | None = 
 # out; ninety-five leaves a shortlist that can still have something on it.
 CUTOFF_STOPS = tuple(range(30, 100, 5))
 
+# How far back "what this source brought you" looks. A week is long enough to
+# survive a quiet day and short enough to still describe today.
+DELIVERY_WINDOW = timedelta(days=7)
+
 
 def _safe_return(value: str | None) -> str:
     """A redirect target that can only be a page of this app.
@@ -1455,12 +1459,20 @@ def create_app(
             for platform, entry in repository.source_coverage().items()
             if coverage_is_showable(entry.get("taken_at"))
         }
+        # What each source has really brought in. This is the argument for
+        # connecting one, and unlike a figure scraped from a third party it
+        # cannot be refused, rate-limited or faked: it is the app's own record
+        # of what arrived. A scraped count is kept as a bonus where a site will
+        # still answer, but nothing depends on one.
+        delivery = repository.delivery_since(datetime.now(UTC) - DELIVERY_WINDOW)
+        delivered_total = sum(delivery.values())
         gmail_providers = [
             {
                 "key": key,
                 "name": name,
                 "state": connector_states.get(key),
                 "coverage": coverage.get(name),
+                "delivered": delivery.get(name, 0),
             }
             for key, name in GMAIL_PROVIDERS
             if name not in checked_directly
@@ -1497,6 +1509,9 @@ def create_app(
                 "facebook_searches": _prepared_facebook_searches(preferences),
                 "facebook_unit_searches": _prepared_facebook_unit_searches(preferences),
                 "alert_setup_searches": ALERT_SETUP_SEARCHES,
+                "delivered_total": delivered_total,
+                "delivering_sources": sum(1 for count in delivery.values() if count),
+                "delivery_days": DELIVERY_WINDOW.days,
                 "facebook_sublet_searches": _prepared_facebook_sublet_searches(preferences),
                 "facebook_groups": _prepared_facebook_groups(preferences),
                 "room_min_monthly": setting_int(preferences.section("budget").get("min_monthly"), 800),
