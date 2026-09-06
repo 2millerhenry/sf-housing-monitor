@@ -12,6 +12,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from .classification import classify_listing
 from .connectors import CONNECTOR_STATES, ConnectorStatus
+from .location import parse_street_address
 from .models import (
     CHECK_EXCLUSION_PHRASES,
     ListingCandidate,
@@ -746,6 +747,63 @@ class Repository:
         for threshold in thresholds:
             counts[int(threshold)] = len(scores) - bisect_left(scores, int(threshold))
         return counts
+
+    def corroborations(self, listing_id: int) -> list[dict[str, Any]]:
+        """The same building, as other sources describe it.
+
+        One source saying a home exists is a lead; two saying it is a fact, and
+        where one publishes no rent the other often does. That is the whole
+        question a reader has on this page -- is this worth going to look at --
+        and no single source can answer it.
+
+        Matched on the street address normalised by ``parse_street_address``,
+        because no two of these sites agree on a URL and half of them do not
+        publish a name anyone would recognise. A listing never corroborates
+        itself, and neither does another row from its own platform: two cards
+        from one site are that site repeating itself, not a second opinion.
+        """
+        with self.connection() as connection:
+            rows = connection.execute(
+                """SELECT id, platform, title, price, original_url, neighborhood,
+                          metadata_json, status
+                     FROM listings
+                    WHERE status <> 'dismissed' AND metadata_json LIKE '%"address"%'"""
+            ).fetchall()
+
+        def key(raw: str | None) -> tuple[int, str] | None:
+            return parse_street_address(raw) if raw else None
+
+        by_id = {row["id"]: row for row in rows}
+        subject = by_id.get(listing_id)
+        if subject is None:
+            return []
+        wanted = key(json.loads(subject["metadata_json"] or "{}").get("address"))
+        if wanted is None:
+            return []
+
+        found: list[dict[str, Any]] = []
+        for row in rows:
+            if row["id"] == listing_id or row["platform"] == subject["platform"]:
+                continue
+            metadata = json.loads(row["metadata_json"] or "{}")
+            if key(metadata.get("address")) != wanted:
+                continue
+            found.append(
+                {
+                    "id": row["id"],
+                    "platform": row["platform"],
+                    "title": row["title"],
+                    "price": row["price"],
+                    "neighborhood": row["neighborhood"],
+                    "address": metadata.get("address"),
+                    "original_url": row["original_url"],
+                    "saved": row["status"] == "saved",
+                }
+            )
+        # A published rent first, because that is what the reader came for, and
+        # a source that has one answers the question the others left open.
+        found.sort(key=lambda item: (item["price"] is None, item["price"] or 0, item["platform"]))
+        return found
 
     def listing(self, listing_id: int) -> dict[str, Any] | None:
         """One listing, shaped exactly as a dashboard row.

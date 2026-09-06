@@ -31,6 +31,31 @@
   {% endif %}
 </section>
 
+{% if corroborations %}
+<section class="detail-panel" aria-labelledby="detail-elsewhere">
+  <h2 id="detail-elsewhere">Also listed elsewhere</h2>
+  <p>{{ corroborations|length }} other source{{ '' if corroborations|length == 1 else 's' }} list{{ 's' if corroborations|length == 1 else '' }} this address, so it is a real building and not one site's stale record.</p>
+  <dl class="detail-facts">
+    {% for other in corroborations %}
+    <div>
+      <dt>{{ other.platform }}</dt>
+      <dd>
+        {% if other.price is not none %}${{ "{:,}".format(other.price) }}/month{% else %}<span class="unknown">no rent published</span>{% endif %}
+        {%- if other.title and other.title != listing.title %} &middot; {{ other.title }}{% endif %}
+        &middot; <a href="/listings/{{ other.id }}?from={{ return_to|urlencode }}">open</a>
+      </dd>
+    </div>
+    {% endfor %}
+  </dl>
+  {% if listing.price is none %}
+    {%- set quoted = corroborations|selectattr('price')|list %}
+    {%- if quoted %}
+  <p><strong>{{ quoted[0].platform }} publishes a rent for this building and {{ listing.platform }} does not.</strong> Treat ${{ "{:,}".format(quoted[0].price) }} as the figure to check, not as this home's confirmed rent: the two sources may be describing different homes in it.</p>
+    {%- endif %}
+  {% endif %}
+</section>
+{% endif %}
+
 <section class="detail-panel" aria-labelledby="detail-facts">
   <h2 id="detail-facts">Everything known</h2>
   <dl class="detail-facts">

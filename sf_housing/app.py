@@ -1055,6 +1055,10 @@ def create_app(
                 "back_to": origin,
                 "back_label": back_labels.get(origin_view, "Back to the shortlist"),
                 "view": origin_view,
+                # What the other sources say about this same building. One
+                # source is a lead; a second is corroboration, and often a rent
+                # the first one never published.
+                "corroborations": repository.corroborations(listing_id),
             },
         )
 
