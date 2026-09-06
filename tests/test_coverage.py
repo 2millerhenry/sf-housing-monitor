@@ -754,3 +754,52 @@ def test_the_page_credits_only_the_recent_window(
     match = re.search(r"brought you\s*<strong>([\d,]+) homes</strong>", page)
     assert match, "the figure has to be on the page"
     assert match.group(1) == "1", f"only the one inside the window counts, got {match.group(1)}"
+
+
+def test_the_case_is_made_to_a_connected_reader_too(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Someone who has connected and is watching five providers bring nothing is
+    exactly who needs the comparison, and they were the one reader not shown
+    it."""
+    from fastapi.testclient import TestClient
+
+    from sf_housing.app import create_app
+    from sf_housing.models import ListingCandidate, ScoreResult
+    from sf_housing.settings import Settings
+    from tests.conftest import TEST_PREFERENCES
+    from tests.test_gmail_connector_flow import connect_mailbox_properties
+
+    connect_mailbox_properties(monkeypatch)
+    data = tmp_path / "data"
+    data.mkdir(parents=True, exist_ok=True)
+    preferences_path = tmp_path / "preferences.yaml"
+    preferences_path.write_text(TEST_PREFERENCES, encoding="utf-8")
+    settings = Settings(
+        data_dir=data,
+        preferences_path=preferences_path,
+        database_path=data / "housing.sqlite3",
+        log_path=data / "test.log",
+    )
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    for index in range(5):
+        application.state.repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"c{index}",
+                title=f"Room {index}",
+                original_url=f"https://sfbay.craigslist.org/roo/d/x/c{index}.html",
+                price=1500,
+                neighborhood="NOPA",
+                listing_type="Room/share",
+                summary="A private room.",
+            ),
+            ScoreResult(80, ["fits"], "", {}),
+        )
+
+    with TestClient(application) as client:
+        page = client.get("/alerts").text
+
+    assert "For scale:" in page
+    assert "5 homes" in page
+    assert "have brought none" in page

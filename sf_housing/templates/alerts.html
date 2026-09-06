@@ -67,6 +67,17 @@
     <div class="half-done" role="note">
       <p><strong>Connecting your email was step 1 of 2.</strong> None of these sites send anything until you go to each one, save a search, and ask it to email you. Until then this page will keep saying &ldquo;waiting for first alert&rdquo;, and it is not a fault.</p>
       <p class="half-done-do">Below: what to click on each site, in order. About two minutes each.</p>
+      {#- The same argument the invitation page makes, for the reader who has
+          connected and is now looking at five providers that have brought them
+          nothing. Built from what the app itself collected, so it holds whether
+          or not any of those sites will answer a script. -#}
+      {% if delivered_total %}
+      <p class="half-done-do">
+        For scale: the {{ delivering_sources }} sources that need no setup brought you
+        <strong>{{ "{:,}".format(delivered_total) }} homes</strong> in the last {{ delivery_days }} days.
+        These {{ gmail_providers|length }} have brought none.
+      </p>
+      {% endif %}
     </div>
     {% endif %}
     <div class="connect-actions">
