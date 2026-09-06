@@ -290,6 +290,11 @@ def _profile_check(settings: Settings) -> DiagnosticCheck:
     )
 
 
+def _slot_label(slot: datetime) -> str:
+    """A missed slot needs its date: "10am thu" is ambiguous across a week."""
+    return slot.strftime("%-I%p %a %b %-d").replace("AM", "am").replace("PM", "pm")
+
+
 def _schedule_check(
     repository: Repository,
     scanner: Scanner,
@@ -358,8 +363,8 @@ def _schedule_check(
     # The schedule reports on itself rather than asking to be trusted. A run of
     # missed slots is the fault this whole mechanism exists to catch, and it is
     # invisible in "last checked an hour ago".
-    if coverage.measurable and not coverage.complete:
-        missed = ", ".join(slot.strftime("%-I%p %a").lower() for slot in coverage.missed[:3])
+    if coverage.measurable and coverage.worth_raising(now=now):
+        missed = ", ".join(_slot_label(slot) for slot in coverage.missed[:3])
         more = f" and {len(coverage.missed) - 3} more" if len(coverage.missed) > 3 else ""
         return _check(
             "schedule", "Scanning", "attention",
@@ -374,7 +379,14 @@ def _schedule_check(
         "schedule", "Scanning", "pass",
         "Checking on schedule",
         f"{health.summary} The next check runs at {next_run_label(health)}."
-        + (f" {coverage.summary()}" if coverage.measurable else ""),
+        + (f" {coverage.summary()}" if coverage.measurable else "")
+        # A single old miss that has already been caught up is a fact worth
+        # stating, not an alarm worth raising.
+        + (
+            f" The one missed was {_slot_label(coverage.missed[0])}, and it was caught up."
+            if coverage.measurable and coverage.missed and not coverage.worth_raising(now=now)
+            else ""
+        ),
         "Nothing to do.",
         owner="App", metadata=metadata,
     )

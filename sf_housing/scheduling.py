@@ -82,6 +82,22 @@ class ScheduleCoverage:
         """False on a fresh install, where there is nothing to report on yet."""
         return self.due > 0
 
+    def worth_raising(self, *, now: datetime | None = None) -> bool:
+        """Is this a fault to raise, or a fact to state?
+
+        One slot missed days ago, already caught up, is not something to act on
+        -- the advice for it is "nothing, if the Mac is often closed". Turning
+        the whole Support page amber for that trains people to ignore the page,
+        which costs more than the miss did. A pattern is different: two or more
+        in a week, or one in the last day, is worth a look.
+        """
+        if not self.missed:
+            return False
+        if len(self.missed) >= 2:
+            return True
+        current = (now or datetime.now(UTC)).astimezone(UTC)
+        return current - self.missed[-1].astimezone(UTC) < timedelta(days=1)
+
     def summary(self) -> str:
         if not self.measurable:
             return "Not enough history yet to report on the schedule."

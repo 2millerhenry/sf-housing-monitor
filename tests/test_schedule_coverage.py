@@ -315,3 +315,119 @@ def test_the_record_comes_from_the_same_history_as_the_state(tmp_path) -> None:
     source = inspect.getsource(diagnostics._schedule_check)
     assert source.count("recent_scans(") == 1, "one fetch feeds both answers"
     assert "recent[:8]" in source
+
+
+# --------------------------------------------------------------------------
+# proportion: an alarm nobody can act on is worse than no alarm
+# --------------------------------------------------------------------------
+
+
+def test_one_old_miss_is_stated_not_raised() -> None:
+    """Its own advice is "nothing, if the Mac is often closed". Turning the
+    whole page amber for that teaches people to ignore the page."""
+    now = datetime.now(UTC)
+    coverage = ScheduleCoverage(9, 8, (now.astimezone(PACIFIC) - timedelta(days=3),), now.astimezone(PACIFIC))
+
+    assert coverage.worth_raising(now=now) is False
+    assert not coverage.complete, "it is still counted and still reported"
+
+
+def test_a_miss_in_the_last_day_is_worth_raising() -> None:
+    now = datetime.now(UTC)
+    coverage = ScheduleCoverage(9, 8, (now.astimezone(PACIFIC) - timedelta(hours=6),), now.astimezone(PACIFIC))
+
+    assert coverage.worth_raising(now=now) is True
+
+
+def test_a_pattern_of_misses_is_worth_raising_however_old() -> None:
+    now = datetime.now(UTC)
+    missed = (
+        now.astimezone(PACIFIC) - timedelta(days=5),
+        now.astimezone(PACIFIC) - timedelta(days=4),
+    )
+    coverage = ScheduleCoverage(9, 7, missed, now.astimezone(PACIFIC))
+
+    assert coverage.worth_raising(now=now) is True
+
+
+def test_a_complete_record_raises_nothing() -> None:
+    now = datetime.now(UTC)
+    assert ScheduleCoverage(14, 14, (), now.astimezone(PACIFIC)).worth_raising(now=now) is False
+
+
+def managed_schedule_check(tmp_path, scans, now=None):
+    """The check as the installed app runs it: managed, with a live scan job.
+
+    The test app runs unmanaged, which returns "this process does not keep the
+    schedule" before any of this is reached -- correct, and the reason the
+    sentence a person actually reads needs asserting here rather than through
+    the page.
+    """
+    from sf_housing.diagnostics import _schedule_check
+    from sf_housing.scheduling import SCAN_JOB_ID
+
+    application, _ = support_app(tmp_path, scans)
+
+    class Job:
+        id = SCAN_JOB_ID
+        next_run_time = (now or datetime.now(UTC)) + timedelta(hours=4)
+
+    class Alive:
+        running = True
+
+        def get_jobs(self):
+            return [Job()]
+
+    return _schedule_check(
+        application.state.repository,
+        application.state.scanner,
+        Alive(),
+        True,
+        now or datetime.now(UTC),
+    )
+
+
+def test_an_old_miss_still_appears_as_a_fact(tmp_path) -> None:
+    """Not raising it must not mean hiding it."""
+    now = datetime.now(UTC)
+    slots = scheduled_slots(now - timedelta(days=5), now - SLOT_GRACE - timedelta(minutes=5))
+    # Deliberately not the first: the window floors at the app's own history, so
+    # a slot before the earliest scan is correctly never judged at all.
+    skipped = slots[1]
+    check = managed_schedule_check(
+        tmp_path, [slot + timedelta(minutes=2) for slot in slots if slot != skipped], now
+    )
+
+    assert check.status == "pass", f"one old, caught-up miss is not an alarm: {check.explanation}"
+    assert "caught up" in check.explanation
+    assert check.metadata["coverage"]["missed"], "and it is still recorded"
+
+
+def test_a_recent_miss_does_raise_on_the_page(tmp_path) -> None:
+    now = datetime.now(UTC)
+    slots = scheduled_slots(now - timedelta(days=5), now - SLOT_GRACE - timedelta(minutes=5))
+    check = managed_schedule_check(
+        tmp_path, [slot + timedelta(minutes=2) for slot in slots[:-1]], now
+    )
+
+    assert check.status == "attention", check.explanation
+    assert "did not run" in check.label
+    assert "Missed:" in check.explanation
+
+
+def test_a_complete_record_reads_as_a_pass_and_says_so(tmp_path) -> None:
+    now = datetime.now(UTC)
+    slots = scheduled_slots(now - timedelta(days=5), now - SLOT_GRACE - timedelta(minutes=5))
+    check = managed_schedule_check(tmp_path, [slot + timedelta(minutes=2) for slot in slots], now)
+
+    assert check.status == "pass"
+    assert "Every one of the last" in check.explanation
+
+
+def test_a_missed_slot_is_named_with_its_date(tmp_path) -> None:
+    """"10am thu" is ambiguous across a week-long window."""
+    from sf_housing.diagnostics import _slot_label
+
+    label = _slot_label(datetime(2026, 9, 3, 10, 0, tzinfo=PACIFIC))
+
+    assert label == "10am Thu Sep 3", label
