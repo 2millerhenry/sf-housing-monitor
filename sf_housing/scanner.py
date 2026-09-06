@@ -147,6 +147,8 @@ class Scanner:
             "Listings Project": 15,
             "Abacus (small buildings)": 20,
             "SpareRoom": 25,
+            # A student board: one small page per scan, no detail reads.
+            "Uloop": 28,
             "Zillow": 30,
             "HotPads": 35,
             "Apartments.com": 40,

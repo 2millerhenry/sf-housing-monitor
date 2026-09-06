@@ -3,24 +3,25 @@
     it was opened, so nothing may be hotlinked, and shipping other people's
     trademarks inside an MIT repository is a liability the project does not
     need. Distinct hues at one lightness read as a family, re-spaced to
-    twenty-four degrees so all fifteen names fit and none collides with the
+    twenty-two degrees so all sixteen names fit and none collides with the
     hue an unlisted name falls back to. -#}
 {% set source_marks = {
-  'Roomies':                 ('R',  '2'),
-  'Craigslist':              ('CL', '26'),
-  'Abacus (small buildings)':('AB', '50'),
-  'Listings Project':        ('LP', '74'),
-  'HotPads':                 ('HP', '98'),
-  'Redfin':                  ('Rf', '122'),
-  'SF Housing Portal':       ('SF', '146'),
-  'SpareRoom':               ('SR', '170'),
-  'Apartment List':          ('AL', '194'),
-  'Furnished Finder':        ('FF', '218'),
-  'Zillow':                  ('Z',  '242'),
-  'Facebook Marketplace':    ('FB', '266'),
-  'Zumper':                  ('Zu', '290'),
-  'Apartments.com':          ('A',  '314'),
-  'Rent.com':                ('Rc', '338')
+  'Roomies':                  ('R', '2'),
+  'Craigslist':               ('CL', '24'),
+  'Abacus (small buildings)': ('AB', '46'),
+  'Listings Project':         ('LP', '68'),
+  'HotPads':                  ('HP', '90'),
+  'Redfin':                   ('Rf', '112'),
+  'Uloop':                    ('Ul', '134'),
+  'SF Housing Portal':        ('SF', '156'),
+  'SpareRoom':                ('SR', '178'),
+  'Apartment List':           ('AL', '200'),
+  'Furnished Finder':         ('FF', '222'),
+  'Zillow':                   ('Z', '244'),
+  'Facebook Marketplace':     ('FB', '266'),
+  'Zumper':                   ('Zu', '288'),
+  'Apartments.com':           ('A', '310'),
+  'Rent.com':                 ('Rc', '332')
 } %}
 {% macro source_chip(name) %}
   {%- set mark = source_marks.get(name, (name[0], '162')) -%}

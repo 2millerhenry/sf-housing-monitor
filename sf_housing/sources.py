@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from dataclasses import replace
 from html import unescape
 from typing import Protocol
@@ -26,6 +27,9 @@ from .location import (
 )
 from .models import ListingCandidate
 from .preferences import Preferences, setting_int
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class SourceError(RuntimeError):
@@ -2038,6 +2042,234 @@ class RentComSource:
         )
 
 
+class UloopSource:
+    """Read a university's off-campus housing board.
+
+    Every other source here reads a commercial listing site. This is a student
+    board, and the inventory is different in kind: rooms in shared flats,
+    sublets, and small landlords who post where students look and nowhere
+    else. It is also the only source whose cards all carry a real posting
+    date, and it answers the monitor's own name rather than demanding a
+    browser's.
+
+    One board, not five. The five San Francisco schools -- UCSF, USF, SFSU, the
+    Academy of Art and City College -- publish the *same* listings under
+    per-board ids: "Parkmerced" is 2569628208 on one and 2569628209 on the
+    next. Reading all five would be five times the requests for one board's
+    inventory, and storing them by that numeric id would file one home five
+    times. The slug is what is stable across boards, so that is the identity.
+
+    There is no structured data on the page at all -- the only schema.org block
+    is a breadcrumb -- so this is parsed out of the markup, which makes it the
+    most fragile source here. It fails loudly on purpose.
+    """
+
+    platform = "Uloop"
+    mode = "automatic"
+    # The per-school subdomain. Not uloop.com/housing/san-francisco-ca/, which
+    # despite its name returned twenty-three cards and not one of them in San
+    # Francisco: Denver, Houston, Daytona Beach, Logan Utah.
+    search_url = "https://ucsf.uloop.com/housing/index.php/available"
+    manual_reason = None
+    # The card already carries price, size, posting date and a description.
+    detail_budget = 0
+    empty_result_message = "The student board currently lists no San Francisco homes."
+    # San Francisco homes are scattered rather than clustered: measured over
+    # five pages, 21 then 1, 3, 4 and 7. Worth paging, worth stopping.
+    max_pages = 5
+
+    CARD = "div.listing-list.housing-listing"
+
+    def _page_url(self, page: int) -> str:
+        return self.search_url if page == 1 else f"{self.search_url}?page={page}"
+
+    @staticmethod
+    def _slug(url: str) -> str | None:
+        """The identity a listing keeps across every board that carries it."""
+        match = re.search(r"/housing/view\.php/\d+/([^/?#]+)", str(url or ""))
+        return match.group(1) if match else None
+
+    @staticmethod
+    def _posted(text: str) -> str | None:
+        """The board states a real posting date, unlike almost everything here."""
+        match = re.search(r"\b(\d{2})/(\d{2})/(\d{2})\b", text)
+        if not match:
+            return None
+        month, day, year = (int(part) for part in match.groups())
+        try:
+            return datetime(2000 + year, month, day, tzinfo=UTC).isoformat()
+        except ValueError:
+            return None
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        floor = _bedroom_floor(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        read_a_card = False
+        document = ""
+
+        for page in range(1, self.max_pages + 1):
+            document = _require_page(client.get(self._page_url(page)), self.platform)
+            cards = BeautifulSoup(document, "html.parser").select(self.CARD)
+            if not cards:
+                break
+            fresh = 0
+            for card in cards:
+                slug = self._slug((card.find("a", href=True) or {}).get("href", ""))
+                if not slug or slug in seen:
+                    continue
+                seen.add(slug)
+                fresh += 1
+                read_a_card = True
+                candidate = self._candidate(card, slug, floor)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+            if not fresh:
+                break
+        else:
+            # Every page was read and every one still had new homes on it, so
+            # the read ended at the limit rather than at the end of the board.
+            # Said out loud: a truncated result that says nothing reads exactly
+            # like complete coverage.
+            LOGGER.info(
+                "%s stopped at its %s-page limit with homes still arriving; "
+                "raise max_pages to see further.",
+                self.platform,
+                self.max_pages,
+            )
+
+        if not read_a_card:
+            # A selector that has stopped matching must not read as a city with
+            # no homes in it. This is markup, not a contract, and the day it
+            # changes the scan has to say so rather than report a quiet market.
+            raise _read_nothing(self.platform, document, "housing cards")
+        return listings
+
+    # "$2,892 - $5,216 · Studio, 1-3 Beds Apartment living at its best..." --
+    # the figures and sizes are a fixed prefix, and everything after them is the
+    # lister's own prose. Read from the whole card instead, a description that
+    # mentions "utilities are about $50 per month" becomes the rent.
+    _RENT = r"^\s*\$(?P<low>[\d,]+)(?:\s*-\s*\$(?P<high>[\d,]+))?\s*·\s*"
+    # Two shapes, tried in order. "$1,350 · 3 Beds" and "$2,247 · Studio, 1-5
+    # Beds" end at the word Beds; "$3,950 · Studio Space Modern Glen Park..."
+    # never reaches it, and anchoring only on Beds loses the studio entirely --
+    # its price and its size both.
+    OFFERS = (
+        re.compile(_RENT + r"(?P<sizes>[^·]*?)\s*Beds?\b", re.IGNORECASE),
+        re.compile(_RENT + r"(?P<sizes>Studio)\b", re.IGNORECASE),
+    )
+
+    @classmethod
+    def _offer(cls, card) -> tuple[int | None, tuple[int, int] | None]:
+        """The asking rent and the bedroom sizes, from the card's own prefix."""
+        node = card.select_one(".description")
+        if node is None:
+            return None, None
+        said = re.sub(r"\s+", " ", node.get_text(" ", strip=True))
+        match = next((found for found in (rule.match(said) for rule in cls.OFFERS) if found), None)
+        if match is None:
+            return None, None
+        price = int(match.group("low").replace(",", ""))
+        sizes = match.group("sizes")
+        span = _bedroom_span(sizes)
+        # "Studio, 1-3 Beds" offers a studio as well, which is a nought the
+        # digits alone do not contain.
+        if re.search(r"\bstudio\b", sizes, re.IGNORECASE):
+            span = (0, span[1]) if span else (0, 0)
+        return (price if price > 0 else None), span
+
+    def _candidate(self, card, slug: str, floor: int) -> ListingCandidate | None:
+        link = card.find("a", href=True)
+        url = str(link["href"]).strip() if link else ""
+        if not url.startswith("https://") or "uloop.com/housing/view.php/" not in url:
+            return None
+
+        titles = [
+            node for node in card.select(".listingOneLineTitle")
+            if "sub-title" not in (node.get("class") or [])
+        ]
+        title = _clean_text(titles[0].get_text(" ", strip=True), 180) if titles else ""
+        located = card.select_one(".sub-title")
+        address = _clean_text(located.get_text(" ", strip=True), 200) if located else ""
+        # "19th Ave, San Francisco, CA, 94101": the city is the field before the
+        # state, and the board writes it "San francisco" and "BERKELEY" as
+        # readily as it writes it properly.
+        city = re.search(r",\s*([A-Za-z .'-]+),\s*[A-Za-z]{2}\b", address)
+        if not _is_san_francisco_locality(city.group(1) if city else ""):
+            return None
+
+        text = re.sub(r"\s+", " ", card.get_text(" ", strip=True))
+        price, span = self._offer(card)
+        if span is not None and span[1] < floor:
+            return None
+
+        street = address.split(",")[0].strip()
+        metadata: dict[str, object] = {}
+        if street:
+            metadata["address"] = street
+        posted = self._posted(text)
+        if posted:
+            # Genuinely when the home was posted, so it belongs here: it is what
+            # the shortlist shows as "Posted" and sorts newest by.
+            metadata["listing_timestamp"] = posted
+
+        detail = [f"{title or street} on the student housing board."]
+        if address:
+            detail.append(f"Address: {address}.")
+
+        if span is not None:
+            low, high = span
+            representative = max(low, min(floor, high))
+            # Said in the summary, never asserted as metadata["bedrooms"]. On a
+            # student board "$3,089 · 1 Bed" against "Furnished Master Bedroom"
+            # means one room in a shared flat, not a one-bedroom home, and a
+            # structured bedroom count would overrule the one reader that can
+            # tell those apart. The number is still true enough to filter on.
+            metadata["bedrooms_low"], metadata["bedrooms_high"] = low, high
+            if low == high:
+                detail.append(f"Listed as {_bedroom_phrase(low)}.")
+            else:
+                detail.append(f"It lets {_bedroom_noun(low)} through {_bedroom_noun(high)} homes.")
+            # The board quotes one figure for a building that lets several
+            # sizes, and it belongs to the smallest of them. Against a larger
+            # home it would read as that home's rent.
+            if price is not None and representative != low:
+                metadata["price_from"] = price
+                detail.append(
+                    f"Rents start at ${price:,} for {_bedroom_phrase(low)}; "
+                    f"the {_bedroom_phrase(representative)} rent is not published."
+                )
+                price = None
+        if price is not None:
+            detail.append(f"Asking ${price:,} a month.")
+
+        description = card.select_one(".desc")
+        if description:
+            said = _clean_text(description.get_text(" ", strip=True), 600)
+            if said:
+                detail.append(said)
+
+        return ListingCandidate(
+            platform=self.platform,
+            # The slug, not the numeric id in the same URL: every board carries
+            # the same homes under ids of its own, so the id would file one
+            # home once per board.
+            source_id=slug,
+            title=title or street or slug.replace("-", " "),
+            original_url=url,
+            price=price,
+            neighborhood=sf_area_from_address(street) or visible_sf_area_hint(f"{title} {address}"),
+            listing_type=None,
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            # Half of this board is rooms and half is whole homes, and the card
+            # says which in words. Asserting either here would overrule the one
+            # reader that can tell them apart.
+        )
+
 class ApifyFacebookMarketplaceSource:
     """Optional low-volume Facebook automation that does not use a FB login."""
 
@@ -3270,6 +3502,7 @@ def default_sources(
     sf_portal = SFHousingPortalSource()
     zumper = ZumperSource()
     apartment_list = ApartmentListSource()
+    uloop = UloopSource()
     redfin = RedfinSource()
     rent_com = RentComSource()
     free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
@@ -3305,6 +3538,7 @@ def default_sources(
             sf_portal,
             apartment_list,
             zumper,
+            uloop,
             redfin,
             rent_com,
             RoomiesAlertSource(mailbox),
@@ -3332,6 +3566,7 @@ def default_sources(
         sf_portal,
         apartment_list,
         zumper,
+        uloop,
         redfin,
         rent_com,
         *manual_sources[1:],
