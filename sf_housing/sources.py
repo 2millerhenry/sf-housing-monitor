@@ -1419,26 +1419,34 @@ _WHOLE_UNIT_BEDROOMS = {
 
 
 # The scanner identifies itself honestly, and Craigslist, Zumper, Apartment
-# List and the city portal all answer it. These two do not: measured
-# side by side on one request each, the monitor's own User-Agent gets 403 from
-# Redfin and 429 from Rent.com, while a browser string gets 200 from both. The
-# filter is reading the name, not the behaviour -- the request rate, the pages
-# asked for and what is done with them are identical either way -- so this
-# borrows a browser's name to get past it and changes nothing else. Remove
-# these two lines and both sources simply stop working; nothing else breaks.
+# List and the city portal all answer it. Four sources do not: measured side by
+# side on one request each, the monitor's own User-Agent gets 403 from Redfin
+# and Trulia and 429 from Rent.com and ApartmentGuide, while a browser string
+# gets 200 from all four. The filter is reading the name, not the behaviour --
+# the request rate, the pages asked for and what is done with them are
+# identical either way -- so this borrows a browser's name to get past it and
+# changes nothing else. Remove these lines and those four sources simply stop
+# working; nothing else breaks.
+#
+# Accept-Language earns its place separately. Trulia alone refuses a request
+# that does not state one, with the same 403 it gives the honest User-Agent:
+# browser string without this header is 403, with it is 200. The other three
+# are indifferent to it, so it is set here once rather than special-cased.
 _BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
 }
 
 
 def _require_page(response: httpx.Response, platform: str) -> str:
     """Return a page of results, or refuse to read a wall as an empty result.
 
-    Rate-limited, both of these answer with HTTP 202 and an empty body.
+    Rate-limited, these sources answer with HTTP 202 and an empty body --
+    observed on Rent.com and, read too often, on ApartmentGuide too.
     ``raise_for_status`` lets a 202 through and an empty body parses into zero
     listings, so a scan would record "this source found nothing today" at
     exactly the moment the source stopped talking to us. That is the fabricated
@@ -1663,10 +1671,7 @@ class RedfinSource:
             # building's starting rate and this home's rent stays unknown.
             if price is not None and representative != low:
                 metadata["price_from"] = price
-                detail.append(
-                    f"Rents here start at ${price:,} a month for {_bedroom_phrase(low)}; "
-                    f"the {_bedroom_phrase(representative)} rent is not published."
-                )
+                detail.append(_starting_rate_note(price, low, representative))
                 published = None
         if published is not None:
             detail.append(f"Advertised from ${published:,} a month.")
@@ -1708,12 +1713,117 @@ def _american_date(value: str) -> str | None:
     return f"{parsed.strftime('%B')} {parsed.day}, {parsed.year}"
 
 
+def _nested_mapping(payload: object, *keys: str) -> dict:
+    """Walk a chain of keys, giving up rather than raising on any surprise.
+
+    ``payload.get("props", {}).get("pageProps", {})`` reads safely only while
+    every level really is a mapping. One level arriving as a list -- which is
+    what a payload change looks like -- raises AttributeError from inside the
+    parser, and the scan log gets a class name instead of "the format may have
+    changed".
+    """
+    node: object = payload
+    for key in keys:
+        if not isinstance(node, dict):
+            return {}
+        node = node.get(key)
+    return node if isinstance(node, dict) else {}
+
+
+def _representative_bedroom(entries: object, wanted: set[int]) -> tuple[int | None, int | None]:
+    """The bedroom count a deal asked for, and what that size costs.
+
+    Rent.com and ApartmentGuide are one company on one codebase and publish the
+    same ``bedCountData`` array -- a rent per bedroom count -- so unlike every
+    other building source here the right home can be priced exactly rather than
+    stood in for by the cheapest one in the building.
+
+    A building the search returned that turns out to hold nothing of the wanted
+    size keeps its own cheapest home instead, so the mismatch is scored rather
+    than hidden. Where two sizes are equally cheap the smaller wins, and a size
+    with no published rent sorts last: an unpriced studio must never displace a
+    priced one-bedroom the deal actually asked for.
+    """
+    priced: list[tuple[int, int | None]] = []
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        beds = entry.get("beds")
+        prices = entry.get("prices") if isinstance(entry.get("prices"), dict) else {}
+        low = prices.get("low")
+        if isinstance(beds, (int, float)) and not isinstance(beds, bool):
+            rent = int(low) if isinstance(low, (int, float)) and not isinstance(low, bool) and low > 0 else None
+            priced.append((int(beds), rent))
+    if not priced:
+        return None, None
+    matching = [pair for pair in priced if pair[0] in wanted]
+    return min(matching or priced, key=lambda pair: (pair[1] is None, pair[1] or 0, pair[0]))
+
+
+def _other_bedroom_sizes(entries: object, representative: int | None) -> list[str]:
+    """The building's *other* sizes, phrased as "a 1-bedroom from $2,740".
+
+    The size this listing already stands for is left out. "Its studio homes
+    start at $1,845. This building also lets a studio from $1,845" is one fact
+    said twice, and reads as though the building had two different studios.
+    """
+    sizes: list[str] = []
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        beds, prices = entry.get("beds"), entry.get("prices")
+        low = prices.get("low") if isinstance(prices, dict) else None
+        if (
+            not isinstance(beds, (int, float))
+            or isinstance(beds, bool)
+            or not isinstance(low, (int, float))
+            or isinstance(low, bool)
+        ):
+            continue
+        if representative is not None and int(beds) == representative:
+            continue
+        sizes.append(f"{_bedroom_phrase(int(beds))} from ${int(low):,}")
+    return sizes
+
+
+def _numeric_span(low: object, high: object) -> tuple[int, int] | None:
+    """A bedroom range published as two numbers, when both are really numbers.
+
+    Either end missing makes the range unusable rather than half-known: a
+    building whose smallest home is unknown cannot be excluded by a bedroom
+    floor, and must not be quoted the starting rent of a size nobody stated.
+    """
+    if isinstance(low, bool) or isinstance(high, bool):
+        return None
+    if not isinstance(low, (int, float)) or not isinstance(high, (int, float)):
+        return None
+    return (int(min(low, high)), int(max(low, high)))
+
+
 def _bedroom_noun(count: int) -> str:
     return "studio" if count == 0 else f"{count}-bedroom"
 
 
 def _bedroom_phrase(count: int) -> str:
     return f"a {_bedroom_noun(count)}"
+
+
+def _starting_rate_note(price: int, low: int, representative: int) -> str:
+    """Say whose rent this is, when it is not this home's.
+
+    Three sources publish one rent for a building that lets several sizes, and
+    it always belongs to the smallest home in it. Printed against a larger one
+    it reads as a three-bedroom going for a studio's rent, so it is reported as
+    the building's starting rate and this home's rent is left unstated.
+
+    ``_bedroom_phrase`` already carries its own article, so the size is named
+    here without one: "the a 2-bedroom rent is not published" is what reads
+    otherwise, and it has been shipping.
+    """
+    return (
+        f"Rents here start at ${price:,} a month for {_bedroom_phrase(low)}; "
+        f"the {_bedroom_noun(representative)} rent is not published."
+    )
 
 
 def _redfin_display_name(value: object) -> str:
@@ -1773,12 +1883,7 @@ class RentComSource:
             parsed = json.loads(match.group(1))
         except (ValueError, json.JSONDecodeError):
             return {}
-        page_data = (
-            parsed.get("props", {}).get("pageProps", {}).get("pageData")
-            if isinstance(parsed, dict)
-            else None
-        )
-        return page_data if isinstance(page_data, dict) else {}
+        return _nested_mapping(parsed, "props", "pageProps", "pageData")
 
     @staticmethod
     def _listing_id(url: str) -> str | None:
@@ -1879,28 +1984,8 @@ class RentComSource:
         )
 
     def _representative(self, building: dict) -> tuple[int | None, int | None]:
-        """The bedroom count this search was about, and what it costs.
-
-        Rent.com publishes a rent per bedroom count, so unlike every other
-        building source here the right home can be priced exactly rather than
-        stood in for by the cheapest one. A building the search returned that
-        turns out to hold nothing of the wanted size keeps its own cheapest
-        home instead, so the mismatch is scored rather than hidden.
-        """
-        priced: list[tuple[int, int]] = []
-        for entry in building.get("bedCountData") or []:
-            if not isinstance(entry, dict):
-                continue
-            beds = entry.get("beds")
-            low = (entry.get("prices") or {}).get("low") if isinstance(entry.get("prices"), dict) else None
-            if isinstance(beds, (int, float)) and not isinstance(beds, bool):
-                rent = int(low) if isinstance(low, (int, float)) and low > 0 else None
-                priced.append((int(beds), rent))
-        if not priced:
-            return None, None
-        wanted = [pair for pair in priced if pair[0] in self._wanted]
-        beds, rent = min(wanted or priced, key=lambda pair: (pair[1] is None, pair[1] or 0, pair[0]))
-        return beds, rent
+        """The bedroom count this search was about, and what it costs."""
+        return _representative_bedroom(building.get("bedCountData"), self._wanted)
 
     # Rent.com answers a building it no longer lets with a 404. Named here for
     # the same reason Craigslist names its own 404 and 410: raising instead
@@ -1959,14 +2044,8 @@ class RentComSource:
                 detail.append(f"Its {_bedroom_noun(beds)} homes start at ${rent:,} a month.")
             else:
                 detail.append(f"It lets {_bedroom_noun(beds)} homes, at a rent it does not publish.")
-        sizes = [
-            f"{_bedroom_phrase(int(entry['beds']))} from ${int(entry['prices']['low']):,}"
-            for entry in building.get("bedCountData") or []
-            if isinstance(entry, dict)
-            and isinstance(entry.get("beds"), (int, float))
-            and isinstance((entry.get("prices") or {}).get("low"), (int, float))
-        ]
-        if len(sizes) > 1:
+        sizes = _other_bedroom_sizes(building.get("bedCountData"), beds)
+        if sizes:
             detail.append("This building also lets " + ", ".join(sizes[:6]) + ".")
 
         available = building.get("unitsAvailable")
@@ -2040,6 +2119,501 @@ class RentComSource:
             building_units=building_units,
             housing_kind=ROOM if building.get("roomForRent") is True else WHOLE_UNIT,
             metadata=metadata,
+        )
+
+
+class ApartmentGuideSource:
+    """Read the San Francisco buildings ApartmentGuide publishes.
+
+    ApartmentGuide and Rent.com are one company on one codebase, and this is
+    that same hydration payload read a second way. The difference is where the
+    facts sit: Rent.com's search cards carry a name and an address and keep
+    everything worth scoring behind a detail fetch, while ApartmentGuide's
+    ``listingSearch.listings`` carries the whole building -- map pin, a rent per
+    bedroom count, floor plans with their own counts and move-in dates. There is
+    nothing behind a detail page worth spending a budget on, so ``detail_budget``
+    is zero and one page read is one page of complete listings. That also means
+    no listing here can be stranded by a rate-limited detail fetch, which is the
+    failure ``detail_pending`` exists to recover from on Rent.com.
+
+    ``filterMatchResults`` is a parallel projection of the same buildings, and
+    the one place the upper end of each rent range and the floor areas are
+    published. It is joined on ``listingId`` and never by position: both arrays
+    came back in the same order on every page read here, which is exactly the
+    kind of thing that silently stops being true and pairs one building's rent
+    with another's address.
+    """
+
+    platform = "ApartmentGuide"
+    mode = "automatic"
+    search_url = "https://www.apartmentguide.com/apartments/California/San-Francisco/"
+    manual_reason = None
+    # The search page is the whole source; see the class docstring.
+    detail_budget = 0
+    empty_result_message = (
+        "ApartmentGuide published no San Francisco buildings in its structured data."
+    )
+    # Fifty buildings a page against a city total of 476. Four pages is more
+    # inventory than a scan can score; the rest is bandwidth.
+    max_pages = 4
+
+    def _page_url(self, page: int) -> str:
+        # Deliberately no bedroom or rent filter. ApartmentGuide accepts
+        # `/N-bedrooms/` and `?maxPrice=` in the path and ignores both -- asked
+        # for four-bedrooms under $2,000 it returned the same 476-building
+        # first page -- so a filter here would only advertise a narrowing that
+        # never happened. The bedroom count each deal wants is applied to the
+        # payload instead, where it is real.
+        return self.search_url if page == 1 else f"{self.search_url}?page={page}"
+
+    @staticmethod
+    def _payload(document: str) -> dict:
+        """ApartmentGuide's building search, or an empty mapping."""
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', document, re.S)
+        if not match:
+            return {}
+        try:
+            parsed = json.loads(match.group(1))
+        except (ValueError, json.JSONDecodeError):
+            return {}
+        return _nested_mapping(
+            parsed, "props", "pageProps", "pageData", "location", "listingSearch"
+        )
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        wanted = _wanted_bedroom_counts(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        read_a_card = False
+        document = ""
+
+        for page in range(1, self.max_pages + 1):
+            document = _require_page(
+                client.get(self._page_url(page), headers=_BROWSER_HEADERS), self.platform
+            )
+            search = self._payload(document)
+            buildings = [item for item in (search.get("listings") or []) if isinstance(item, dict)]
+            if not buildings:
+                break
+            matched = {
+                str(row.get("listingId")): row
+                for row in (search.get("filterMatchResults") or [])
+                if isinstance(row, dict) and row.get("listingId")
+            }
+            padded = {str(item) for item in (search.get("expandedSearchIds") or [])}
+            fresh = 0
+            for building in buildings:
+                identifier = str(building.get("id") or "").strip()
+                if not identifier or identifier in seen:
+                    continue
+                seen.add(identifier)
+                fresh += 1
+                read_a_card = True
+                candidate = self._candidate(building, matched.get(identifier), padded, wanted)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+            # Past its last real page -- 476 buildings, so page ten --
+            # ApartmentGuide serves page one again rather than an empty result,
+            # with its own `total` still reading 476. Page eleven and page
+            # ninety-nine both came back as page one. A page that adds no new
+            # building is the end of the results whatever the payload claims.
+            if not fresh:
+                break
+
+        if not read_a_card:
+            raise _read_nothing(self.platform, document, "structured building cards")
+        return listings
+
+    @staticmethod
+    def _lettable_now(plan: dict) -> bool:
+        """Can somebody rent this floor plan today?
+
+        Two ways of saying yes, because ApartmentGuide uses both: a positive
+        count, or a status that says available without one. Of the plans read
+        here 123 were AVAILABLE_WITH_COUNT and 235 AVAILABLE_WITHOUT_COUNT, so
+        testing the count alone would call two thirds of the lettable stock
+        unavailable.
+        """
+        count = plan.get("availableCount")
+        if isinstance(count, (int, float)) and not isinstance(count, bool) and count > 0:
+            return True
+        return str(plan.get("availabilityStatusCode") or "").startswith("AVAILABLE")
+
+    def _candidate(
+        self,
+        building: dict,
+        matched: dict | None,
+        padded: set[str],
+        wanted: set[int],
+    ) -> ListingCandidate | None:
+        identifier = str(building.get("id") or "").strip()
+        # ApartmentGuide names its own padding in the same field Rent.com does.
+        # Dropping it by id rather than by guessing from the address is what
+        # catches a padded result that happens to carry a San Francisco address.
+        if identifier in padded:
+            return None
+        location = building.get("location") if isinstance(building.get("location"), dict) else {}
+        # The feed is city-scoped and every building read here was in San
+        # Francisco, but this is the guard that has to hold when that changes:
+        # one Oakland building scored against San Francisco rents would look
+        # like the find of the week.
+        if not _is_san_francisco_locality(location.get("city")):
+            return None
+
+        path = str(building.get("urlPathname") or "").strip()
+        if not path:
+            return None
+        url = urljoin("https://www.apartmentguide.com", path)
+        if not url.startswith("https://www.apartmentguide.com/"):
+            # urljoin honours an absolute URL in `path`, so a payload carrying
+            # somebody else's host would otherwise be stored and opened as-is.
+            return None
+
+        street = _clean_text(building.get("address"), 160)
+        name = _clean_text(building.get("name"), 180) or street
+        if not name:
+            return None
+
+        # filterMatchResults carries the high end of each rent range and the
+        # floor areas; the listing's own copy carries only the low. Prefer the
+        # richer one, fall back to the listing when the join finds nothing.
+        rows = (matched or {}).get("bedCountData") or building.get("bedCountData")
+        beds, rent = _representative_bedroom(rows, wanted)
+
+        metadata: dict[str, object] = {"building_listing": True}
+        if street:
+            metadata["address"] = street
+        detail = [f"{name} listed on ApartmentGuide."]
+        if street:
+            detail.append(f"Address: {street}.")
+
+        if beds is not None:
+            metadata["bedrooms"] = beds
+            if rent:
+                detail.append(f"Its {_bedroom_noun(beds)} homes start at ${rent:,} a month.")
+            else:
+                detail.append(f"It lets {_bedroom_noun(beds)} homes, at a rent it does not publish.")
+        sizes = _other_bedroom_sizes(rows, beds)
+        if sizes:
+            detail.append("This building also lets " + ", ".join(sizes[:6]) + ".")
+
+        available = (matched or {}).get("totalAvailable")
+        if isinstance(available, (int, float)) and not isinstance(available, bool) and available > 0:
+            # Deliberately not phrased as "N units", which the building-size
+            # reader would take for the size of the whole building. Nothing
+            # ApartmentGuide publishes is the building's own size, so
+            # `building_units` is left unset rather than guessed at from this.
+            detail.append(f"{int(available)} homes are free right now.")
+            metadata["homes_available"] = int(available)
+
+        # ApartmentGuide's `availableDate` is the day a floor plan *starts*
+        # letting, and it is published only for plans that are not lettable
+        # now: every one of the 103 dated plans read here was
+        # UNAVAILABLE_WITH_FUTURE_MOVE_DATE with a count of zero, and every
+        # plan free today carried no date at all. Reading the date as "this is
+        # available from" and taking the earliest would therefore put a date
+        # months out on a building with homes free this afternoon, and hand
+        # scoring a move-in date later than the truth.
+        plans = [plan for plan in building.get("floorPlans") or [] if isinstance(plan, dict)]
+        if not any(self._lettable_now(plan) for plan in plans):
+            # Nothing free today, so the first future date really is the
+            # earliest somebody could move in.
+            moves = sorted(
+                {str(plan.get("availableDate"))[:10] for plan in plans if plan.get("availableDate")}
+            )
+            stated = _american_date(moves[0]) if moves else None
+            if stated:
+                # Written the one way `scoring._available_on` reads a date. An
+                # ISO string under a key of its own is a fact nothing consults.
+                metadata["available_on"] = stated
+                detail.append(f"Nothing is free today; the first home here opens up {stated}.")
+
+        area = _clean_text(building.get("squareFeetText"), 40)
+        if area:
+            metadata["floor_area"] = area
+            detail.append(f"Floor area {area}.")
+
+        offer = _clean_text(building.get("dealsText"), 240)
+        if offer:
+            # Said, never priced in. A concession changes what a year costs and
+            # nothing about the rent, and folding it into `price` would put a
+            # building below a budget it does not actually meet.
+            # Terminated here because the concession is landlord copy and
+            # arrives however it was typed: "*Restrictions May Apply" with no
+            # full stop runs straight into the next sentence of the summary.
+            detail.append(f"Offer: {offer}" if offer.endswith((".", "!", "?")) else f"Offer: {offer}.")
+            metadata["concession"] = offer
+
+        if building.get("offMarket") is True:
+            # Said plainly so a building that is gone can leave the shortlist.
+            # Left unsaid it looks exactly like a dropped connection and keeps
+            # its place forever.
+            metadata["verified_inactive"] = True
+            detail.append("ApartmentGuide has taken this building off the market.")
+        if building.get("incomeRestrictions"):
+            detail.append("This building is income restricted.")
+            metadata["below_market_rate"] = True
+
+        manager = building.get("propertyManagementCompany")
+        manager_name = _clean_text(manager.get("name"), 120) if isinstance(manager, dict) else ""
+        if manager_name:
+            metadata["managed_by"] = manager_name
+            detail.append(f"Managed by {manager_name}.")
+
+        updated = _clean_text(building.get("updatedAt"), 40)
+        if updated:
+            # When ApartmentGuide last touched its own record, not when the home
+            # was posted. Stored as listing_timestamp it would become
+            # published_at, be rewritten on every scan, render as "Posted today"
+            # and pin every building to the top of the newest sort forever.
+            metadata["record_updated"] = updated
+
+        return ListingCandidate(
+            platform=self.platform,
+            # ApartmentGuide's own id. The path carries the building's name, so
+            # a rename would orphan the stored row and add a duplicate rather
+            # than update it.
+            source_id=identifier,
+            title=name,
+            original_url=url,
+            price=rent,
+            neighborhood=(
+                sf_area_from_address(street)
+                or sf_target_coordinate_neighborhood(location.get("lat"), location.get("lng"))
+                or sf_area_from_zip(location.get("zip") or building.get("zipCode"))
+            ),
+            listing_type=(
+                f"{_bedroom_noun(beds).capitalize()} apartment"
+                if beds is not None
+                else "Apartment building"
+            ),
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            # ApartmentGuide lets whole homes, never a room inside one.
+            housing_kind=WHOLE_UNIT,
+        )
+
+
+class TruliaSource:
+    """Read the San Francisco rental buildings Trulia publishes.
+
+    One ``__NEXT_DATA__`` payload holds the whole result: ``searchData.homes``
+    is one card per building, carrying the address as separate fields, the
+    bedroom range, the floor area and a rent. Nothing worth scoring sits behind
+    a detail page, so ``detail_budget`` is zero and no listing here can be
+    stranded by a second request that never lands.
+
+    Two things about this source shape the code. Its rent is a *range* --
+    ``"$3,834 - $4,002/mo"`` -- and where a building lets more than one size the
+    bottom of that range belongs to the smallest home in it, so the same rule
+    Redfin needs applies here: quote it only against the smallest home the
+    search would have accepted, and otherwise keep it as the building's
+    starting rate with this home's own rent left unknown.
+
+    And it refuses unattended requests hard. It answers 403 to the monitor's
+    own User-Agent, 403 to a browser string that states no ``Accept-Language``,
+    and -- read a few dozen times in a couple of minutes -- 403 to everything
+    for a good while afterwards. A scan reads two pages a few times a day,
+    which is nothing like that, but the refusal is common enough that it is
+    reported as rate-limiting rather than breakage and simply retried on the
+    next scheduled check. There is deliberately no retry loop here: retrying
+    inside a scan is what turns an occasional refusal into a sustained one.
+    """
+
+    platform = "Trulia"
+    mode = "automatic"
+    search_url = "https://www.trulia.com/for_rent/San_Francisco,CA/"
+    manual_reason = None
+    # The search page is the whole source; see the class docstring.
+    detail_budget = 0
+    empty_result_message = "Trulia published no San Francisco rentals in its structured data."
+    # Forty homes a page. Two pages is a scan's worth of inventory and, more to
+    # the point, the smallest footprint that still returns something: every
+    # extra page is another chance to be turned away for the next hour.
+    max_pages = 2
+
+    def _page_url(self, page: int) -> str:
+        # No bedroom filter. Trulia spells one `/2p_beds/`, and asked for it
+        # alongside a city it answered 403 to every attempt while the unfiltered
+        # page kept working. The bedroom count each deal wants is applied to the
+        # payload instead, where it costs nothing.
+        return self.search_url if page == 1 else f"{self.search_url}{page}_p/"
+
+    @staticmethod
+    def _homes(document: str) -> list[dict]:
+        """The building cards on a Trulia search page, or nothing."""
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', document, re.S)
+        if not match:
+            return []
+        try:
+            parsed = json.loads(match.group(1))
+        except (ValueError, json.JSONDecodeError):
+            return []
+        homes = _nested_mapping(parsed, "props", "searchData").get("homes")
+        return [home for home in homes or [] if isinstance(home, dict)]
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        floor = _bedroom_floor(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        read_a_card = False
+        document = ""
+
+        for page in range(1, self.max_pages + 1):
+            document = _require_page(
+                client.get(self._page_url(page), headers=_BROWSER_HEADERS), self.platform
+            )
+            homes = self._homes(document)
+            if not homes:
+                break
+            fresh = 0
+            for home in homes:
+                identifier = self._home_id(home)
+                if not identifier or identifier in seen:
+                    continue
+                seen.add(identifier)
+                fresh += 1
+                read_a_card = True
+                candidate = self._candidate(home, identifier, floor)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+            # Past its last real page Trulia serves the first one again rather
+            # than an empty result: page sixty came back as page one, card for
+            # card. A page that adds no new building is the end of the results.
+            if not fresh:
+                break
+
+        if not read_a_card:
+            raise _read_nothing(self.platform, document, "structured rental cards")
+        return listings
+
+    @staticmethod
+    def _home_id(home: dict) -> str:
+        """Trulia's own id for the building.
+
+        ``typedHomeId`` is the stable one. The URL carries the building's name
+        and street, so keyed on that a rename orphans the stored row and adds a
+        duplicate rather than updating it.
+        """
+        return _clean_text(home.get("typedHomeId") or home.get("providerListingId"), 60)
+
+    def _candidate(self, home: dict, identifier: str, floor: int) -> ListingCandidate | None:
+        location = home.get("location") if isinstance(home.get("location"), dict) else {}
+        if not _is_san_francisco_locality(location.get("city")):
+            return None
+
+        # `homeUrl` is published as null on every card read here; `url` is the
+        # real one and it is a path, not an address. Left as it arrives it
+        # would be stored as "/building/..." and open nothing.
+        path = str(home.get("url") or "").strip()
+        if not path:
+            return None
+        url = urljoin("https://www.trulia.com", path)
+        if not url.startswith("https://www.trulia.com/"):
+            # urljoin honours an absolute URL in `path`, so a payload carrying
+            # somebody else's host would otherwise be stored and opened as-is.
+            return None
+
+        street = _clean_text(location.get("streetAddress"), 160)
+        name = street or _clean_text(location.get("fullLocation"), 180)
+        if not name:
+            return None
+
+        bedrooms = home.get("bedrooms") if isinstance(home.get("bedrooms"), dict) else {}
+        # Read as numbers rather than formatted into a string for _bedroom_span:
+        # a card with a max and no min renders as "None 2", from which the span
+        # reader takes the single number it can find and reports a
+        # two-bedroom floor for a building whose smallest home is unknown.
+        span = _numeric_span(bedrooms.get("min"), bedrooms.get("max"))
+        if span is not None and span[1] < floor:
+            # A building's range is what it lets, so its largest home decides
+            # whether it is worth keeping at all.
+            return None
+
+        price_text = _clean_text(
+            (home.get("price") or {}).get("formattedPrice") if isinstance(home.get("price"), dict) else None,
+            60,
+        )
+        # A range reads as its lower end, which is what `_parse_price` returns.
+        price = _parse_price(price_text, require_currency=True)
+
+        metadata: dict[str, object] = {"building_listing": True}
+        if street:
+            metadata["address"] = street
+        detail = [f"{name} listed on Trulia."]
+        if street:
+            detail.append(f"Address: {street}.")
+
+        published = price
+        if span is not None:
+            low, high = span
+            # The home this card stands for is the smallest one that still
+            # meets the search; anything smaller was excluded on purpose.
+            representative = max(low, min(floor, high))
+            metadata["bedrooms"] = representative
+            metadata["bedrooms_low"], metadata["bedrooms_high"] = low, high
+            if low == high:
+                detail.append(f"Listed as {_bedroom_phrase(low)}.")
+            else:
+                detail.append(
+                    f"This building lets {_bedroom_noun(low)} through {_bedroom_noun(high)} homes."
+                )
+            # The bottom of Trulia's range belongs to the smallest home in the
+            # building. Printed against a larger one it reads as a two-bedroom
+            # going for a studio's rent, so it stays the building's starting
+            # rate and this home's rent stays unknown.
+            if price is not None and representative != low:
+                metadata["price_from"] = price
+                detail.append(_starting_rate_note(price, low, representative))
+                published = None
+        if published is not None:
+            detail.append(
+                f"Advertised at {price_text}." if "-" in price_text
+                else f"Advertised at ${published:,} a month."
+            )
+        elif price is None:
+            detail.append("Trulia publishes no rent for this home yet.")
+
+        floor_space = home.get("floorSpace") if isinstance(home.get("floorSpace"), dict) else {}
+        area = _clean_text(floor_space.get("formattedDimension"), 40)
+        if area:
+            metadata["floor_area"] = area
+            detail.append(f"Floor area {area}.")
+
+        # Trulia's own labels: "SPECIAL OFFER" is a concession worth seeing on
+        # a card, and the rest say what the building allows.
+        labels = [
+            _clean_text(tag.get("formattedName"), 40)
+            for tag in home.get("tags") or []
+            if isinstance(tag, dict) and tag.get("formattedName")
+        ]
+        if labels:
+            detail.append("Trulia tags it " + ", ".join(label.lower() for label in labels[:4]) + ".")
+
+        # A room inside somebody's home is not a whole flat, and scoring the
+        # two the same way is how a lodger's room reaches a whole-home deal.
+        kind = ROOM if "room" in str(home.get("__typename") or "").casefold() else WHOLE_UNIT
+
+        return ListingCandidate(
+            platform=self.platform,
+            source_id=identifier,
+            title=name,
+            original_url=url,
+            price=published,
+            neighborhood=(
+                sf_area_from_address(street)
+                or sf_area_from_zip(location.get("zipCode"))
+            ),
+            listing_type="Room in a home" if kind == ROOM else "Apartment building",
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            housing_kind=kind,
         )
 
 
@@ -2239,10 +2813,7 @@ class UloopSource:
             # home it would read as that home's rent.
             if price is not None and representative != low:
                 metadata["price_from"] = price
-                detail.append(
-                    f"Rents start at ${price:,} for {_bedroom_phrase(low)}; "
-                    f"the {_bedroom_phrase(representative)} rent is not published."
-                )
+                detail.append(_starting_rate_note(price, low, representative))
                 price = None
         if price is not None:
             detail.append(f"Asking ${price:,} a month.")
@@ -4184,6 +4755,16 @@ def default_sources(
     rentsfnow = RentSFNowSource()
     redfin = RedfinSource()
     rent_com = RentComSource()
+    apartment_guide = ApartmentGuideSource()
+    # TruliaSource is written and one line from live, and is deliberately not
+    # instantiated here. Its parser has never read a live Trulia page: the site
+    # answered 403 to every request for an hour and a half after a burst of
+    # research traffic, including after twelve minutes of complete silence.
+    # Everything testable without the site is tested -- 50 tests, every guard
+    # proved by killing a mutation -- but "the payload is still shaped the way
+    # it was recorded" is an assumption, and an integration nobody has watched
+    # work is not one to switch on. To enable it, instantiate it here and add
+    # it to both lists below, next to apartment_guide.
     free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
     manual_sources: list[ListingSource] = [
         ManualSource("HotPads", "https://hotpads.com/san-francisco-ca/apartments-for-rent", blocked_reason),
@@ -4224,6 +4805,7 @@ def default_sources(
             rentsfnow,
             redfin,
             rent_com,
+            apartment_guide,
             RoomiesAlertSource(mailbox),
         ]
     return [
@@ -4256,5 +4838,6 @@ def default_sources(
         rentsfnow,
         redfin,
         rent_com,
+        apartment_guide,
         *manual_sources[1:],
     ]

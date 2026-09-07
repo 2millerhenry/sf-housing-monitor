@@ -961,3 +961,29 @@ def test_both_sources_ask_the_way_a_browser_asks() -> None:
         assert requests and carried == requests, (
             f"{source.__name__} makes {requests} request(s) but only {carried} would be answered"
         )
+
+
+def test_the_starting_rate_note_names_the_size_without_doubling_its_article() -> None:
+    """Three sources share this sentence. `_bedroom_phrase` carries its own
+    article, so composing it after "the" shipped "the a 2-bedroom rent is not
+    published" on Redfin and Uloop for as long as both have existed."""
+    from sf_housing.sources import _starting_rate_note
+
+    note = _starting_rate_note(4377, 0, 2)
+    assert note == (
+        "Rents here start at $4,377 a month for a studio; "
+        "the 2-bedroom rent is not published."
+    )
+    assert "the a " not in note
+
+
+def test_a_larger_home_is_never_quoted_the_smallest_homes_rent(preferences) -> None:
+    """The building's published rent belongs to its smallest home. Read end to
+    end so the note and the withheld price stay in step."""
+    listings = RedfinSource().search(FakeClient(FakeResponse(redfin_page())), profile("two_bedroom"))
+    spread = [item for item in listings if item.metadata.get("price_from")]
+    assert spread, "fixture no longer contains a building letting several sizes"
+    for item in spread:
+        assert item.price is None
+        assert "the a " not in (item.summary or "")
+        assert "rent is not published" in (item.summary or "")

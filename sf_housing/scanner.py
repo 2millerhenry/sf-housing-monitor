@@ -158,7 +158,15 @@ class Scanner:
             "HotPads": 35,
             "Apartments.com": 40,
             "Zumper": 45,
+            # Two search pages and no detail reads, and the source most
+            # likely to be turned away, so it is asked early while the
+            # scan still has time to record the refusal.
+            "Trulia": 46,
             "Redfin": 47,
+            # Four search pages and no detail reads, so it costs about what
+            # Redfin does and runs well before the sources that fetch a page
+            # per building.
+            "ApartmentGuide": 48,
             "Roomies": 50,
             # A search page plus a detail page per building, like Rent.com.
             "Apartment List": 52,

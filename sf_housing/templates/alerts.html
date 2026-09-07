@@ -29,7 +29,9 @@
   'Rent.com':                 ('Rc', '330', '54'),
   'AvalonBay':                ('Av', '350', '54'),
   'AppFolio':                 ('AF', '10', '33'),
-  'UDR':                      ('UD', '30', '33')
+  'UDR':                      ('UD', '30', '33'),
+  'ApartmentGuide':           ('AG', '50', '33'),
+  'Trulia':                   ('Tr', '70', '33')
 } %}
 {% macro source_chip(name) %}
   {%- set mark = source_marks.get(name, (name[0], '165', '54')) -%}
