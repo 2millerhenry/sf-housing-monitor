@@ -89,11 +89,22 @@ def test_release_wheel_never_packages_a_profile_or_mutable_data() -> None:
     )
     assert patterns == ["*.css", "*.html", "*.js", "*.zip", "data/*.json"]
 
-    # The one shipped data directory holds exactly one file, and it is the
-    # street table. Anything else appearing there would be packaged silently.
-    assert sorted(p.name for p in (ROOT / "sf_housing" / "data").iterdir()) == ["sf_streets.json"]
+    # The shipped data directory is named file by file, because anything else
+    # appearing there would be packaged silently. Each one has to be reference
+    # data a stranger could rebuild from public information -- never a profile,
+    # a database, a log or a credential.
+    shipped = sorted(p.name for p in (ROOT / "sf_housing" / "data").iterdir())
+    assert shipped == ["appfolio_managers.json", "sf_streets.json"], shipped
+
     table = json.loads((ROOT / "sf_housing" / "data" / "sf_streets.json").read_text(encoding="utf-8"))
     assert table["source"].startswith("DataSF"), "the shipped table must be public city data"
+
+    roster = json.loads((ROOT / "sf_housing" / "data" / "appfolio_managers.json").read_text(encoding="utf-8"))
+    assert roster["managers"], "the roster must list managers"
+    for manager in roster["managers"]:
+        # A company subdomain and a company name. Nothing about anybody.
+        assert set(manager) == {"subdomain", "name"}, manager
+        assert manager["subdomain"].isascii() and manager["subdomain"].islower()
 
 
 def test_the_street_table_is_committed_and_not_swallowed_by_an_ignore_rule() -> None:

@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import re
+from pathlib import Path
 from datetime import UTC, datetime
 from dataclasses import replace
 from html import unescape
@@ -2631,6 +2632,191 @@ class AvalonBaySource:
             housing_kind=WHOLE_UNIT,
         )
 
+class AppFolioSource:
+    """Read the small San Francisco managers who let through AppFolio.
+
+    One parser, a list of managers. Every tenant site is the same page at
+    ``https://<subdomain>.appfolio.com/listings`` with the same markup, so
+    adding a manager is a row in ``data/appfolio_managers.json`` and no code at
+    all. This is the fifty-buildings idea in the shape that works: not fifty
+    scrapers, one scraper and a list.
+
+    These are small landlords -- six homes between three managers on the day
+    this was written -- but they are older buildings let by people who post
+    where their own tenants look, and none of it reaches a portal.
+
+    The failure that matters is a subdomain which is not a tenant site. AppFolio
+    answers those with HTTP 200 and its own "Page not found", which parses into
+    zero homes and would read as a manager with nothing free, for good. A real
+    tenant site always carries the listings container, whether or not it has
+    anything in it, so that is what tells them apart.
+    """
+
+    platform = "AppFolio"
+    mode = "automatic"
+    search_url = "https://chandlerproperties.appfolio.com/listings"
+    manual_reason = None
+    # Everything is on the one page: rent, size, square footage, availability
+    # and the full address.
+    detail_budget = 0
+    empty_result_message = "The AppFolio managers list no San Francisco homes today."
+
+    CARD = "div.listing-item"
+    # Present on every tenant site, with or without listings on it. Absent from
+    # AppFolio's own not-found page, which is the whole point.
+    CONTAINER = "js-listings"
+    ROSTER = Path(__file__).resolve().parent / "data" / "appfolio_managers.json"
+
+    @classmethod
+    def managers(cls) -> list[dict[str, str]]:
+        try:
+            roster = json.loads(cls.ROSTER.read_text(encoding="utf-8"))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            raise SourceError("The AppFolio manager list could not be read.") from exc
+        managers = roster.get("managers") if isinstance(roster, dict) else None
+        if not isinstance(managers, list) or not managers:
+            raise SourceError("The AppFolio manager list is empty.")
+        return [
+            {"subdomain": str(m["subdomain"]), "name": str(m.get("name") or m["subdomain"])}
+            for m in managers
+            if isinstance(m, dict) and m.get("subdomain")
+        ]
+
+    @staticmethod
+    def origin(subdomain: str) -> str:
+        return f"https://{subdomain}.appfolio.com"
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        floor = _bedroom_floor(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        answered = 0
+        managers = self.managers()
+
+        for manager in managers:
+            origin = self.origin(manager["subdomain"])
+            try:
+                document = _require_page(client.get(f"{origin}/listings"), self.platform)
+            except SourceError as exc:
+                # One manager's outage is not the end of the others.
+                LOGGER.info("%s could not read %s: %s", self.platform, manager["name"], exc)
+                continue
+            if self.CONTAINER not in document:
+                # Not a tenant site. Counted as nothing rather than as a
+                # manager with nothing, because the two look identical and only
+                # one of them is somebody's typo.
+                LOGGER.warning(
+                    "%s: %s is not an AppFolio tenant site; check the subdomain %r.",
+                    self.platform, manager["name"], manager["subdomain"],
+                )
+                continue
+            answered += 1
+            for card in BeautifulSoup(document, "html.parser").select(self.CARD):
+                candidate = self._candidate(card, manager, origin, floor)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+
+        if not answered:
+            raise SourceError(
+                f"None of the {len(managers)} AppFolio managers answered with a listings page."
+            )
+        return listings
+
+    # "1 bd / 1 ba", "Studio / 1 ba", "3 bd / 2.5 ba". Both numbers live in one
+    # string, so reading it as a bedroom range makes a two-bed-one-bath into a
+    # one-bedroom and a three-bed-two-and-a-half into a two. The bed count is
+    # the figure before "bd", and a studio says so in words instead.
+    BED_BATH = re.compile(r"(?:(?P<studio>studio)|(?P<beds>[\d.]+)\s*bd)?[^\d]*(?:(?P<baths>[\d.]+)\s*ba)?", re.IGNORECASE)
+
+    @classmethod
+    def _bed_bath(cls, value: str) -> tuple[int | None, float | None]:
+        match = cls.BED_BATH.search(value or "")
+        if match is None:
+            return None, None
+        if match.group("studio"):
+            bedrooms: int | None = 0
+        elif match.group("beds"):
+            try:
+                bedrooms = int(float(match.group("beds")))
+            except ValueError:
+                bedrooms = None
+        else:
+            bedrooms = None
+        try:
+            baths = float(match.group("baths")) if match.group("baths") else None
+        except ValueError:
+            baths = None
+        return bedrooms, baths
+
+    @staticmethod
+    def _text(card, selector: str) -> str:
+        node = card.select_one(selector)
+        return _clean_text(node.get_text(" ", strip=True), 200) if node else ""
+
+    def _candidate(self, card, manager: dict, origin: str, floor: int) -> ListingCandidate | None:
+        link = card.select_one("a[href]")
+        href = str(link["href"]).strip() if link else ""
+        # The uuid is the identity. The rest of the path carries the address.
+        found = re.search(r"/listings/detail/([A-Za-z0-9-]+)", href)
+        if not found:
+            return None
+        url = urljoin(origin, href)
+
+        address = self._text(card, ".js-listing-address")
+        # "1330 Jones St. Apt 306, San Francisco, CA 94109" -- the city is the
+        # field before the state.
+        city = re.search(r",\s*([A-Za-z .'-]+),\s*[A-Za-z]{2}\b", address)
+        if not _is_san_francisco_locality(city.group(1) if city else ""):
+            return None
+
+        bedrooms, baths = self._bed_bath(self._text(card, ".js-listing-blurb-bed-bath"))
+        if bedrooms is not None and bedrooms < floor:
+            return None
+        price = _parse_price(self._text(card, ".js-listing-blurb-rent"), require_currency=True)
+        title = self._text(card, ".js-listing-title") or address.split(",")[0]
+        street = address.split(",")[0].strip()
+
+        metadata: dict[str, object] = {"address": street, "small_manager": True}
+        detail = [f"{title} — let by {manager['name']} through AppFolio."]
+        if address:
+            detail.append(f"Address: {address}.")
+        if bedrooms is not None:
+            metadata["bedrooms"] = bedrooms
+            detail.append(f"Listed as {_bedroom_phrase(bedrooms)}.")
+        if baths is not None:
+            metadata["bathrooms"] = baths
+        for item in card.select(".detail-box__item"):
+            label = self._text(item, ".detail-box__label").casefold()
+            value = self._text(item, ".detail-box__value")
+            if label.startswith("square") and value.isdigit():
+                metadata["floor_area"] = f"{value} sq ft"
+                detail.append(f"{value} sq ft.")
+        available = self._text(card, ".js-listing-available")
+        if available:
+            stated = _american_date(available) or (
+                "now" if available.strip().casefold() in {"now", "available now"} else ""
+            )
+            if stated and stated != "now":
+                metadata["available_on"] = stated
+            detail.append(f"Available {available.lower()}.")
+        if price:
+            detail.append(f"Asking ${price:,} a month.")
+
+        return ListingCandidate(
+            platform=self.platform,
+            source_id=found.group(1),
+            title=title,
+            original_url=url,
+            price=price,
+            neighborhood=sf_area_from_address(street),
+            listing_type="Apartment",
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            housing_kind=WHOLE_UNIT,
+        )
+
 class ApifyFacebookMarketplaceSource:
     """Optional low-volume Facebook automation that does not use a FB login."""
 
@@ -3864,6 +4050,7 @@ def default_sources(
     zumper = ZumperSource()
     apartment_list = ApartmentListSource()
     uloop = UloopSource()
+    appfolio = AppFolioSource()
     avalonbay = AvalonBaySource()
     rentsfnow = RentSFNowSource()
     redfin = RedfinSource()
@@ -3902,6 +4089,7 @@ def default_sources(
             apartment_list,
             zumper,
             uloop,
+            appfolio,
             avalonbay,
             rentsfnow,
             redfin,
@@ -3932,6 +4120,7 @@ def default_sources(
         apartment_list,
         zumper,
         uloop,
+        appfolio,
         avalonbay,
         rentsfnow,
         redfin,

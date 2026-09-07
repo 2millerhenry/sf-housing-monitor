@@ -1,0 +1,8 @@
+{
+  "note": "San Francisco property managers on AppFolio. Every tenant site is the same page at https://<subdomain>.appfolio.com/listings, so adding one is a row here rather than any code. Verified against the live site on 2026-09-06; a subdomain that is not a tenant site answers 200 with AppFolio's own 'Page not found', which the source reports as misconfigured rather than as a manager with nothing free.",
+  "managers": [
+    {"subdomain": "chandlerproperties", "name": "Chandler Properties"},
+    {"subdomain": "greentree", "name": "GreenTree Property Management"},
+    {"subdomain": "structureproperties", "name": "Structure Properties"}
+  ]
+}

@@ -149,6 +149,7 @@ class Scanner:
             # A handful of small JSON posts and no detail reads.
             "RentSFNow": 22,
             "AvalonBay": 24,
+            "AppFolio": 26,
             "SpareRoom": 25,
             # A student board: one small page per scan, no detail reads.
             "Uloop": 28,
