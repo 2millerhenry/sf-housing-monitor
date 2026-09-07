@@ -2426,6 +2426,14 @@ class ApartmentGuideSource:
         )
 
 
+# 32767 is the largest signed 16-bit integer, and Trulia publishes it as a unit
+# number where a home has none: one address in the 120 read here arrived as
+# "1825 Mission St #32767", on a building card, which cannot have a unit number
+# in the first place. Every other suffix seen was an ordinary flat number, so
+# this strips the sentinel by value rather than guessing which numbers are real.
+_TRULIA_NO_UNIT = re.compile(r"\s*#\s*32767\b")
+
+
 class TruliaSource:
     """Read the San Francisco rental buildings Trulia publishes.
 
@@ -2549,7 +2557,7 @@ class TruliaSource:
             # somebody else's host would otherwise be stored and opened as-is.
             return None
 
-        street = _clean_text(location.get("streetAddress"), 160)
+        street = _TRULIA_NO_UNIT.sub("", _clean_text(location.get("streetAddress"), 160)).strip()
         name = street or _clean_text(location.get("fullLocation"), 180)
         if not name:
             return None
@@ -4998,15 +5006,7 @@ def default_sources(
     rent_com = RentComSource()
     apartment_guide = ApartmentGuideSource()
     movoto = MovotoSource()
-    # TruliaSource is written and one line from live, and is deliberately not
-    # instantiated here. Its parser has never read a live Trulia page: the site
-    # answered 403 to every request for an hour and a half after a burst of
-    # research traffic, including after twelve minutes of complete silence.
-    # Everything testable without the site is tested -- 50 tests, every guard
-    # proved by killing a mutation -- but "the payload is still shaped the way
-    # it was recorded" is an assumption, and an integration nobody has watched
-    # work is not one to switch on. To enable it, instantiate it here and add
-    # it to both lists below, next to apartment_guide.
+    trulia = TruliaSource()
     free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
     manual_sources: list[ListingSource] = [
         ManualSource("HotPads", "https://hotpads.com/san-francisco-ca/apartments-for-rent", blocked_reason),
@@ -5049,6 +5049,7 @@ def default_sources(
             rent_com,
             apartment_guide,
             movoto,
+            trulia,
             RoomiesAlertSource(mailbox),
         ]
     return [
@@ -5083,5 +5084,6 @@ def default_sources(
         rent_com,
         apartment_guide,
         movoto,
+        trulia,
         *manual_sources[1:],
     ]

@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from sf_housing.classification import ROOM, WHOLE_UNIT
+from sf_housing.classification import ROOM as ROOM_KIND, WHOLE_UNIT
 from sf_housing.preferences import Preferences, parse_preferences
 from sf_housing.sources import (
     SourceError,
@@ -130,21 +130,11 @@ def test_the_starting_rate_note_says_whose_rent_it_is() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_trulia_is_deliberately_not_live_yet() -> None:
-    """Written, tested, and switched off on purpose.
-
-    Everything in this file passes without Trulia ever answering, because it
-    never did: the site returned 403 to every request for an hour and a half
-    after a burst of research traffic, including after twelve minutes of
-    silence. So the parser has been proved against cards shaped like the live
-    payload, and never against the live payload.
-
-    That is the one thing a source has to have done before it runs unattended
-    against a real pool, and this test is here so switching it on is a
-    deliberate act with a reason attached rather than a line somebody adds
-    back. When one real page has been read: instantiate TruliaSource in
-    default_sources and add it to both return lists, then invert this test.
-    """
+def test_trulia_ships_whether_or_not_an_inbox_is_connected() -> None:
+    """Switched on once one real page had been read and parsed, which is what
+    the fixture at the bottom of this file is. Before that it was written,
+    tested and deliberately not registered: a parser that has only ever seen
+    cards somebody built for it has not been shown to work."""
     class FakeMailbox:
         credential = None
 
@@ -155,7 +145,7 @@ def test_trulia_is_deliberately_not_live_yet() -> None:
         ("no inbox", default_sources()),
         ("inbox connected", default_sources(FakeMailbox())),
     ):
-        assert "Trulia" not in [item.platform for item in sources], label
+        assert "Trulia" in [item.platform for item in sources], label
 
 
 def test_trulia_is_ready_to_switch_on() -> None:
@@ -440,7 +430,7 @@ def test_a_card_with_no_rent_is_kept_and_says_so(preferences) -> None:
 def test_a_room_for_rent_is_not_scored_as_a_whole_home(preferences) -> None:
     """A lodger's room reaching a whole-home deal is the failure here."""
     room = card(__typename="HOME_RoomForRent")
-    assert read(page_of(room), preferences)[0].housing_kind == ROOM
+    assert read(page_of(room), preferences)[0].housing_kind == ROOM_KIND
     assert read(page_of(card()), preferences)[0].housing_kind == WHOLE_UNIT
     assert read(page_of(room), preferences)[0].listing_type == "Room in a home"
 
@@ -510,3 +500,110 @@ def test_trulias_own_labels_reach_the_reader(preferences) -> None:
 
 def test_a_card_with_no_labels_says_nothing_about_them(preferences) -> None:
     assert "Trulia tags it" not in (read(page_of(card(tags=[])), preferences)[0].summary or "")
+
+
+def test_trulias_placeholder_unit_number_is_not_shown_to_anybody(preferences) -> None:
+    """32767 is the largest signed 16-bit integer, and Trulia publishes it
+    where a home has no unit: "1825 Mission St #32767" arrived on a *building*
+    card, which cannot have a unit number at all. One address in the 120 read
+    carried it; every other suffix was an ordinary flat number, so it is
+    stripped by value rather than by guessing which numbers are real."""
+    listing = read(page_of(card(location={
+        "city": "San Francisco", "zipCode": "94103",
+        "streetAddress": "1825 Mission St #32767",
+        "fullLocation": "1825 Mission St #32767, San Francisco, CA 94103"})), preferences)[0]
+    assert listing.title == "1825 Mission St"
+    assert "32767" not in (listing.summary or "")
+    assert listing.metadata["address"] == "1825 Mission St"
+
+
+def test_a_real_unit_number_is_left_alone(preferences) -> None:
+    listing = read(page_of(card(location={
+        "city": "San Francisco", "zipCode": "94103",
+        "streetAddress": "205 9th St #28",
+        "fullLocation": "205 9th St #28, San Francisco, CA 94103"})), preferences)[0]
+    assert listing.title == "205 9th St #28"
+
+
+# --------------------------------------------------------------------------
+# the real captured page
+#
+# The constructed cards above prove each guard fires. These prove the parser
+# reads a page Trulia actually served: five real records captured from its
+# San Francisco and Oakland searches, chosen for one behaviour each.
+# --------------------------------------------------------------------------
+
+
+MISSION = "1001488048_BUILDING_ID"   # one bedroom count, rent published as a range
+PRISM = "2753090638_BUILDING_ID"     # studio through 2-bed, so the range's floor is the studio's
+ROOM = "401673398_ZPID"              # a room for rent among the buildings
+STUDIO_BLDG = "2757916840_BUILDING_ID"
+OAKLAND = "2747960547_BUILDING_ID"   # a real Oakland building on a real Oakland page
+
+
+def real(preferences: Preferences):
+    return {item.source_id: item for item in
+            TruliaSource().search(FakeClient(FakeResponse(search_page())), preferences)}
+
+
+def test_the_captured_page_reads_into_its_san_francisco_homes(preferences) -> None:
+    assert set(real(preferences)) == {MISSION, PRISM, ROOM, STUDIO_BLDG}
+
+
+def test_the_oakland_building_on_the_captured_page_is_dropped(preferences) -> None:
+    assert OAKLAND not in real(preferences)
+
+
+def test_a_real_range_price_is_kept_for_a_single_size_building(preferences) -> None:
+    """"$3,834 - $4,002/mo" on a building letting only one-bedrooms is a
+    spread across its own units, so its floor is what a one-bedroom starts
+    at."""
+    listing = real(preferences)[MISSION]
+    assert listing.price == 3834
+    assert "price_from" not in listing.metadata
+    assert listing.metadata["bedrooms_low"] == listing.metadata["bedrooms_high"] == 1
+
+
+def test_a_real_multi_size_building_withholds_the_larger_homes_rent() -> None:
+    listings = {i.source_id: i for i in TruliaSource().search(
+        FakeClient(FakeResponse(search_page())), profile("one_bedroom"))}
+    listing = listings[PRISM]
+    assert listing.price is None
+    assert listing.metadata["price_from"] == 3675
+    assert listing.metadata["bedrooms_low"] == 0 and listing.metadata["bedrooms_high"] == 2
+    assert "the 1-bedroom rent is not published" in (listing.summary or "")
+
+
+def test_the_real_room_for_rent_is_not_scored_as_a_whole_home(preferences) -> None:
+    stored = real(preferences)
+    assert stored[ROOM].housing_kind == ROOM_KIND
+    assert stored[ROOM].listing_type == "Room in a home"
+    assert stored[MISSION].housing_kind == WHOLE_UNIT
+
+
+def test_every_real_link_is_absolute_and_on_trulia(preferences) -> None:
+    """`url` is a path and `homeUrl` is null on all 120 captured records."""
+    for listing in real(preferences).values():
+        assert listing.original_url.startswith("https://www.trulia.com/")
+
+
+def test_every_real_home_publishes_a_usable_address_and_area(preferences) -> None:
+    from sf_housing.location import parse_street_address
+
+    for listing in real(preferences).values():
+        assert parse_street_address(listing.metadata["address"]) is not None
+        assert listing.neighborhood, f"{listing.title} resolved to no neighbourhood"
+
+
+def test_a_page_that_repeats_the_last_one_ends_the_walk(preferences) -> None:
+    """Past its last real page Trulia serves page one again: page sixty came
+    back card for card. At the shipped two-page depth that costs one wasted
+    request, which is why the guard has to be asserted rather than inferred --
+    read deeper it would re-read the same homes until the budget ran out."""
+    source = TruliaSource()
+    source.max_pages = 6
+    client = FakeClient(FakeResponse(page_of(card())))
+    listings = source.search(client, preferences)
+
+    assert len(listings) == 1
+    assert len(client.requested) == 2, "the repeat should stop the walk, not six pages of it"
