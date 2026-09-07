@@ -1811,6 +1811,24 @@ def _homes_free_note(count: int) -> str:
     return "1 home is free right now." if count == 1 else f"{count} homes are free right now."
 
 
+def _mentions_unit(address: str, unit: str) -> bool:
+    """Does this address already carry this unit number?
+
+    Compared on letters and digits alone, because the two fields spell the
+    same unit differently: "#323" against "APT 323", "# 416" against "416".
+    """
+    def core(value: str) -> str:
+        return re.sub(r"[^0-9a-z]", "", value.casefold())
+
+    stripped = core(unit)
+    # "APT 323" and "323" have to compare equal, so the label is dropped too.
+    for label in ("apt", "unit", "ste", "suite", "no"):
+        if stripped.startswith(label):
+            stripped = stripped[len(label):]
+            break
+    return bool(stripped) and stripped in core(address)
+
+
 def _bedroom_noun(count: int) -> str:
     return "studio" if count == 0 else f"{count}-bedroom"
 
@@ -2625,6 +2643,218 @@ class TruliaSource:
             summary=_clean_text(" ".join(detail), 1200),
             metadata=metadata,
             housing_kind=kind,
+        )
+
+
+class MovotoSource:
+    """Read the individual San Francisco homes Movoto has out to let.
+
+    Almost every other automatic source here publishes *buildings*: one card
+    for an address, with a rent that belongs to whichever home in it is
+    cheapest. Movoto publishes the homes themselves -- 1,964 of them across
+    forty pages, each with its own rent, its own unit number and its own
+    bedroom count -- which is a different shape of inventory rather than more
+    of the same, and it is why a third of the addresses read here were ones no
+    other source had.
+
+    Two payloads sit on the page and only one is worth reading. The
+    schema.org blocks carry an address and nothing else: no bedrooms, no floor
+    area, and the rent in a separate ``Product`` keyed on a URL that the
+    residence block does not repeat. The ``__INITIAL_STATE__`` script behind
+    them carries the whole record -- rent, bedrooms, bathrooms, floor area,
+    the unit number, and Movoto's own name for the neighbourhood -- so that is
+    what is read, and the schema.org blocks are ignored entirely.
+
+    The page is a rentals search, but nothing about a listing's shape says so:
+    a home for sale and a home to let are the same record with a different
+    status, and its ``listPrice`` is a sale price on one and a monthly rent on
+    the other. So every record is checked against ``houseRealStatus`` before
+    it is believed. Read without that, one search returning sale listings
+    would put million-dollar "rents" into the pool.
+    """
+
+    platform = "Movoto"
+    mode = "automatic"
+    search_url = "https://www.movoto.com/san-francisco-ca/rentals/"
+    manual_reason = None
+    # Every field worth scoring is on the search page.
+    detail_budget = 0
+    empty_result_message = "Movoto published no San Francisco rentals in its page data."
+    # Fifty homes a page. Six pages is more than the per-source cap will keep,
+    # so the cap decides how many are stored and this only bounds the reading.
+    max_pages = 6
+
+    # The status that means "this is a home to let". Checked rather than
+    # assumed from the URL, because the record shape is identical for a sale.
+    FOR_RENT = "FOR_RENT"
+
+    def _page_url(self, page: int) -> str:
+        return self.search_url if page == 1 else f"{self.search_url}p-{page}/"
+
+    @staticmethod
+    def _listings(document: str) -> list[dict]:
+        """The homes on a Movoto search page, or nothing."""
+        match = re.search(
+            r'<script id="__INITIAL_STATE__"[^>]*>(.*?)</script>', document, re.S
+        )
+        if not match:
+            return []
+        try:
+            parsed = json.loads(match.group(1))
+        except (ValueError, json.JSONDecodeError):
+            return []
+        rows = _nested_mapping(parsed, "pageData").get("listings")
+        return [row for row in rows or [] if isinstance(row, dict)]
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        wanted = _wanted_bedroom_counts(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        read_a_card = False
+        document = ""
+
+        for page in range(1, self.max_pages + 1):
+            document = _require_page(
+                client.get(self._page_url(page), headers=_BROWSER_HEADERS), self.platform
+            )
+            homes = self._listings(document)
+            if not homes:
+                break
+            fresh = 0
+            for home in homes:
+                identifier = _clean_text(home.get("mlsNumber") or home.get("id"), 60)
+                if not identifier or identifier in seen:
+                    continue
+                seen.add(identifier)
+                fresh += 1
+                read_a_card = True
+                candidate = self._candidate(home, identifier, wanted)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+            # Forty pages of results, then page one again: page forty holds the
+            # last fourteen homes, and pages forty-five and fifty both came
+            # back as page one, home for home. A page that adds nothing new is
+            # the end of the results whatever its own total claims.
+            if not fresh:
+                break
+
+        if not read_a_card:
+            raise _read_nothing(self.platform, document, "homes in its page data")
+        return listings
+
+    def _candidate(
+        self, home: dict, identifier: str, wanted: set[int]
+    ) -> ListingCandidate | None:
+        # The one check that stops a sale listing being read as a rent. Every
+        # home on this page said FOR_RENT; a page that ever returns something
+        # else is returning a different kind of thing, not a cheaper home.
+        if _clean_text(home.get("houseRealStatus"), 40).upper() != self.FOR_RENT:
+            return None
+        if home.get("isRentals") is False or home.get("isSold") is True:
+            return None
+
+        geo = home.get("geo") if isinstance(home.get("geo"), dict) else {}
+        if not _is_san_francisco_locality(geo.get("city")):
+            return None
+
+        path = str(home.get("path") or "").strip()
+        if not path:
+            return None
+        url = urljoin("https://www.movoto.com/", path)
+        if not url.startswith("https://www.movoto.com/"):
+            # urljoin honours an absolute URL in `path`, so a payload carrying
+            # somebody else's host would otherwise be stored and opened as-is.
+            return None
+
+        street = _clean_text(geo.get("address"), 160)
+        # The unit number is what separates two homes at one address. Kept in
+        # the title rather than the address so corroboration still matches the
+        # building, which is the thing another source can confirm.
+        #
+        # Movoto writes it in both fields on most homes and only one on some:
+        # "1140 Harrison St #323" arrives with a subPremise of "APT 323".
+        # Appended unconditionally that reads "1140 Harrison St #323 APT 323",
+        # so it is added only where the address has not already got it.
+        unit = _clean_text(geo.get("subPremise"), 24)
+        name = street or _clean_text(geo.get("formatAddress"), 180)
+        if unit and not _mentions_unit(street, unit):
+            name = f"{name} {unit}".strip()
+        if not name:
+            return None
+
+        rent = home.get("listPrice")
+        price = int(rent) if isinstance(rent, (int, float)) and not isinstance(rent, bool) and rent > 0 else None
+
+        metadata: dict[str, object] = {}
+        if street:
+            metadata["address"] = street
+        if unit:
+            metadata["unit"] = unit
+        detail = [f"{name} listed on Movoto."]
+        if street:
+            detail.append(f"Address: {street}.")
+
+        beds = home.get("bed")
+        bedrooms = int(beds) if isinstance(beds, (int, float)) and not isinstance(beds, bool) else None
+        if bedrooms is not None:
+            metadata["bedrooms"] = bedrooms
+            detail.append(f"Listed as {_bedroom_phrase(bedrooms)}.")
+        else:
+            # Roughly one home in seven publishes no bedroom count. Said out
+            # loud rather than defaulted to a studio, which is what an
+            # unstated count silently becomes wherever zero is the fallback.
+            detail.append("Movoto does not state how many bedrooms this home has.")
+
+        baths = home.get("bath")
+        if isinstance(baths, (int, float)) and not isinstance(baths, bool) and baths > 0:
+            plural = "" if baths == 1 else "s"
+            detail.append(f"{int(baths) if float(baths).is_integer() else baths} bathroom{plural}.")
+
+        area = home.get("sqftTotal")
+        if isinstance(area, (int, float)) and not isinstance(area, bool) and area > 0:
+            metadata["floor_area"] = f"{int(area):,} sq ft"
+            detail.append(f"Floor area {int(area):,} sq ft.")
+
+        if price is not None:
+            detail.append(f"Asking ${price:,} a month.")
+
+        kind = _clean_text(home.get("propertyType"), 40).replace("_", " ").title()
+
+        # Movoto names the neighbourhood itself, which beats inferring one from
+        # the street -- but only where it names one this deal can also rank.
+        # Nineteen of the thirty-five it used here are names the app knows.
+        stated = _clean_text(geo.get("neighborhoodName"), 60)
+        neighborhood = (
+            stated if stated in SF_NEIGHBORHOODS else None
+        ) or sf_area_from_address(street) or sf_target_coordinate_neighborhood(
+            geo.get("lat"), geo.get("lng")
+        ) or sf_area_from_zip(geo.get("zipcode"))
+        # Worth saying only where it disagrees with the label this listing got.
+        # "Movoto files it under Parkmerced" against a listing already labelled
+        # Park Merced is the same fact spelled differently.
+        if stated and _normal_text(stated).replace(" ", "") != _normal_text(
+            str(neighborhood or "")
+        ).replace(" ", ""):
+            detail.append(f"Movoto files it under {stated}.")
+
+        return ListingCandidate(
+            platform=self.platform,
+            # Movoto's own listing id. The path carries the street and the unit,
+            # so keyed on that a re-listing at a corrected address would orphan
+            # the stored row rather than update it.
+            source_id=identifier,
+            title=name,
+            original_url=url,
+            price=price,
+            neighborhood=neighborhood,
+            listing_type=kind or "Home",
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            # One home let whole, not a room inside somebody else's.
+            housing_kind=WHOLE_UNIT,
         )
 
 
@@ -4767,6 +4997,7 @@ def default_sources(
     redfin = RedfinSource()
     rent_com = RentComSource()
     apartment_guide = ApartmentGuideSource()
+    movoto = MovotoSource()
     # TruliaSource is written and one line from live, and is deliberately not
     # instantiated here. Its parser has never read a live Trulia page: the site
     # answered 403 to every request for an hour and a half after a burst of
@@ -4817,6 +5048,7 @@ def default_sources(
             redfin,
             rent_com,
             apartment_guide,
+            movoto,
             RoomiesAlertSource(mailbox),
         ]
     return [
@@ -4850,5 +5082,6 @@ def default_sources(
         redfin,
         rent_com,
         apartment_guide,
+        movoto,
         *manual_sources[1:],
     ]

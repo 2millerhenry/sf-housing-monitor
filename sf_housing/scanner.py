@@ -167,6 +167,9 @@ class Scanner:
             # Redfin does and runs well before the sources that fetch a page
             # per building.
             "ApartmentGuide": 48,
+            # Six search pages and no detail reads, and the deepest
+            # inventory of the direct sources, so it is worth the pages.
+            "Movoto": 49,
             "Roomies": 50,
             # A search page plus a detail page per building, like Rent.com.
             "Apartment List": 52,
