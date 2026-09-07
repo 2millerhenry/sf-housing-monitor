@@ -2688,9 +2688,13 @@ class MovotoSource:
     # Every field worth scoring is on the search page.
     detail_budget = 0
     empty_result_message = "Movoto published no San Francisco rentals in its page data."
-    # Fifty homes a page. Six pages is more than the per-source cap will keep,
-    # so the cap decides how many are stored and this only bounds the reading.
-    max_pages = 6
+    # Fifty homes a page and forty pages of them, which is the whole San
+    # Francisco inventory: 1,967 homes read in about eleven seconds, because
+    # each page is a single request and a JSON parse. The ceiling sits above
+    # the real depth on purpose -- the repeat-guard below ends the walk as
+    # soon as a page comes back the same, so headroom for a bigger inventory
+    # costs one request rather than five wasted ones.
+    max_pages = 45
 
     # The status that means "this is a home to let". Checked rather than
     # assumed from the URL, because the record shape is identical for a sale.

@@ -9,6 +9,7 @@ from typing import Callable
 
 from .classification import (
     bathrooms_from_listing,
+    FOUR_BEDROOM,
     ONE_BEDROOM,
     STUDIO,
     THREE_BEDROOM,
@@ -23,8 +24,14 @@ from .location import (
     declared_outside_sf_url_hint,
 )
 from .models import ListingCandidate, ScoreResult
-from .deal_profile import SF_NEIGHBORHOODS
+from .deal_profile import DEFAULT_OCCUPANTS, DEFAULT_PER_PERSON, SF_NEIGHBORHOODS, SPLIT_PATHS
 from .preferences import Preferences
+
+
+# Every path that describes an entire home, shared or not. Listed once so a
+# home of a size nobody remembered to add here cannot quietly become "entire
+# homes are not enabled in your deal".
+WHOLE_HOME_PATHS = frozenset({STUDIO, ONE_BEDROOM, *SPLIT_PATHS})
 
 
 PRIVATE_POSITIVE = (
@@ -893,15 +900,18 @@ def _lifestyle(text: str, preferences: Preferences) -> Criterion:
 
 def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> ScoreResult:
     """Score only the constraints that define the separate whole-unit search."""
-    is_split_unit = listing.unit_type in {TWO_BEDROOM, THREE_BEDROOM}
-    if listing.unit_type == THREE_BEDROOM:
-        settings = preferences.section("three_bedroom")
-        occupants = int(settings.get("occupants", 3))
-        max_per_person = int(settings.get("max_per_person", 2500))
-    elif listing.unit_type == TWO_BEDROOM:
-        settings = preferences.section("two_bedroom")
-        occupants = int(settings.get("occupants", 2))
-        max_per_person = int(settings.get("max_per_person", 2700))
+    # Every shared path reads its own section, rather than a branch per path.
+    # Written that way, four-bedroom was left out of the branch and out of the
+    # set above it, so it fell through to the whole-unit settings -- whose
+    # allowed types are studio and one-bedroom -- and every four-bedroom home
+    # was refused as "outside this deal path" no matter what the deal enabled.
+    # A fifth path added to SPLIT_PATHS now works without touching this.
+    is_split_unit = listing.unit_type in SPLIT_PATHS
+    if is_split_unit:
+        path = str(listing.unit_type)
+        settings = preferences.section(path)
+        occupants = int(settings.get("occupants", DEFAULT_OCCUPANTS[path]))
+        max_per_person = int(settings.get("max_per_person", DEFAULT_PER_PERSON[path]))
     else:
         settings = preferences.section("whole_unit")
         occupants = 1
@@ -1252,7 +1262,7 @@ def _enforce_enabled_path(
     verification: str | None = None
     if listing.housing_kind == WHOLE_UNIT:
         if listing.unit_type is None:
-            if not enabled.intersection({STUDIO, ONE_BEDROOM, TWO_BEDROOM, THREE_BEDROOM}):
+            if not enabled.intersection(WHOLE_HOME_PATHS):
                 failure = "Entire homes are not enabled in your deal."
             else:
                 verification = "Confirm which enabled whole-home path this listing belongs to."

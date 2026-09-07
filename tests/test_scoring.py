@@ -1351,3 +1351,118 @@ def test_anywhere_in_sf_still_accepts_a_san_francisco_home() -> None:
 
     assert result.eligibility != "ineligible"
     assert result.score >= 60
+
+
+# --------------------------------------------------------------------------
+# every whole-home size a deal can enable
+# --------------------------------------------------------------------------
+
+
+def _deal(*paths: str, maximum: int = 8000) -> Preferences:
+    """A deal enabling exactly these whole-home paths, anywhere in the city."""
+    import yaml
+
+    from sf_housing.deal_profile import DEFAULT_OCCUPANTS
+
+    return parse_preferences(
+        yaml.safe_dump(
+            {
+                "profile_version": 1,
+                "profile": {
+                    "state": "active",
+                    "enabled_paths": list(paths),
+                    "budgets": {
+                        path: {
+                            "maximum_monthly": maximum,
+                            **({"occupants": DEFAULT_OCCUPANTS[path]} if path in DEFAULT_OCCUPANTS else {}),
+                        }
+                        for path in paths
+                    },
+                    "geography": {"anywhere_in_sf": True},
+                },
+            }
+        )
+    )
+
+
+def _home(bedrooms: int, price: int = 6000) -> ListingCandidate:
+    from sf_housing.classification import WHOLE_UNIT
+
+    return ListingCandidate(
+        platform="Test",
+        source_id=f"home-{bedrooms}-{price}",
+        title=f"A {bedrooms}-bedroom home",
+        original_url=f"https://example.test/{bedrooms}/{price}",
+        price=price,
+        neighborhood="Mission District",
+        listing_type="Condo",
+        summary=f"Listed as a {bedrooms}-bedroom. Asking ${price:,} a month.",
+        metadata={"address": "1 Valencia St", "bedrooms": bedrooms},
+        housing_kind=WHOLE_UNIT,
+    )
+
+
+@pytest.mark.parametrize("bedrooms,path", [(2, "two_bedroom"), (3, "three_bedroom"), (4, "four_bedroom")])
+def test_a_shared_home_of_any_enabled_size_is_not_refused_as_the_wrong_type(bedrooms, path) -> None:
+    """Four-bedroom was missing from the set of shared paths and from the
+    branch below it, so it fell through to the whole-unit settings -- whose
+    allowed types are studio and one-bedroom -- and every four-bedroom home
+    came back "The home type is outside this deal path", ineligible, however
+    plainly the deal enabled it. Two- and three-bedroom worked; four did not,
+    and enabling it did nothing at all."""
+    result = score_listing(_home(bedrooms), _deal(path))
+
+    assert result.eligibility != "ineligible", result.eligibility_reasons
+    assert "outside this deal path" not in " ".join(result.eligibility_reasons)
+
+
+@pytest.mark.parametrize("bedrooms,path", [(2, "two_bedroom"), (3, "three_bedroom"), (4, "four_bedroom")])
+def test_a_shared_home_reads_its_own_paths_budget(bedrooms, path) -> None:
+    """Its own section, not the whole-unit one. Read from the wrong section a
+    four-bedroom was measured against a ceiling nobody set for it."""
+    assert score_listing(_home(bedrooms, price=7000), _deal(path, maximum=8000)).eligibility != "ineligible"
+
+    over = score_listing(_home(bedrooms, price=40000), _deal(path, maximum=8000))
+    assert over.eligibility == "ineligible"
+    assert any("maximum" in reason for reason in over.eligibility_reasons)
+
+
+def test_a_size_the_deal_does_not_enable_is_still_refused() -> None:
+    """The fix must not turn the check off: a three-bedroom is refused by a
+    deal that only enabled four."""
+    result = score_listing(_home(3), _deal("four_bedroom"))
+    assert result.eligibility == "ineligible"
+    assert any("not enabled" in reason for reason in result.eligibility_reasons)
+
+
+def test_a_deal_of_only_large_homes_still_counts_as_wanting_entire_homes() -> None:
+    """A whole home whose size could not be read is asked about, not refused.
+    The set naming the whole-home paths omitted four-bedroom too, so a deal
+    enabling only that was told entire homes were not part of it."""
+    from sf_housing.classification import WHOLE_UNIT
+
+    unsized = ListingCandidate(
+        platform="Test",
+        source_id="unsized",
+        title="An apartment",
+        original_url="https://example.test/unsized",
+        price=6000,
+        neighborhood="Mission District",
+        summary="An apartment in the Mission.",
+        metadata={"address": "1 Valencia St"},
+        housing_kind=WHOLE_UNIT,
+    )
+    result = score_listing(unsized, _deal("four_bedroom"))
+    assert "Entire homes are not enabled" not in " ".join(result.eligibility_reasons)
+
+
+def test_every_shared_path_has_the_defaults_the_scorer_reads() -> None:
+    """The branch is gone; the scorer looks these up by path name. A path in
+    SPLIT_PATHS without an entry here would raise KeyError mid-scan."""
+    from sf_housing.deal_profile import DEFAULT_OCCUPANTS, DEFAULT_PER_PERSON, SPLIT_PATHS
+    from sf_housing.scoring import WHOLE_HOME_PATHS
+
+    for path in SPLIT_PATHS:
+        assert path in DEFAULT_OCCUPANTS, path
+        assert path in DEFAULT_PER_PERSON, path
+        assert path in WHOLE_HOME_PATHS, path

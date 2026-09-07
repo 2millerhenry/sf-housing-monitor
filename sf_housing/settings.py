@@ -16,8 +16,14 @@ class Settings:
     log_path: Path
     # Public-source work stays inside one bounded scan even with separate room,
     # small-unit, and 2–3 bedroom searches plus their detail reads.
+    #
+    # Raised from 110 when Movoto began reading its whole inventory. A scan was
+    # using 96 of those 110 seconds, so the fourteen left were not enough for a
+    # source that reads forty pages, and the sources ordered after it would
+    # have started recording "skipped to keep this scan within the budget"
+    # instead of results.
     request_timeout_seconds: float = 8.0
-    scan_max_seconds: float = 110.0
+    scan_max_seconds: float = 180.0
     gmail_client_secret_path: Path | None = None
     gmail_token_path: Path | None = None
     gmail_pending_state_path: Path | None = None
