@@ -146,6 +146,12 @@ def test_an_unstated_size_stops_being_a_question_you_did_not_ask() -> None:
     assert any(item["check"] == "building size" for item in asked.details["hard_constraints"])
     assert not any(item["check"] == "building size" for item in unasked.details["hard_constraints"])
     assert unasked.score > asked.score
+    # And it is never mentioned in words either. Asked with no ceiling set, the
+    # sentence reads "verify it has None units or fewer", which is the kind of
+    # thing a reader rightly stops trusting a page over.
+    assert "building size" not in unasked.concern.casefold()
+    assert "None" not in unasked.concern
+    assert "building size is not stated" in asked.concern
 
 
 def test_a_tighter_answer_refuses_more() -> None:
@@ -180,9 +186,14 @@ def test_the_question_is_asked_out_loud(tmp_path: Path) -> None:
     page = page_for(tmp_path)
 
     assert "Largest building you would live in" in page
-    assert page.count('name="building_units"') == 4
-    # The shape it replaced: a hidden field nobody could answer.
+    # Four choices a reader can actually see and click. Counting the fields
+    # alone would pass just as happily on four hidden ones, which is the exact
+    # shape this replaced.
+    assert page.count('type="radio" name="building_units"') == 4
+    assert 'name="building_units"' in page and 'type="hidden" name="building_units"' not in page
     assert 'type="hidden" name="studio_building_units"' not in page
+    for label in ("Up to 25", "Up to 50", "Up to 100", "Any size"):
+        assert label in page
 
 
 @pytest.mark.parametrize(("units", "expected"), [("25", 'value="25" checked'), ("", 'value="" checked')])

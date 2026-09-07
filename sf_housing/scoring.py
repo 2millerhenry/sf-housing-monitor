@@ -986,13 +986,10 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         "neighborhood": neighborhood.value,
         "unit_type": 1.0 if type_matches else 0.5 if listing.unit_type is None else 0.0,
         "price": 1.0 if price_matches else 0.5 if not price_known else 0.0,
-        # A size nobody set a limit on is not a half-known fact: it is a
-        # question the reader chose not to ask.
-        "building_size": (
-            1.0
-            if not building_size_matters or building_matches
-            else 0.5 if not building_known else 0.0
-        ),
+        # An unknown size is half a fact when a limit was set. Where none
+        # was, building_matches is already true and this is simply full marks:
+        # a question the reader declined is not a gap in the listing.
+        "building_size": 1.0 if building_matches else 0.5 if not building_known else 0.0,
     }
     weights = {"neighborhood": 35.0, "unit_type": 25.0, "price": 25.0, "building_size": 15.0}
     for item in active_amenities:
@@ -1019,7 +1016,7 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
             score = min(score, 39)
     if price_known and not price_matches:
         score = min(score, 49)
-    if building_size_matters and building_known and not building_matches:
+    if building_known and not building_matches:
         score = min(score, 49)
     # A secondary area remains available as a fallback, but it must not look
     # equally strong as a dream or strong neighborhood simply because the card
