@@ -1,0 +1,291 @@
+{
+ "last_page": 7,
+ "current_page": "1",
+ "units": [],
+ "recommended_units": [
+  {
+   "url": "/apartments/rental/329-olema",
+   "image": "https://www.rentsfnow.com/wp-content/uploads/2025/11/veritas-329-olema-01.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 304,
+   "neightborhood": "Fairfax",
+   "post_title": "329 Olema",
+   "criteria": "3  Beds \\\\ 2  Baths \\\\ &#36;4,295",
+   "pet": "Cats or Dogs",
+   "promotions": [],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "329-337 Olema 329 Olema",
+   "id": "828817"
+  },
+  {
+   "url": "/apartments/rental/333-olema",
+   "image": "https://www.rentsfnow.com/wp-content/uploads/2025/11/veritas-333-olema-01.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 304,
+   "neightborhood": "Fairfax",
+   "post_title": "333 Olema",
+   "criteria": "3  Beds \\\\ 2  Baths \\\\ &#36;4,295",
+   "pet": "Cats or Dogs",
+   "promotions": [],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "329-337 Olema 333 Olema",
+   "id": "828856"
+  },
+  {
+   "url": "/apartments/rental/1320-lombard-301",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/168391/veritas-1320-lombard-unit-301-01.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 2603,
+   "neightborhood": "Russian Hill",
+   "post_title": "1320 Lombard #301",
+   "criteria": "2  Beds \\\\ 1  Bath \\\\ &#36;7,495",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 924,
+     "name": "$325 Move-In Special",
+     "slug": "sf_promo_a0xey000000iimg2a0",
+     "term_group": 0,
+     "term_taxonomy_id": 924,
+     "taxonomy": "tax_promotion",
+     "description": "Pay only $325 to purchase a Move-In Special Security Deposit Waiver, subject to screening application approval. $325 Security Deposit Waiver is not a deposit and is non-refundable. Resident is responsible for any damages to unit at move out. Lease must be signed by September 30th. Lease must be signed within 48 hours of touring the unit.",
+     "parent": 0,
+     "count": 407,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "1320-1380 Lombard 1320 Lombard #301",
+   "id": "84878"
+  },
+  {
+   "url": "/apartments/rental/1320-lombard-505",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/168391/veritas-1320-lombard-unit-505-01.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 2033,
+   "neightborhood": "Russian Hill",
+   "post_title": "1320 Lombard #505",
+   "criteria": "2  Beds \\\\ 1  Bath \\\\ &#36;7,595",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 924,
+     "name": "$325 Move-In Special",
+     "slug": "sf_promo_a0xey000000iimg2a0",
+     "term_group": 0,
+     "term_taxonomy_id": 924,
+     "taxonomy": "tax_promotion",
+     "description": "Pay only $325 to purchase a Move-In Special Security Deposit Waiver, subject to screening application approval. $325 Security Deposit Waiver is not a deposit and is non-refundable. Resident is responsible for any damages to unit at move out. Lease must be signed by September 30th. Lease must be signed within 48 hours of touring the unit.",
+     "parent": 0,
+     "count": 407,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "1320-1380 Lombard 1320 Lombard #505",
+   "id": "84947"
+  },
+  {
+   "url": "/apartments/rental/312-baker-314a",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/514705/rentsfnow-312-baker-unit-314a-1.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 2603,
+   "neightborhood": "NOPA",
+   "post_title": "312 Baker #314A",
+   "criteria": "2  Beds \\\\ 1  Bath \\\\ &#36;6,995",
+   "pet": "Cats or Dogs",
+   "promotions": [],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "312 Baker 314A",
+   "id": "93476"
+  },
+  {
+   "url": "/apartments/rental/655-powell-503",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/530706/veritas-655-powell-staged-unit-503-01(1).jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 1802,
+   "neightborhood": "Nob Hill",
+   "post_title": "655 Powell #503",
+   "criteria": "2  Beds \\\\ 2  Baths \\\\ &#36;7,495",
+   "pet": "Cats or Dogs",
+   "promotions": [],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "655 Powell 503",
+   "id": "124970"
+  },
+  {
+   "url": "/apartments/rental/2275-broadway-207",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/890855/veritas-2275-broadway-staged-unit-207-01-wm.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 2012,
+   "neightborhood": "Pacific Heights",
+   "post_title": "2275 Broadway #207",
+   "criteria": "2  Beds \\\\ 2  Baths \\\\ &#36;16,000",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 924,
+     "name": "$325 Move-In Special",
+     "slug": "sf_promo_a0xey000000iimg2a0",
+     "term_group": 0,
+     "term_taxonomy_id": 924,
+     "taxonomy": "tax_promotion",
+     "description": "Pay only $325 to purchase a Move-In Special Security Deposit Waiver, subject to screening application approval. $325 Security Deposit Waiver is not a deposit and is non-refundable. Resident is responsible for any damages to unit at move out. Lease must be signed by September 30th. Lease must be signed within 48 hours of touring the unit.",
+     "parent": 0,
+     "count": 407,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "2275 Broadway 207",
+   "id": "135847"
+  },
+  {
+   "url": "/apartments/rental/2927-sacramento-9",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/992103/veritas-2927-sacramento-unit-9-01.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 1426,
+   "neightborhood": "Pacific Heights",
+   "post_title": "2927 Sacramento #9",
+   "criteria": "2  Beds \\\\ 1  Bath \\\\ &#36;6,495",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 924,
+     "name": "$325 Move-In Special",
+     "slug": "sf_promo_a0xey000000iimg2a0",
+     "term_group": 0,
+     "term_taxonomy_id": 924,
+     "taxonomy": "tax_promotion",
+     "description": "Pay only $325 to purchase a Move-In Special Security Deposit Waiver, subject to screening application approval. $325 Security Deposit Waiver is not a deposit and is non-refundable. Resident is responsible for any damages to unit at move out. Lease must be signed by September 30th. Lease must be signed within 48 hours of touring the unit.",
+     "parent": 0,
+     "count": 407,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "2927 Sacramento #9",
+   "id": "506776"
+  },
+  {
+   "url": "/apartments/rental/2200-leavenworth-505",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/1108124/veritas-2200-leavenworth-unit-505-01(1).jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 1048,
+   "neightborhood": "Russian Hill",
+   "post_title": "2200 Leavenworth #505",
+   "criteria": "2  Beds \\\\ 2  Baths \\\\ &#36;14,000",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 1164,
+     "name": "Receive a Bilt Reward Equivalent to .5 Month\u2019s Rent + $95 Move-In Special",
+     "slug": "sf_promo_a0xjw00000benfrma1",
+     "term_group": 0,
+     "term_taxonomy_id": 1164,
+     "taxonomy": "tax_promotion",
+     "description": "Tour and sign a lease within 48 hours to receive a Bilt reward equal to .5 month\u2019s rent, plus enjoy our $325 Move-In Special in lieu of a security deposit. Offer valid through September 30th, 2026, subject to screening and approval, for new applicants only. To qualify, applicants must tour and sign within 48 hours.\r\n\r\nThe Bilt reward may be redeemed as either:\r\n\u2022 A gift card from participating vendors in the Bilt database, or\r\n\u2022 Bilt Points, which can be used toward travel, dining, and other eligible rewards.\r\n\r\nBilt reward will be issued approximately 120 days after move-in via your Bilt account, and requires your account remain in good standing with rent and charges paid on time for the first four months. Failure to meet these requirements, or early termination before lease completion, will result in forfeiture or repayment. The $325 Deposit Waiver is not a security deposit and is non-refundable. Resident is responsible for any damages.",
+     "parent": 0,
+     "count": 2,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "2200 Leavenworth 505",
+   "id": "634651"
+  },
+  {
+   "url": "/apartments/rental/1300-26th-avenue-604",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/1337199/veritas-1300-26th-avenue-staged-unit-604-01-wm.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 1553,
+   "neightborhood": "Outer Sunset",
+   "post_title": "1300 26th Avenue #604",
+   "criteria": "2  Beds \\\\ 1  Bath \\\\ &#36;5,995",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 924,
+     "name": "$325 Move-In Special",
+     "slug": "sf_promo_a0xey000000iimg2a0",
+     "term_group": 0,
+     "term_taxonomy_id": 924,
+     "taxonomy": "tax_promotion",
+     "description": "Pay only $325 to purchase a Move-In Special Security Deposit Waiver, subject to screening application approval. $325 Security Deposit Waiver is not a deposit and is non-refundable. Resident is responsible for any damages to unit at move out. Lease must be signed by September 30th. Lease must be signed within 48 hours of touring the unit.",
+     "parent": 0,
+     "count": 407,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "1300 26th Avenue 604",
+   "id": "471139"
+  },
+  {
+   "url": "/apartments/rental/900-broderick-6",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/1235729/veritas-900-broderick-unit-6-01(1).jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 2078,
+   "neightborhood": "NOPA",
+   "post_title": "900 Broderick #6",
+   "criteria": "2  Beds \\\\ 1  Bath \\\\ &#36;6,245",
+   "pet": "Cats or Dogs",
+   "promotions": [
+    {
+     "term_id": 924,
+     "name": "$325 Move-In Special",
+     "slug": "sf_promo_a0xey000000iimg2a0",
+     "term_group": 0,
+     "term_taxonomy_id": 924,
+     "taxonomy": "tax_promotion",
+     "description": "Pay only $325 to purchase a Move-In Special Security Deposit Waiver, subject to screening application approval. $325 Security Deposit Waiver is not a deposit and is non-refundable. Resident is responsible for any damages to unit at move out. Lease must be signed by September 30th. Lease must be signed within 48 hours of touring the unit.",
+     "parent": 0,
+     "count": 407,
+     "filter": "raw"
+    }
+   ],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "900 Broderick #6",
+   "id": "285515"
+  },
+  {
+   "url": "/apartments/rental/1035-sutter-6",
+   "image": "https://cdn.rentcafe.com/dmslivecafe/3/184115/rentsfnow-1035-sutter-staged-unit-6-01-wm.jpg",
+   "building_openhouse_title": null,
+   "post_age_days": 1643,
+   "neightborhood": "Lower Nob Hill",
+   "post_title": "1035 Sutter #6",
+   "criteria": "1  Bed \\\\ 1  Bath \\\\ &#36;4,395",
+   "pet": "Cats or Dogs",
+   "promotions": [],
+   "iscomingsoon": "no",
+   "active": 1,
+   "is_furnished": 0,
+   "unit_name": "1035 Sutter #6",
+   "id": "316305"
+  }
+ ],
+ "markers": []
+}

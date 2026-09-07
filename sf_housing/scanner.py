@@ -146,6 +146,8 @@ class Scanner:
             "SF Housing Portal": 12,
             "Listings Project": 15,
             "Abacus (small buildings)": 20,
+            # A handful of small JSON posts and no detail reads.
+            "RentSFNow": 22,
             "SpareRoom": 25,
             # A student board: one small page per scan, no detail reads.
             "Uloop": 28,

@@ -2270,6 +2270,199 @@ class UloopSource:
             # reader that can tell them apart.
         )
 
+class RentSFNowSource:
+    """Read the leasing feed of San Francisco's largest landlord.
+
+    Veritas lets roughly 6,500 apartments across 293 buildings, and unlike the
+    portals this is not a tower catalogue: these are older, mid-size, largely
+    rent-controlled buildings, and the landlord states the neighbourhood itself
+    rather than leaving it to be inferred from an address.
+
+    Nothing is on the page. The San Francisco search returns eighty-five
+    kilobytes of filter UI and no homes, and the sitemap enumerates four
+    thousand property pages of which nearly all are long gone -- the most
+    recently touched one reads "Apartment No Longer Available". What answers is
+    the search plugin's own endpoint, which returns JSON to an ordinary request
+    with no nonce, no cookie and no browser.
+    """
+
+    platform = "RentSFNow"
+    mode = "automatic"
+    # What a reader opens. The homes come from the endpoint below, but this is
+    # the page a person can actually look at, and it is what the dashboard
+    # links and the Ready Check probes.
+    search_url = "https://www.rentsfnow.com/apartments/sf/"
+    ajax_url = "https://www.rentsfnow.com/wp-admin/admin-ajax.php"
+    origin = "https://www.rentsfnow.com"
+    manual_reason = None
+    # The unit record is complete: address, area, size, baths, rent and pets.
+    detail_budget = 0
+    empty_result_message = "Veritas currently lets no San Francisco homes matching this deal."
+    # Five pages of twelve today. The cap is a backstop; the server's own
+    # last_page and a page that adds nothing new are what normally stop it.
+    max_pages = 8
+
+    def _request(self, page: int, floor: int) -> dict[str, str]:
+        """The search form as the page itself submits it.
+
+        Deliberately without latN/latS/lonE/lonW: those are the map view's
+        viewport bounds, and sending them would quietly narrow a city-wide
+        search to whatever rectangle happened to be on screen.
+        """
+        return {
+            "neighborhood": "",
+            "city": "san-francisco",
+            "bedrooms": str(floor) if floor else "",
+            "bathrooms": "",
+            "sort": "priority_value-desc",
+            "view": "list",
+            "action": "wpas_ajax_load",
+            "type": "json",
+            "page": str(page),
+        }
+
+    @staticmethod
+    def _criteria(value: object) -> tuple[tuple[int, int] | None, float | None, int | None]:
+        """Size, bathrooms and rent, out of one escaped string.
+
+        The feed writes ``"Studio \\\\ 1  Bath \\\\ &#36;1,945"``: HTML-escaped,
+        with the parts divided by backslashes. All four shapes it uses are
+        here -- Studio, N Bed, N Beds, and Baths plural or not.
+        """
+        parts = [part.strip() for part in re.split(r"\\+", unescape(str(value or ""))) if part.strip()]
+        span = baths = price = None
+        for part in parts:
+            if re.search(r"\bstudio\b", part, re.IGNORECASE):
+                span = (0, 0)
+            elif re.search(r"\bbeds?\b", part, re.IGNORECASE):
+                span = _bedroom_span(part)
+            elif re.search(r"\bbaths?\b", part, re.IGNORECASE):
+                found = re.search(r"([\d.]+)", part)
+                baths = float(found.group(1)) if found else None
+            elif "$" in part:
+                # The dollar sign is the guard; requiring one again inside
+                # _parse_price could never change the answer, and a test could
+                # not tell the difference.
+                price = _parse_price(part)
+        return span, baths, price
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        floor = _bedroom_floor(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        answered = False
+        last_page = self.max_pages
+
+        for page in range(1, self.max_pages + 1):
+            document = _require_page(
+                client.post(self.ajax_url, data=self._request(page, floor)), self.platform
+            )
+            try:
+                payload = json.loads(document)
+            except (ValueError, json.JSONDecodeError) as exc:
+                raise SourceError("RentSFNow answered its search endpoint with something other than JSON.") from exc
+            if not isinstance(payload, dict):
+                raise SourceError("RentSFNow's search endpoint returned an unexpected shape.")
+            answered = True
+            # `units` only. Asked for something it does not have, the site
+            # answers with recommended_units instead -- twelve homes that match
+            # nothing that was asked for -- and its own page shows those in
+            # place of results. Stored, they would be twelve inventions.
+            units = payload.get("units")
+            if not isinstance(units, list) or not units:
+                break
+            try:
+                last_page = max(1, int(payload.get("last_page") or self.max_pages))
+            except (TypeError, ValueError):
+                last_page = self.max_pages
+
+            fresh = 0
+            for unit in units:
+                if not isinstance(unit, dict):
+                    continue
+                identifier = str(unit.get("id") or "").strip()
+                if not identifier or identifier in seen:
+                    continue
+                seen.add(identifier)
+                fresh += 1
+                candidate = self._candidate(unit, identifier, floor)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+            if not fresh or page >= last_page:
+                break
+
+        if not answered:
+            raise SourceError("RentSFNow's search endpoint returned nothing at all.")
+        return listings
+
+    def _candidate(self, unit: dict, identifier: str, floor: int) -> ListingCandidate | None:
+        path = str(unit.get("url") or "").strip()
+        if not path:
+            return None
+        url = urljoin(self.origin, path)
+        if not url.startswith(f"{self.origin}/"):
+            return None
+        title = _clean_text(unit.get("post_title"), 180)
+        if not title:
+            return None
+        if str(unit.get("active", 1)) in {"0", "False", "false"}:
+            return None
+
+        span, baths, price = self._criteria(unit.get("criteria"))
+        if span is not None and span[1] < floor:
+            return None
+
+        # The street, without the unit number, which is what the address table
+        # can answer for.
+        street = re.sub(r"\s*#.*$", "", title).strip()
+        said = _clean_text(unit.get("neightborhood"), 60)
+        metadata: dict[str, object] = {"address": street}
+        detail = [f"{title} from RentSFNow."]
+        if said:
+            detail.append(f"{said}, as the landlord describes it.")
+
+        if span is not None:
+            metadata["bedrooms"] = span[0]
+            detail.append(f"Listed as {_bedroom_phrase(span[0])}.")
+        if baths is not None:
+            metadata["bathrooms"] = baths
+        if price:
+            detail.append(f"Asking ${price:,} a month.")
+        if unit.get("is_furnished"):
+            metadata["furnished"] = True
+            detail.append("Furnished.")
+        if str(unit.get("iscomingsoon") or "").casefold() == "yes":
+            metadata["coming_soon"] = True
+            detail.append("Listed as coming soon rather than available now.")
+        pets = _clean_text(unit.get("pet"), 40)
+        if pets:
+            detail.append(f"Pets: {pets}.")
+
+        return ListingCandidate(
+            platform=self.platform,
+            # The feed's own post id. The slug carries the address, so a
+            # renumbered unit would arrive as a second home.
+            source_id=identifier,
+            title=title,
+            original_url=url,
+            price=price,
+            # The landlord's own word first, where it is a name this deal can
+            # rank; then the street. No table of near-misses: "Lower Nob Hill"
+            # becomes Nob Hill because the address says so, not because
+            # somebody decided the two are the same.
+            neighborhood=(
+                said if said in SF_NEIGHBORHOODS else visible_sf_area_hint(said) or sf_area_from_address(street)
+            ),
+            listing_type="Apartment",
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            # Veritas lets whole apartments, never a room in one.
+            housing_kind=WHOLE_UNIT,
+        )
+
 class ApifyFacebookMarketplaceSource:
     """Optional low-volume Facebook automation that does not use a FB login."""
 
@@ -3503,6 +3696,7 @@ def default_sources(
     zumper = ZumperSource()
     apartment_list = ApartmentListSource()
     uloop = UloopSource()
+    rentsfnow = RentSFNowSource()
     redfin = RedfinSource()
     rent_com = RentComSource()
     free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
@@ -3539,6 +3733,7 @@ def default_sources(
             apartment_list,
             zumper,
             uloop,
+            rentsfnow,
             redfin,
             rent_com,
             RoomiesAlertSource(mailbox),
@@ -3567,6 +3762,7 @@ def default_sources(
         apartment_list,
         zumper,
         uloop,
+        rentsfnow,
         redfin,
         rent_com,
         *manual_sources[1:],
