@@ -2817,6 +2817,130 @@ class AppFolioSource:
             housing_kind=WHOLE_UNIT,
         )
 
+class UDRSource:
+    """Read UDR's San Francisco page, which prices a building by bedroom size.
+
+    Six buildings, each publishing a starting rent per size rather than a rent
+    per home. So one candidate per building and size, following the city
+    portal's precedent: a building offering a studio and a one-bedroom is two
+    things a reader can judge separately, and collapsing them to a single
+    "from" price would hide the one they actually want.
+
+    A size with nothing free reads ``"0 Available Apartments"`` where the rent
+    goes. Parsed as a number that would be a home going for nothing, so a rent
+    has to carry a dollar sign to count, and a size without one is not offered
+    at all rather than offered at an unknown price -- UDR is saying it has none.
+    """
+
+    platform = "UDR"
+    mode = "automatic"
+    search_url = "https://www.udr.com/san-francisco-bay-area-apartments/san-francisco/"
+    origin = "https://www.udr.com"
+    manual_reason = None
+    detail_budget = 0
+    empty_result_message = "UDR lists no San Francisco homes matching this deal."
+
+    CARD = ".community-card__container"
+    SIZES = {"studio": 0, "1 bedroom": 1, "2 bedrooms": 2, "3 bedrooms": 3, "4 bedrooms": 4}
+
+    @classmethod
+    def _offers(cls, card) -> list[tuple[int, int]]:
+        """Every bedroom size this building has a real rent for."""
+        cells = [node.get_text(" ", strip=True) for node in card.select(".community-card__rent-cell")]
+        offers = []
+        for label, rent in zip(cells, cells[1:]):
+            size = cls.SIZES.get(_normal_text(label))
+            if size is None or "$" not in rent:
+                continue
+            price = _parse_price(rent, require_currency=True)
+            if price:
+                offers.append((size, price))
+        return offers
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        floor = _bedroom_floor(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        document = _require_page(client.get(self.search_url), self.platform)
+        cards = BeautifulSoup(document, "html.parser").select(self.CARD)
+        if not cards:
+            raise _read_nothing(self.platform, document, "building cards")
+
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        for card in cards:
+            for candidate in self._candidates(card, floor):
+                if candidate.source_id in seen:
+                    continue
+                seen.add(candidate.source_id)
+                listings.append(candidate)
+                if len(listings) >= maximum:
+                    return listings
+        return listings
+
+    # A building's link may end in a marketing sub-page: /399-fremont/specials/
+    # and /2000-post/specials/ both end in "specials", so taking the last
+    # segment named five different buildings the same thing and four of them
+    # were deduplicated away in silence.
+    MARKETING_SEGMENTS = frozenset({"specials", "floorplans", "availability", "gallery", "amenities"})
+
+    @classmethod
+    def _building_slug(cls, page: str) -> str:
+        parts = [part for part in urlsplit(page).path.strip("/").split("/") if part]
+        while parts and parts[-1].casefold() in cls.MARKETING_SEGMENTS:
+            parts.pop()
+        return parts[-1] if parts else _source_id(page)
+
+    @staticmethod
+    def _one(card, selector: str) -> str:
+        node = card.select_one(selector)
+        return _clean_text(node.get_text(" ", strip=True), 160) if node else ""
+
+    def _candidates(self, card, floor: int) -> list[ListingCandidate]:
+        city = self._one(card, ".community-card__city-state")
+        # "San Francisco, CA 94105" -- the city is what precedes the state.
+        named = re.match(r"([A-Za-z .'-]+),", city)
+        if not _is_san_francisco_locality(named.group(1) if named else ""):
+            return []
+        link = card.select_one("a[href]")
+        href = str(link["href"]).strip() if link else ""
+        if not href:
+            return []
+        page = urljoin(self.origin, href)
+        slug = self._building_slug(page)
+        name = self._one(card, ".community-card__title")
+        street = self._one(card, ".community-card__number-street")
+        if not name and not street:
+            return []
+
+        made = []
+        for size, price in self._offers(card):
+            if size < floor:
+                continue
+            detail = [f"{name or street} from UDR."]
+            if street:
+                detail.append(f"Address: {street}, {city}.")
+            detail.append(f"Its {_bedroom_noun(size)} homes start at ${price:,} a month.")
+            detail.append("A building's starting rent for this size, not one home's.")
+            made.append(
+                ListingCandidate(
+                    platform=self.platform,
+                    # One row per building and size. The city portal files a
+                    # building's unit types the same way, and for the same
+                    # reason: canonical_url is UNIQUE, so one row per building
+                    # would keep whichever size happened to be read first.
+                    source_id=f"{slug}:{size}",
+                    title=f"{name or street} — {_bedroom_noun(size)}",
+                    original_url=f"{page}{'&' if '?' in page else '?'}unit={size}",
+                    price=price,
+                    neighborhood=sf_area_from_address(street) or visible_sf_area_hint(name),
+                    listing_type="Apartment building",
+                    summary=_clean_text(" ".join(detail), 900),
+                    metadata={"address": street, "bedrooms": size, "building_listing": True},
+                    housing_kind=WHOLE_UNIT,
+                )
+            )
+        return made
+
 class ApifyFacebookMarketplaceSource:
     """Optional low-volume Facebook automation that does not use a FB login."""
 
@@ -4050,6 +4174,7 @@ def default_sources(
     zumper = ZumperSource()
     apartment_list = ApartmentListSource()
     uloop = UloopSource()
+    udr = UDRSource()
     appfolio = AppFolioSource()
     avalonbay = AvalonBaySource()
     rentsfnow = RentSFNowSource()
@@ -4089,6 +4214,7 @@ def default_sources(
             apartment_list,
             zumper,
             uloop,
+            udr,
             appfolio,
             avalonbay,
             rentsfnow,
@@ -4120,6 +4246,7 @@ def default_sources(
         apartment_list,
         zumper,
         uloop,
+        udr,
         appfolio,
         avalonbay,
         rentsfnow,
