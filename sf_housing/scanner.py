@@ -148,6 +148,7 @@ class Scanner:
             "Abacus (small buildings)": 20,
             # A handful of small JSON posts and no detail reads.
             "RentSFNow": 22,
+            "AvalonBay": 24,
             "SpareRoom": 25,
             # A student board: one small page per scan, no detail reads.
             "Uloop": 28,

@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from dataclasses import replace
 from html import unescape
 from typing import Protocol
-from urllib.parse import unquote, urlencode, urljoin, urlsplit
+from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit
 
 import httpx
 from bs4 import BeautifulSoup
@@ -2463,6 +2463,174 @@ class RentSFNowSource:
             housing_kind=WHOLE_UNIT,
         )
 
+class AvalonBaySource:
+    """Read AvalonBay's San Francisco page, which ships its own data.
+
+    The page renders server-side and carries the whole result set as a JSON
+    blob assigned to ``Fusion.globalContent`` -- unit by unit, not building by
+    building, with a floor, a square footage, a real move-in date and a rent.
+    That is richer than anything here except Rent.com, and it costs one request.
+
+    Eight of the sixteen buildings the page lists are Equity Residential stock
+    AvalonBay markets, and they were worth writing a line about until the feed
+    was counted: they contribute no units at all. The unit list is AvalonBay's
+    own, and the eight are already in this database through Redfin and
+    Rent.com. The buildings are still read, for the link each unit needs.
+    """
+
+    platform = "AvalonBay"
+    mode = "automatic"
+    search_url = "https://www.avaloncommunities.com/california/san-francisco-apartments/"
+    manual_reason = None
+    # Every unit arrives complete. There is nothing a detail page would add.
+    detail_budget = 0
+    empty_result_message = "AvalonBay lists no San Francisco homes matching this deal."
+
+    BLOB = re.compile(r"Fusion\.globalContent\s*=\s*(\{.*?\});", re.S)
+
+    @classmethod
+    def _payload(cls, document: str) -> dict:
+        match = cls.BLOB.search(document)
+        if not match:
+            raise _read_nothing(cls.platform, document, "embedded search results")
+        try:
+            parsed = json.loads(match.group(1))
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise SourceError("AvalonBay's embedded results are no longer valid JSON.") from exc
+        if not isinstance(parsed, dict):
+            raise SourceError("AvalonBay's embedded results are not the expected shape.")
+        return parsed
+
+    def _unit_url(self, community: dict | None, identifier: str) -> str:
+        """A link per home, because one link per source stores one home.
+
+        ``listings.canonical_url`` is UNIQUE, so pointing every unit at the
+        search page would file the first one and silently discard the rest. The
+        building's page carries the unit as a query parameter, which is the
+        shape the city portal already uses for the same reason -- and which
+        ``canonicalize_url`` keeps while dropping the campaign tags AvalonBay
+        hangs off its Equity Residential links.
+        """
+        page = str((community or {}).get("url") or "").strip()
+        base = urljoin(self.search_url, page) if page else self.search_url
+        return f"{base}{'&' if '?' in base else '?'}unit={quote(identifier, safe='')}"
+
+    @staticmethod
+    def _communities(payload: dict) -> dict[str, dict]:
+        """Buildings by id, so a unit can borrow its page and its operator.
+
+        A unit carries no link of its own and does not say who runs the
+        building; the building carries both.
+        """
+        block = payload.get("communityResults")
+        block = block.get("communities") if isinstance(block, dict) else None
+        items = block.get("items") if isinstance(block, dict) else None
+        return {
+            str(item.get("communityId")): item
+            for item in (items or [])
+            if isinstance(item, dict) and item.get("communityId")
+        }
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        floor = _bedroom_floor(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        payload = self._payload(_require_page(client.get(self.search_url), self.platform))
+        units = (payload.get("unitResults") or {}).get("items")
+        if not isinstance(units, list):
+            raise SourceError("AvalonBay published no unit list in its embedded results.")
+        communities = self._communities(payload)
+
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        for unit in units:
+            if not isinstance(unit, dict):
+                continue
+            identifier = str(unit.get("unitId") or "").strip()
+            if not identifier or identifier in seen:
+                continue
+            seen.add(identifier)
+            candidate = self._candidate(unit, identifier, communities, floor)
+            if candidate is not None:
+                listings.append(candidate)
+                if len(listings) >= maximum:
+                    break
+        return listings
+
+    def _candidate(
+        self, unit: dict, identifier: str, communities: dict[str, dict], floor: int
+    ) -> ListingCandidate | None:
+        address = unit.get("address") if isinstance(unit.get("address"), dict) else {}
+        # The page is titled San Francisco and answers with San Bruno and
+        # Pacifica in it -- twenty-seven and ten of a hundred and thirty-seven.
+        if not _is_san_francisco_locality(address.get("city")):
+            return None
+
+        bedrooms = unit.get("bedroomNumber")
+        if not isinstance(bedrooms, (int, float)) or isinstance(bedrooms, bool):
+            return None
+        bedrooms = int(bedrooms)
+        if bedrooms < floor:
+            return None
+
+        # The unfurnished price and date, deliberately. A furnished quote is a
+        # different product at a different rent, and "OnDemand" means furnishing
+        # is offered rather than that the home comes furnished.
+        offer = unit.get("startingAtPricesUnfurnished")
+        prices = offer.get("prices") if isinstance(offer, dict) else None
+        raw_price = prices.get("price") if isinstance(prices, dict) else None
+        price = int(raw_price) if isinstance(raw_price, (int, float)) and raw_price > 0 else None
+
+        community = communities.get(str(unit.get("communityId") or ""))
+        street = _clean_text(address.get("addressLine1"), 160)
+        name = _clean_text(unit.get("communityName"), 120)
+        title = f"{name} — {street}" if name and street else name or street
+        if not title:
+            return None
+
+        metadata: dict[str, object] = {"address": street, "building_listing": True}
+        detail = [f"{title} from AvalonBay."]
+        if bedrooms is not None:
+            metadata["bedrooms"] = bedrooms
+            detail.append(f"Listed as {_bedroom_phrase(bedrooms)}.")
+        baths = unit.get("bathroomNumber")
+        if isinstance(baths, (int, float)) and not isinstance(baths, bool):
+            metadata["bathrooms"] = float(baths)
+        size = unit.get("squareFeet")
+        if isinstance(size, (int, float)) and size > 0:
+            metadata["floor_area"] = f"{int(size)} sq ft"
+            detail.append(f"{int(size)} sq ft.")
+        floor_number = _clean_text(unit.get("floorNumber"), 8)
+        if floor_number:
+            detail.append(f"Floor {floor_number}.")
+        if price:
+            detail.append(f"Asking ${price:,} a month.")
+
+        stated = _american_date(str(unit.get("availableDateUnfurnished") or "")[:10])
+        if stated:
+            # Written the way the scoring reads a move-in date; an ISO date
+            # under a key of its own is a fact nothing consults.
+            metadata["available_on"] = stated
+            detail.append(f"Available {stated}.")
+        return ListingCandidate(
+            platform=self.platform,
+            source_id=identifier,
+            title=title,
+            original_url=self._unit_url(community, identifier),
+            price=price,
+            # Street, then ZIP. The buildings' own map pins were tried and
+            # dropped: measured over all hundred San Francisco units they
+            # placed none of them, because the coordinate boxes this app keeps
+            # are a small hand-picked set and no AvalonBay building sits in
+            # one. A line that looks like coverage and provides none is worse
+            # than the gap it hides. The join stays for the link and the
+            # operator, which it does earn.
+            neighborhood=sf_area_from_address(street) or sf_area_from_zip(address.get("zip")),
+            listing_type="Apartment",
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            housing_kind=WHOLE_UNIT,
+        )
+
 class ApifyFacebookMarketplaceSource:
     """Optional low-volume Facebook automation that does not use a FB login."""
 
@@ -3696,6 +3864,7 @@ def default_sources(
     zumper = ZumperSource()
     apartment_list = ApartmentListSource()
     uloop = UloopSource()
+    avalonbay = AvalonBaySource()
     rentsfnow = RentSFNowSource()
     redfin = RedfinSource()
     rent_com = RentComSource()
@@ -3733,6 +3902,7 @@ def default_sources(
             apartment_list,
             zumper,
             uloop,
+            avalonbay,
             rentsfnow,
             redfin,
             rent_com,
@@ -3762,6 +3932,7 @@ def default_sources(
         apartment_list,
         zumper,
         uloop,
+        avalonbay,
         rentsfnow,
         redfin,
         rent_com,
