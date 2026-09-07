@@ -1087,10 +1087,13 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         score = min(score, 49)
     if unverified_craigslist_unit:
         score = min(score, 59)
-    if implausibly_low_craigslist_unit:
-        score = min(score, 49)
-    if unusually_low:
-        score = min(score, 79)
+    # Nothing caps a home for being cheap. Both of these used to: an
+    # implausibly cheap Craigslist unit was held at 49 and any low rent at 79,
+    # which against a cut-off of 80 meant a whole category missed the
+    # shortlist by one point. A rent that looks too good is still said out
+    # loud in the concern below and still shows on the card -- it is a note to
+    # read, not a reason to bury the home. Whoever is searching can open the
+    # listing and decide in ten seconds; this cannot.
     if short_stay_days is not None and short_stay_days < 28:
         score = min(score, 49)
 
@@ -1287,8 +1290,6 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         constraints.append({"status": "fail", "check": "listing page", "reason": "The Craigslist detail page conflicts with the result card."})
     elif unverified_craigslist_unit:
         constraints.append({"status": "unknown", "check": "listing page", "reason": "Confirm the Craigslist detail page before relying on this home."})
-    if implausibly_low_craigslist_unit or unusually_low:
-        constraints.append({"status": "unknown", "check": "rent", "reason": "Confirm that this unusually low amount is the full monthly rent."})
     if short_stay_days is not None and short_stay_days < 28:
         constraints.append({"status": "fail", "check": "stay length", "reason": "The stated stay is shorter than one month."})
     if is_sublet and sublet_months is None:

@@ -135,16 +135,20 @@ def test_the_badge_names_the_unknown_rather_than_labelling_the_listing() -> None
     assert checks_of(result)[0] in CHECK_ORDER
 
 
-def test_a_rent_that_looks_wrong_outranks_a_building_size_nobody_publishes() -> None:
+def test_a_listing_that_may_be_gone_outranks_a_building_size_nobody_publishes() -> None:
     """The case that started this. Most listings cannot state a building size,
     so ranking by the order constraints happen to be appended in buried the one
     thing worth a minute of the renter's time behind the one thing that is
-    almost always unknown."""
+    almost always unknown.
+
+    A suspiciously low rent used to be the example here. It is not a question
+    any more -- a cheap home is what this is looking for -- so the example is
+    now a detail page that has not been confirmed."""
     result = scored(price=300)
 
-    assert "rent" in checks_of(result)
-    assert checks_of(result)[0] == "rent"
-    assert checks_of(result).index("rent") < checks_of(result).index("building size")
+    assert "listing page" in checks_of(result)
+    assert checks_of(result)[0] == "listing page"
+    assert checks_of(result).index("listing page") < checks_of(result).index("building size")
 
 
 def test_a_missing_price_outranks_a_missing_building_size() -> None:
@@ -246,13 +250,15 @@ def test_the_row_states_the_question_rather_than_a_label(tmp_path: pathlib.Path)
     truncated version of it, which made the cell four lines tall and said less,
     so the sentence is now the only place it appears."""
     page, ids = render(
-        tmp_path, [("low", scored(price=300), listing(price=300))], view="near_matches"
+        # On the shortlist, not in near matches: an open question is something
+        # to read on a home worth looking at, not a reason to file it away.
+        tmp_path, [("unpriced", scored(price=None), listing(price=None))], view="shortlist"
     )
-    row = row_for(page, ids["low"])
+    row = row_for(page, ids["unpriced"])
 
-    assert "Confirm that this unusually low amount is the full monthly rent." in row
+    assert "Confirm the monthly price." in row
     assert "Needs verification" not in row
-    assert "Check rent" not in row, "the score cell no longer repeats the check column"
+    assert "Check price" not in row, "the score cell no longer repeats the check column"
 
 
 def test_the_check_column_shows_every_open_question_not_one_of_them(
@@ -261,11 +267,11 @@ def test_the_check_column_shows_every_open_question_not_one_of_them(
     """The column used to show a sentence chosen by different logic than the
     constraints, so a listing could be held back for a reason the row never
     mentioned."""
-    result = scored(price=300)
+    result = scored(price=None)
     page, ids = render(
-        tmp_path, [("low", result, listing(price=300))], view="near_matches"
+        tmp_path, [("unpriced", result, listing(price=None))], view="shortlist"
     )
-    row = row_for(page, ids["low"])
+    row = row_for(page, ids["unpriced"])
 
     reasons = [item["reason"] for item in ordered_checks(result.details["hard_constraints"], "unknown")]
     assert len(reasons) >= 2
@@ -300,16 +306,18 @@ def test_the_saved_page_names_the_questions_before_someone_makes_contact(
     data_dir.mkdir(parents=True, exist_ok=True)
     repository = Repository(settings.database_path)
     repository.initialize()
-    listing_id, _ = repository.upsert_listing(listing(price=300), scored(price=300))
+    listing_id, _ = repository.upsert_listing(listing(price=None), scored(price=None))
     assert repository.set_listing_status(listing_id, "saved")
 
     application = create_app(settings=settings, sources=[], enable_scheduler=False)
     with TestClient(application) as client:
         page = client.get("/?view=saved&housing=one_bedroom").text
 
-    assert "check rent" in page
+    # The badge names the most actionable open question; the column carries
+    # every one of them.
+    assert "check listing page" in page
     assert "needs verification" not in page
-    assert "Confirm that this unusually low amount" in page
+    assert "Confirm the monthly price." in page
 
 
 # --------------------------------------------------------------------------
@@ -345,7 +353,7 @@ def page_after_rewrite(tmp_path: pathlib.Path, transform, *, view: str):
     settings = settings_for(tmp_path)
     repository = Repository(settings.database_path)
     repository.initialize()
-    listing_id, _ = repository.upsert_listing(listing(price=300), scored(price=300))
+    listing_id, _ = repository.upsert_listing(listing(price=None), scored(price=None))
     application = create_app(settings=settings, sources=[], enable_scheduler=False)
     with TestClient(application) as client:
         client.get("/")  # start-up rescoring happens here, before the rewrite
@@ -366,11 +374,11 @@ def test_a_listing_scored_before_this_change_still_shows_its_sentences(
             {key: value for key, value in constraint.items() if key != "check"}
             for constraint in constraints
         ],
-        view="near_matches",
+        view="shortlist",
     )
     row = row_for(page, listing_id)
 
-    assert "Confirm that this unusually low amount is the full monthly rent." in row, (
+    assert "Confirm the monthly price." in row, (
         "an older row carries no names, so the sentence has to still reach the reader"
     )
 
@@ -381,7 +389,7 @@ def test_an_unreadable_constraint_list_never_breaks_the_page(
 ) -> None:
     """Whatever is in the column, the listing itself still has to reach the
     reader; losing the row loses the home."""
-    page, listing_id = page_after_rewrite(tmp_path, lambda _: stored, view="near_matches")
+    page, listing_id = page_after_rewrite(tmp_path, lambda _: stored, view="shortlist")
 
     assert row_for(page, listing_id)
 

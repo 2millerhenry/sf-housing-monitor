@@ -565,12 +565,19 @@ def test_craigslist_whole_unit_requires_a_clean_detail_check_and_price_floor() -
     under_floor_result = score_listing(under_floor, profile)
     rejected_result = score_listing(rejected, profile)
 
+    # An unchecked detail page and rejected content are still held back: those
+    # say the listing itself may not be what it claims.
     assert unchecked_result.score < profile.minimum_score
     assert "detail-page check" in unchecked_result.concern
-    assert under_floor_result.score < profile.minimum_score
-    assert "safety floor" in under_floor_result.concern
     assert rejected_result.score < profile.minimum_score
     assert rejected_result.concern.startswith("Rejected:")
+
+    # A low rent is not. It is said out loud and left in the results, because
+    # a cheap home is the thing being searched for and holding one back for
+    # being cheap is the app deciding something the reader is better placed to
+    # decide by opening the listing.
+    assert "safety floor" in under_floor_result.concern
+    assert under_floor_result.score >= profile.minimum_score
 
 
 def test_a_sublet_is_judged_against_the_reader_s_own_lease_minimum() -> None:
@@ -1585,22 +1592,15 @@ def test_the_floor_rises_with_the_size_of_the_home() -> None:
 
 
 def test_a_home_with_no_stated_size_still_gets_a_floor() -> None:
-    """An unstated bedroom count must not switch the check off entirely."""
-    from sf_housing.classification import WHOLE_UNIT
+    """An unstated bedroom count must not switch the plausibility floor off.
+    Checked on the floor itself: a listing whose size is unknown has a more
+    pressing thing to say in its one-line concern than its rent."""
+    from sf_housing.scoring import _implausible_rent
 
-    unsized = ListingCandidate(
-        platform="Rent.com",
-        source_id="unsized",
-        title="An apartment",
-        original_url="https://example.test/unsized",
-        price=300,
-        neighborhood="Mission District",
-        summary="An apartment.",
-        metadata={"address": "1 Valencia St"},
-        housing_kind=WHOLE_UNIT,
-    )
+    unsized = replace(_priced(0, 300), metadata={"address": "1 Valencia St"})
 
-    assert _flagged_low(score_listing(unsized, _deal("studio")))
+    assert _implausible_rent(unsized, None) is True
+    assert _implausible_rent(replace(unsized, price=3000), None) is False
 
 
 def test_a_flag_in_the_bedroom_field_is_not_a_bedroom_count() -> None:
@@ -1612,3 +1612,37 @@ def test_a_flag_in_the_bedroom_field_is_not_a_bedroom_count() -> None:
     assert _bedrooms_of(replace(listing, metadata={"bedrooms": True})) is None
     assert _bedrooms_of(replace(listing, metadata={"bedrooms": 2})) == 2
     assert _bedrooms_of(replace(listing, metadata={})) is None
+
+
+def test_nothing_holds_a_home_back_for_being_cheap() -> None:
+    """The rule, stated once. A low rent may earn a note on the card; it may
+    never cost a home its score or its place in the shortlist. Two separate
+    caps used to do exactly that -- 79 for any low rent, 49 for a cheap
+    Craigslist unit -- and against a cut-off of 80 both meant "not shown"."""
+    deal = _deal("studio", "one_bedroom", "four_bedroom")
+    full_price = score_listing(_priced(0, 3000), deal)
+
+    for price in (2000, 1200, 900, 600, 200, 1):
+        cheap = score_listing(_priced(0, price), deal)
+        assert cheap.score >= full_price.score, f"${price} scored below ${3000}"
+        assert cheap.eligibility == "eligible", f"${price} was held back: {cheap.eligibility_reasons}"
+
+
+def test_a_rent_that_looks_too_good_still_says_so_on_the_card() -> None:
+    """Removed from the score, kept as information. The reader opens the
+    listing and decides in ten seconds; this cannot."""
+    result = score_listing(_priced(0, 400), _deal("studio"))
+
+    assert "unusually low" in (result.concern or "")
+    assert result.eligibility == "eligible"
+
+
+def test_a_cheap_home_is_never_asked_to_confirm_its_rent_before_counting() -> None:
+    """The specific line from the dashboard: "confirm that this unusually low
+    amount is the full monthly rent", which made the home a near match rather
+    than a result."""
+    for price in (400, 900, 1626, 2300, 3852):
+        result = score_listing(_priced(0, price), _deal("studio"))
+        assert not any(
+            "full monthly rent" in reason for reason in result.eligibility_reasons
+        ), f"${price} still has to confirm its rent"

@@ -36,14 +36,19 @@ class ScoreResult:
 # the sentence explaining it. "Needs verification" told a renter that something
 # was unknown but never what, which is the one thing they could have acted on.
 #
-# Ordered by how much knowing the answer should change what they do next: a rent
-# that looks wrong is worth a minute right now, a building size the source never
-# publishes is something they can park. A name missing from this tuple keeps its
-# place at the end rather than vanishing, so adding a constraint can never
-# silently hide it.
+# Ordered by how much knowing the answer should change what they do next: a
+# listing page that may be gone is worth a minute right now, a building size the
+# source never publishes is something they can park. A name missing from this
+# tuple keeps its place at the end rather than vanishing, so adding a constraint
+# can never silently hide it.
+#
+# "rent" is gone from this list because nothing produces it any more. It used to
+# mean "this rent is suspiciously low, confirm it before counting the home",
+# which held cheap homes out of the shortlist -- and a cheap home is the thing
+# this app is looking for. A rent that looks too good is still said on the card;
+# it is simply no longer a condition anybody has to clear.
 CHECK_ORDER = (
     "dealbreaker",
-    "rent",
     "listing page",
     "confirmation",
     "stay length",
