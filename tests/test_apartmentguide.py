@@ -683,3 +683,17 @@ def test_the_floor_area_is_kept_as_well_as_said(preferences) -> None:
     listing = by_id(found(preferences))[ISLE_HOUSE]
     assert listing.metadata["floor_area"] == "1034–1483 Sqft"
     assert "Floor area 1034–1483 Sqft." in (listing.summary or "")
+
+
+def test_a_building_with_one_home_left_says_so_in_english() -> None:
+    """"1 homes are free right now" is what the obvious version prints, and a
+    building down to its last home is the one a reader most wants to trust."""
+    from sf_housing.sources import _homes_free_note
+
+    assert _homes_free_note(1) == "1 home is free right now."
+    assert _homes_free_note(2) == "2 homes are free right now."
+    assert "unit" not in _homes_free_note(11), "the building-size reader takes 'N units' for the building"
+
+
+def test_the_count_of_free_homes_is_rendered_for_real(preferences) -> None:
+    assert "11 homes are free right now." in (by_id(found(preferences))[ISLE_HOUSE].summary or "")

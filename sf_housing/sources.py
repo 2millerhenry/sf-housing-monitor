@@ -1800,6 +1800,17 @@ def _numeric_span(low: object, high: object) -> tuple[int, int] | None:
     return (int(min(low, high)), int(max(low, high)))
 
 
+def _homes_free_note(count: int) -> str:
+    """How many homes are free, in English.
+
+    "1 homes are free right now" is what the obvious version prints, and a
+    building with exactly one home left is the one a reader most wants to
+    trust. Deliberately not the word "units": the building-size reader takes
+    "N units" for the size of the whole building.
+    """
+    return "1 home is free right now." if count == 1 else f"{count} homes are free right now."
+
+
 def _bedroom_noun(count: int) -> str:
     return "studio" if count == 0 else f"{count}-bedroom"
 
@@ -2052,7 +2063,7 @@ class RentComSource:
         if isinstance(available, (int, float)) and available > 0:
             # Deliberately not phrased as "N units", which the building-size
             # reader would take for the size of the whole building.
-            detail.append(f"{int(available)} homes are free right now.")
+            detail.append(_homes_free_note(int(available)))
             metadata["homes_available"] = int(available)
         if building.get("roomForRent") is True:
             detail.append("Rent.com lists this as a room rather than a whole home.")
@@ -2306,7 +2317,7 @@ class ApartmentGuideSource:
             # reader would take for the size of the whole building. Nothing
             # ApartmentGuide publishes is the building's own size, so
             # `building_units` is left unset rather than guessed at from this.
-            detail.append(f"{int(available)} homes are free right now.")
+            detail.append(_homes_free_note(int(available)))
             metadata["homes_available"] = int(available)
 
         # ApartmentGuide's `availableDate` is the day a floor plan *starts*
