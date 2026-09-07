@@ -492,3 +492,243 @@ def test_the_stall_ceiling_never_outlasts_the_scan_itself(
     assert elapsed < 15, "the scan's own budget did not bound the wait"
     statuses = {item["platform"]: item for item in repository.latest_source_runs()}
     assert statuses["Stalled"]["status"] == "error"
+
+
+def test_a_source_with_no_detail_budget_is_not_scored_twice(
+    repository: Repository, preferences: Preferences, monkeypatch
+) -> None:
+    """The provisional score ranks the queue for the detail budget, and
+    nothing else reads it. Nine sources here have no detail budget, so for
+    them this was scoring every listing twice and throwing one away -- 250
+    regex searches per listing, for a number never used. It cost Movoto a
+    third of its time."""
+    import sf_housing.scanner as scanner_module
+
+    calls = {"n": 0}
+    real = scanner_module.score_listing
+
+    def counted(listing, prefs):
+        calls["n"] += 1
+        return real(listing, prefs)
+
+    monkeypatch.setattr(scanner_module, "score_listing", counted)
+    scanner = Scanner(repository, lambda: preferences, [GoodSource()], detail_delay_seconds=0)
+    outcome = scanner.run_scan("test")
+
+    assert outcome.listings_added == 1
+    assert calls["n"] == 1, "a source with no detail budget scored its listing twice"
+
+
+def test_a_source_with_a_detail_budget_still_ranks_its_queue(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """Skipping the provisional score must not skip it where it is the thing
+    deciding which homes get a detail page. Spent in arrival order instead,
+    the first few results consume the budget regardless of quality."""
+
+    class Budgeted:
+        platform = "Budgeted"
+        mode = "automatic"
+        search_url = "https://example.test"
+        manual_reason = None
+        detail_budget = 1
+
+        def __init__(self):
+            self.enriched: list[str] = []
+
+        def search(self, client, preferences):
+            return [
+                ListingCandidate(
+                    platform="Budgeted",
+                    source_id=str(index),
+                    title=title,
+                    original_url=f"https://example.test/{index}",
+                    price=price,
+                    neighborhood="Mission",
+                    summary=title,
+                    metadata={"address": f"{index} Valencia St"},
+                )
+                for index, (title, price) in enumerate([("A dud", 9000), ("A good one", 1500)])
+            ]
+
+        def enrich(self, client, listing):
+            self.enriched.append(listing.source_id)
+            return listing
+
+    source = Budgeted()
+    Scanner(repository, lambda: preferences, [source], detail_delay_seconds=0).run_scan("test")
+
+    assert source.enriched == ["1"], "the budget went to the worse home"
+
+
+# --------------------------------------------------------------------------
+# the progress bar somebody is actually watching
+# --------------------------------------------------------------------------
+
+
+class SlowSource:
+    """A source that takes a known, noticeable amount of time."""
+
+    mode = "automatic"
+    search_url = "https://example.test"
+    manual_reason = None
+    detail_budget = 0
+
+    def __init__(self, platform: str, seconds: float):
+        self.platform = platform
+        self.seconds = seconds
+
+    def search(self, client, preferences):
+        time.sleep(self.seconds)
+        return []
+
+
+def test_the_bar_measures_time_rather_than_counting_sources(
+    repository: Repository, preferences: Preferences, monkeypatch
+) -> None:
+    """Counting sources, a 75-second Craigslist and a 1-second Listings
+    Project are a twenty-third each: the bar shows nothing for the first
+    minute of a scan and then jumps. Weighted by how long each source usually
+    takes, it moves at the rate the scan is actually progressing.
+
+    Durations are stubbed rather than produced by sleeping: source runs are
+    timestamped to the second, so a test source can only ever measure zero or
+    one, and what it measures depends on how busy the machine is."""
+    monkeypatch.setattr(
+        repository, "typical_source_seconds", lambda: {"Slow": 75.0, "Quick": 1.0}
+    )
+    sources = [SlowSource("Slow", 0.0), SlowSource("Quick", 0.0)]
+    scanner = Scanner(repository, lambda: preferences, sources, detail_delay_seconds=0)
+
+    weights = scanner._source_weights(sources)
+
+    assert weights == {"Slow": 75.0, "Quick": 1.0}
+    # The slow one is most of the bar, not half of it.
+    assert weights["Slow"] / sum(weights.values()) > 0.9
+
+
+def test_progress_survives_a_database_that_will_not_answer(
+    repository: Repository, preferences: Preferences, monkeypatch
+) -> None:
+    """Weighting is a nicety; results are not. A failure reading durations
+    must cost the bar its accuracy and never cost the scan its listings."""
+    def boom():
+        raise RuntimeError("no")
+
+    monkeypatch.setattr(repository, "typical_source_seconds", boom)
+    scanner = Scanner(repository, lambda: preferences, [GoodSource()], detail_delay_seconds=0)
+
+    outcome = scanner.run_scan("test")
+
+    assert outcome.listings_added == 1
+    assert scanner.progress["percent"] == 100
+
+
+def test_an_unmeasured_source_never_weighs_nothing(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """A source with no history weighing zero lets the bar reach 100% with
+    that source's work still to do."""
+    scanner = Scanner(repository, lambda: preferences, [GoodSource()], detail_delay_seconds=0)
+    weights = scanner._source_weights([SlowSource("NeverSeen", 0.0)])
+
+    assert weights["NeverSeen"] > 0
+
+
+def test_a_source_that_ends_any_way_at_all_stops_holding_up_the_bar(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """However a source ends -- done, failed, skipped, abandoned -- its share
+    has to come off the bar, or the bar stalls there for the rest of the scan.
+
+    Checked mid-scan on purpose: a finished scan reports 100% whatever the
+    weights say, so asserting it at the end proves nothing about this."""
+    scanner = Scanner(repository, lambda: preferences, [GoodSource()], detail_delay_seconds=0)
+    scanner._update_progress(
+        status="running",
+        running=True,
+        sources_total=4,
+        weight_total=100.0,
+        weight_done=0.0,
+        weight_current=25.0,
+        current_started_monotonic=time.monotonic(),
+    )
+    assert int(scanner.progress["percent"]) == 0
+
+    scanner._finish_source_progress(1, 25.0)
+
+    assert int(scanner.progress["percent"]) == 25, "a finished source did not leave the bar"
+
+    scanner._finish_source_progress(2, 25.0)
+
+    assert int(scanner.progress["percent"]) == 50
+
+
+def test_a_finished_scan_always_reads_as_finished(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """Whatever the weights ended up saying, a scan that is over is 100%."""
+    scanner = Scanner(
+        repository, lambda: preferences, [BrokenSource(), GoodSource()], detail_delay_seconds=0
+    )
+    scanner.run_scan("test")
+
+    assert scanner.progress["percent"] == 100
+    assert scanner.progress["running"] is False
+
+
+def test_the_bar_moves_while_a_single_slow_source_is_still_running(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """The whole point of weighting. Partway through a lone slow source the
+    bar has to be somewhere between nothing and everything, rather than stuck
+    at zero until it finishes.
+
+    Driven through the progress state rather than by racing a real scan on a
+    timer: under load a sleeping thread reads whatever it happens to read, and
+    a test that passes on an idle machine and fails on a busy one is telling
+    you about the machine."""
+    scanner = Scanner(repository, lambda: preferences, [GoodSource()], detail_delay_seconds=0)
+    scanner._update_progress(
+        status="running",
+        running=True,
+        sources_total=2,
+        sources_completed=0,
+        weight_total=100.0,
+        weight_done=0.0,
+        weight_current=40.0,
+        # Ten of this source's forty seconds have gone.
+        current_started_monotonic=time.monotonic() - 10.0,
+    )
+
+    percent = int(scanner.progress["percent"])
+
+    assert 0 < percent < 100, "the bar did not move inside a running source"
+    assert percent == 10, f"a quarter of a 40%-weighted source should read 10%, got {percent}"
+
+
+def test_a_source_running_long_cannot_show_progress_that_has_not_happened(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """Interpolating inside the running source is capped just under its own
+    weight: a source taking three times its usual must not borrow the next
+    one's share and march the bar past what has actually been done."""
+    scanner = Scanner(repository, lambda: preferences, [GoodSource()], detail_delay_seconds=0)
+    scanner._update_progress(
+        status="running",
+        running=True,
+        sources_total=2,
+        sources_completed=0,
+        weight_total=100.0,
+        weight_done=0.0,
+        weight_current=40.0,
+        # Three times as long as this source usually takes.
+        current_started_monotonic=time.monotonic() - 120.0,
+    )
+
+    percent = int(scanner.progress["percent"])
+
+    assert percent <= 40, (
+        f"the bar read {percent}% while only the first source, worth 40%, had run"
+    )
+    assert percent >= 35, "a source well past its estimate should read near its full share"

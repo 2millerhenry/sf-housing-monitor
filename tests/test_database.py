@@ -135,3 +135,46 @@ def test_database_can_filter_home_style_and_sort_by_explicit_move_in_date(reposi
     assert [row["source_id"] for row in houses] == ["late-house", "early-house"]
     assert soonest[0]["available_on"] == "2026-08-01"
     assert soonest[0]["home_facts"]["primary"] == "Private room · House"
+
+
+def test_the_listing_identity_lookup_is_indexed(repository: Repository) -> None:
+    """`find_listing` matches on (platform, source_id) OR canonical_url. With
+    only the URL half indexed SQLite cannot use its OR optimisation and scans
+    the whole table -- once per listing read, which for a source bringing two
+    thousand homes against a five-thousand-row table is ten million row
+    reads."""
+    with repository.connection() as connection:
+        plan = " ".join(
+            str(row["detail"])
+            for row in connection.execute(
+                """EXPLAIN QUERY PLAN
+                   SELECT * FROM listings
+                    WHERE (platform = ? AND source_id = ?) OR canonical_url = ?
+                    LIMIT 1""",
+                ("Movoto", "abc", "https://example.test/x"),
+            )
+        )
+
+    # Both halves of the OR must be index-driven for SQLite to use its
+    # multi-index optimisation. One unindexed half turns the whole thing into
+    # a table scan, and the UNIQUE constraints are what currently supply both
+    # -- which is why an explicit index on (platform, source_id) was measured,
+    # found redundant, and not kept.
+    assert "SCAN" not in plan.upper(), f"the identity lookup scans the table: {plan}"
+    assert plan.upper().count("SEARCH") == 2, plan
+
+
+def test_source_durations_ignore_runs_that_did_not_do_the_work(
+    repository: Repository,
+) -> None:
+    """A skipped source finishes instantly and a stalled one is abandoned.
+    Counted as durations they drag the estimate down and the progress bar
+    starts promising a scan far shorter than the one running."""
+    run_id = repository.begin_scan("test")
+    for status, platform in (("success", "Real"), ("skipped", "Skipped")):
+        source_run = repository.begin_source_run(run_id, platform, search_url="https://example.test")
+        repository.finish_source_run(source_run, status)
+
+    durations = repository.typical_source_seconds()
+
+    assert "Skipped" not in durations

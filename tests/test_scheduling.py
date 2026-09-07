@@ -83,3 +83,21 @@ def test_the_deep_sweep_reaches_every_source_a_schedule_would() -> None:
 
     assert DEEP_SWEEP_TRIGGER in AUTOMATIC_TRIGGERS
     assert DEEP_SWEEP_TRIGGER in FULL_SOURCE_TRIGGERS
+
+
+def test_a_scan_can_never_run_longer_than_four_minutes() -> None:
+    """The ceiling somebody watching a progress bar will tolerate. A scan that
+    would run past it stops and records which sources it did not reach, which
+    is the honest outcome: the nightly sweep is what collects the rest."""
+    from sf_housing.settings import Settings
+
+    assert Settings.from_environment().scan_max_seconds <= 240
+
+
+def test_no_single_source_may_use_more_than_a_third_of_a_scan() -> None:
+    """The per-source ceiling has to leave room for the other twenty-two. Set
+    at or above the scan's own budget it stops being a bound at all."""
+    from sf_housing.scanner import SOURCE_HARD_CEILING_SECONDS
+    from sf_housing.settings import Settings
+
+    assert SOURCE_HARD_CEILING_SECONDS < Settings.from_environment().scan_max_seconds / 2

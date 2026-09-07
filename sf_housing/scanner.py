@@ -120,6 +120,15 @@ class Scanner:
             "listings_seen": 0,
             "listings_added": 0,
             "sources_failed": 0,
+            # What the bar is really measuring. Counting sources, Craigslist
+            # and Listings Project are a twenty-third each, so the bar shows
+            # nothing for the 75 seconds the first one takes and then jumps
+            # four points. Weighted by how long each source usually takes, it
+            # moves at the rate the scan is actually progressing.
+            "weight_total": 0.0,
+            "weight_done": 0.0,
+            "weight_current": 0.0,
+            "current_started_monotonic": None,
         }
 
     @property
@@ -134,10 +143,25 @@ class Scanner:
         started = snapshot.pop("started_monotonic", None)
         if snapshot["running"] and isinstance(started, (int, float)):
             snapshot["elapsed_seconds"] = max(0, int(time.monotonic() - started))
+        weight_total = float(snapshot.pop("weight_total", 0.0) or 0.0)
+        weight_done = float(snapshot.pop("weight_done", 0.0) or 0.0)
+        weight_current = float(snapshot.pop("weight_current", 0.0) or 0.0)
+        current_started = snapshot.pop("current_started_monotonic", None)
         completed = int(snapshot["sources_completed"])
         total = int(snapshot["sources_total"])
         if snapshot["status"] in {"completed", "completed_with_errors"}:
             percent = 100
+        elif weight_total > 0:
+            # The source in flight counts for the share of itself it has had
+            # time to do, so the bar keeps moving through a slow one instead
+            # of waiting for it to finish. Capped just under its own weight:
+            # a source running longer than usual must not borrow from the
+            # next one and show progress that has not happened.
+            running = 0.0
+            if snapshot["running"] and weight_current > 0 and isinstance(current_started, (int, float)):
+                spent = max(0.0, time.monotonic() - current_started)
+                running = min(spent / weight_current, 0.95) * weight_current
+            percent = round(((weight_done + running) / weight_total) * 100)
         elif total:
             percent = round((completed / total) * 100)
         else:
@@ -490,6 +514,48 @@ class Scanner:
                 }
             )
 
+    def _source_weights(self, sources: list[ListingSource]) -> dict[str, float]:
+        """How long each source in this scan is expected to take.
+
+        Read from what each one actually did on its own recent runs. A source
+        nobody has timed yet is given the middle of what is known rather than
+        nothing, so an unmeasured source does not silently weigh zero and let
+        the bar reach 100% with work still to do.
+        """
+        try:
+            measured = self.repository.typical_source_seconds()
+        except Exception:  # progress must never cost a scan its results
+            LOGGER.warning("could not read source durations for progress", exc_info=True)
+            measured = {}
+        known = sorted(measured.values())
+        fallback = known[len(known) // 2] if known else 5.0
+        return {
+            source.platform: float(measured.get(source.platform, fallback))
+            for source in sources
+        }
+
+    def _finish_source_progress(
+        self, source_index: int, weight: float, **values: object
+    ) -> None:
+        """Retire a source from the bar, however it ended.
+
+        Called for a skip and a failure as well as a success: a source that
+        stops without its weight being retired leaves the bar stuck for the
+        rest of the scan, which is the failure this replaced.
+        """
+        with self._progress_lock:
+            done = float(self._progress_state.get("weight_done", 0.0) or 0.0)
+            self._progress_state.update(
+                {
+                    **values,
+                    "sources_completed": source_index,
+                    "current_source": None,
+                    "weight_done": done + max(0.0, float(weight)),
+                    "weight_current": 0.0,
+                    "current_started_monotonic": None,
+                }
+            )
+
     def _update_progress(self, **values: object) -> None:
         with self._progress_lock:
             self._progress_state.update(values)
@@ -709,8 +775,16 @@ class Scanner:
             limits = httpx.Limits(max_connections=4, max_keepalive_connections=2)
             with httpx.Client(headers=headers, timeout=timeout, limits=limits, follow_redirects=True) as client:
                 active_sources = sources if sources is not None else self._eligible_sources(trigger)
+                weights = self._source_weights(active_sources)
+                self._update_progress(
+                    weight_total=sum(weights.values()), weight_done=0.0
+                )
                 for source_index, source in enumerate(active_sources, start=1):
-                    self._update_progress(current_source=source.platform)
+                    self._update_progress(
+                        current_source=source.platform,
+                        weight_current=weights.get(source.platform, 0.0),
+                        current_started_monotonic=time.monotonic(),
+                    )
                     source_key = self._source_key(source)
                     source_run_id = self.repository.begin_source_run(
                         run_id,
@@ -726,7 +800,7 @@ class Scanner:
                             message=source.manual_reason,
                             source_key=self._source_key(source),
                         )
-                        self._update_progress(sources_completed=source_index, current_source=None)
+                        self._finish_source_progress(source_index, weights.get(source.platform, 0.0))
                         continue
                     # A source that failed repeatedly gets a short, persisted
                     # automatic cooldown.  This avoids hammering a broken
@@ -747,7 +821,7 @@ class Scanner:
                                 source.platform,
                                 backoff.failure_streak,
                             )
-                            self._update_progress(sources_completed=source_index, current_source=None)
+                            self._finish_source_progress(source_index, weights.get(source.platform, 0.0))
                             continue
                     if time.monotonic() + self.timeout_seconds > deadline:
                         self.repository.finish_source_run(
@@ -759,7 +833,7 @@ class Scanner:
                             ),
                             source_key=self._source_key(source),
                         )
-                        self._update_progress(sources_completed=source_index, current_source=None)
+                        self._finish_source_progress(source_index, weights.get(source.platform, 0.0))
                         continue
 
                     source_seen = source_added = source_updated = detail_failures = 0
@@ -818,10 +892,20 @@ class Scanner:
                                 if existing is not None
                                 else listing
                             )
-                            try:
-                                provisional = score_listing(classify_listing(preview), preferences).score
-                            except Exception:  # scoring a thin card must never lose the listing
-                                provisional = 0
+                            # The provisional score exists to rank the queue for
+                            # the detail budget, and nothing else reads it. Nine
+                            # of the sources here have no detail budget at all,
+                            # so for them this was scoring every listing twice
+                            # and throwing one away -- 250 regex searches per
+                            # listing, 1,959 listings, for a number never used.
+                            provisional = 0
+                            if detail_budget:
+                                try:
+                                    provisional = score_listing(
+                                        classify_listing(preview), preferences
+                                    ).score
+                                except Exception:  # a thin card must never be lost to scoring
+                                    provisional = 0
                             prepared.append(
                                 {
                                     "listing": listing,
@@ -1034,9 +1118,9 @@ class Scanner:
                             if connector_key == "gmail":
                                 self.refresh_gmail_connector_state()
                         LOGGER.exception("%s source failed without stopping other sources", source.platform)
-                    self._update_progress(
-                        sources_completed=source_index,
-                        current_source=None,
+                    self._finish_source_progress(
+                        source_index,
+                        weights.get(source.platform, 0.0),
                         listings_seen=total_seen,
                         listings_added=total_added,
                         sources_failed=sources_failed,

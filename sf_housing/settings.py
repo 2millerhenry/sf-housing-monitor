@@ -22,9 +22,15 @@ class Settings:
     # one scan spent 65 seconds there and skipped sixteen later sources. No
     # single source can run away with this now -- SOURCE_HARD_CEILING_SECONDS
     # bounds each one -- so the budget only has to cover the healthy total,
-    # which measures around 140 seconds across 23 sources.
+    # which measures around 165 seconds across 23 sources.
+    #
+    # Four minutes is a hard ceiling rather than a target: it is how long
+    # somebody who pressed the button on the dashboard is willing to watch a
+    # progress bar. A scan that would run longer stops and says which sources
+    # it did not reach, which is the honest outcome -- the nightly sweep is
+    # what collects anything a bounded scan had to leave.
     request_timeout_seconds: float = 8.0
-    scan_max_seconds: float = 300.0
+    scan_max_seconds: float = 240.0
     gmail_client_secret_path: Path | None = None
     gmail_token_path: Path | None = None
     gmail_pending_state_path: Path | None = None

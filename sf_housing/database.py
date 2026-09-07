@@ -1231,6 +1231,49 @@ class Repository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def typical_source_seconds(self, limit: int = 6) -> dict[str, float]:
+        """How long each source usually takes, from its own recent runs.
+
+        A progress bar counting sources treats Craigslist and Listings Project
+        as equal thirds of a percent apiece, so it sits at nothing for the 75
+        seconds the first one takes and then jumps. Weighted by these instead,
+        it moves at the rate the scan is actually progressing.
+
+        Only completed runs count: a skipped source finishes instantly and a
+        stalled one is abandoned, and neither is how long the work takes.
+        """
+        with self.connection() as connection:
+            rows = connection.execute(
+                """SELECT platform, started_at, finished_at
+                     FROM source_runs
+                    WHERE status IN ('success', 'error')
+                      AND finished_at IS NOT NULL
+                    ORDER BY id DESC
+                    LIMIT ?""",
+                (limit * 64,),
+            ).fetchall()
+        seen: dict[str, list[float]] = {}
+        for row in rows:
+            platform = str(row["platform"])
+            samples = seen.setdefault(platform, [])
+            if len(samples) >= limit:
+                continue
+            try:
+                started = datetime.fromisoformat(str(row["started_at"]))
+                finished = datetime.fromisoformat(str(row["finished_at"]))
+            except (TypeError, ValueError):
+                continue
+            seconds = (finished - started).total_seconds()
+            # A negative clock change is not a duration, and no single source
+            # legitimately runs for an hour.
+            if 0 <= seconds <= 3600:
+                samples.append(seconds)
+        return {
+            platform: sorted(samples)[len(samples) // 2]
+            for platform, samples in seen.items()
+            if samples
+        }
+
     def latest_source_runs(self) -> list[dict[str, Any]]:
         """Return one latest run per durable source, not merely per display platform.
 
