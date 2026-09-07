@@ -35,7 +35,17 @@ LOGGER = logging.getLogger(__name__)
 # separately -- which sources a run may touch, and whether a failing source is
 # allowed its cooldown -- so adding a third kind of automatic run meant finding
 # both or silently getting a lesser scan than the one being caught up.
-AUTOMATIC_TRIGGERS = frozenset({"scheduled", "startup_catchup", "catch_up"})
+AUTOMATIC_TRIGGERS = frozenset({"scheduled", "startup_catchup", "catch_up", "deep_sweep"})
+
+# The nightly run that reads the sources which cannot be read deeply every time.
+# Most sources are simply read in full on every scan: measured end to end that
+# costs about 150 seconds twice a day, which is nothing. Two are different.
+# Trulia and Redfin answer 403 and 202 once they have had enough, and a refused
+# source returns nothing at all -- so reading either of them to the bottom is
+# worth doing once a day at an hour nobody is waiting, and not worth doing at
+# 10:00 when a shallow read that works is better than a deep one that is
+# turned away.
+DEEP_SWEEP_TRIGGER = "deep_sweep"
 # A connector test is a person asking, but it still has to reach the sources a
 # schedule would, or the thing they are testing is not the thing that runs.
 FULL_SOURCE_TRIGGERS = AUTOMATIC_TRIGGERS | {"connector_test"}

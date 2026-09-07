@@ -10,7 +10,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 import logging
 
-from .scanner import Scanner
+from .scanner import DEEP_SWEEP_TRIGGER, Scanner
 
 
 LOGGER = logging.getLogger(__name__)
@@ -36,6 +36,17 @@ CATCH_UP_INTERVAL_MINUTES = 15
 # 12:07 instead of 18:00.
 SCAN_JOB_ID = "housing-scans-pacific"
 CATCH_UP_JOB_ID = "housing-catch-up"
+DEEP_SWEEP_JOB_ID = "housing-deep-sweep"
+
+# When the nightly deep sweep runs. Most sources are read in full on every
+# scan because doing so costs seconds; two cannot be. Trulia and Redfin answer
+# 403 and 202 once they have had enough, so they are read shallowly at 10:00
+# and 18:00 -- when a shallow source that works beats a deep one that is turned
+# away -- and to the bottom once a day at an hour where being refused costs a
+# run nobody is watching. 03:20 rather than 03:00: the hour itself is when
+# every other scheduled thing on a machine fires.
+DEEP_SWEEP_HOUR = 3
+DEEP_SWEEP_MINUTE = 20
 
 # How far back the schedule reports on itself. A week is long enough to expose a
 # pattern and short enough that a fault shows up while it still matters.
@@ -259,6 +270,23 @@ def build_scheduler(scanner: Scanner) -> BackgroundScheduler:
         coalesce=True,
         max_instances=1,
         misfire_grace_time=18 * 60 * 60,
+    )
+    # Once a day, read the sources that cannot be read deeply the rest of the
+    # time. Deliberately not caught up if it is missed: a sweep is how the
+    # long tail is collected, not how anything stays current, so running one
+    # eight hours late on wake is worth less than the next one on time.
+    scheduler.add_job(
+        scanner.run_scan,
+        CronTrigger(
+            hour=DEEP_SWEEP_HOUR, minute=DEEP_SWEEP_MINUTE, timezone=PACIFIC
+        ),
+        args=[DEEP_SWEEP_TRIGGER],
+        id=DEEP_SWEEP_JOB_ID,
+        name="Nightly deep sweep of the rate-limited sources",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+        misfire_grace_time=2 * 60 * 60,
     )
     # The safety net under that job. It asks the database what actually ran
     # rather than trusting the scheduler's own memory of what it meant to run.

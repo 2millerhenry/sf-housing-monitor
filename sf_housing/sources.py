@@ -1442,6 +1442,27 @@ _BROWSER_HEADERS = {
 }
 
 
+# The nightly run that reads a rate-limited source to the bottom. Named here
+# rather than imported from the scanner because sources must not depend on it.
+DEEP_SWEEP_TRIGGER = "deep_sweep"
+
+
+def _pages_for_trigger(source: object, trigger: str) -> int:
+    """How many pages this source reads on this kind of run.
+
+    Most sources here are read in full every time, because doing so costs
+    seconds. Trulia and Redfin cannot be: they answer 403 and 202 once they
+    have had enough, and a source that has been turned away returns nothing at
+    all, which is worse than a shallow source that works. So they are read
+    shallowly on the runs somebody is waiting for and to the bottom once a day
+    at an hour nobody is.
+    """
+    shallow = int(getattr(source, "max_pages", 1))
+    if trigger != DEEP_SWEEP_TRIGGER:
+        return shallow
+    return max(shallow, int(getattr(source, "deep_max_pages", shallow)))
+
+
 def _require_page(response: httpx.Response, platform: str) -> str:
     """Return a page of results, or refuse to read a wall as an empty result.
 
@@ -1550,9 +1571,17 @@ class RedfinSource:
     manual_reason = None
     detail_budget = 0
     empty_result_message = "Redfin published no San Francisco rentals in its structured data."
-    # Each page is around three megabytes. Two is a scan's worth of inventory;
-    # the rest is bandwidth spent on homes nobody scrolls to.
-    max_pages = 2
+    # Each page is around three megabytes, and Redfin answers HTTP 202 when it
+    # has had enough -- it was doing so while this was being measured. Six
+    # pages is roughly 18MB and about 240 homes, which it has been seen to
+    # serve; going deeper on a run somebody is waiting for risks trading a
+    # working source for a rate-limited one, and a refused source returns
+    # nothing at all.
+    max_pages = 6
+    # The nightly sweep goes further, at an hour where being turned away costs
+    # nothing anybody sees. Kept well under Movoto's forty-five because each
+    # page here is three megabytes rather than three hundred kilobytes.
+    deep_max_pages = 15
 
     def _page_url(self, floor: int, page: int) -> str:
         # A bedroom floor narrows the page to homes worth reading. A rent
@@ -1583,14 +1612,24 @@ class RedfinSource:
                 cards.append((block, prices.get(url)))
         return cards
 
+    def search_for_trigger(
+        self, client: httpx.Client, preferences: Preferences, trigger: str
+    ) -> list[ListingCandidate]:
+        return self._search(client, preferences, _pages_for_trigger(self, trigger))
+
     def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        return self._search(client, preferences, self.max_pages)
+
+    def _search(
+        self, client: httpx.Client, preferences: Preferences, pages: int
+    ) -> list[ListingCandidate]:
         floor = _bedroom_floor(preferences)
         maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
         listings: list[ListingCandidate] = []
         seen: set[str] = set()
         read_a_card = False
 
-        for page in range(1, self.max_pages + 1):
+        for page in range(1, pages + 1):
             document = _require_page(
                 client.get(self._page_url(floor, page), headers=_BROWSER_HEADERS), self.platform
             )
@@ -1887,7 +1926,9 @@ class RentComSource:
     manual_reason = None
     detail_budget = 12
     empty_result_message = "Rent.com published no San Francisco buildings in its structured data."
-    max_pages = 3
+    # Ten pages is the whole San Francisco list -- 98 buildings, measured --
+    # where three was reading the first 29 of them.
+    max_pages = 10
 
     def __init__(self) -> None:
         # search() records what the deal asked for so enrich() can pick the home
@@ -2182,9 +2223,13 @@ class ApartmentGuideSource:
     empty_result_message = (
         "ApartmentGuide published no San Francisco buildings in its structured data."
     )
-    # Fifty buildings a page against a city total of 476. Four pages is more
-    # inventory than a scan can score; the rest is bandwidth.
-    max_pages = 4
+    # Fifty buildings a page against a city total of 476, so ten pages is all
+    # of San Francisco and the rest is headroom: the repeat-guard below ends
+    # the walk the moment a page comes back the same, so a ceiling above the
+    # real depth costs one request rather than four wasted ones. Measured at
+    # 491 buildings in 45 seconds, which is the slowest healthy source here
+    # and still inside the scanner's per-source ceiling.
+    max_pages = 14
 
     def _page_url(self, page: int) -> str:
         # Deliberately no bedroom or rent filter. ApartmentGuide accepts
@@ -2467,10 +2512,17 @@ class TruliaSource:
     # The search page is the whole source; see the class docstring.
     detail_budget = 0
     empty_result_message = "Trulia published no San Francisco rentals in its structured data."
-    # Forty homes a page. Two pages is a scan's worth of inventory and, more to
-    # the point, the smallest footprint that still returns something: every
-    # extra page is another chance to be turned away for the next hour.
+    # Forty homes a page against 1,365 San Francisco rentals. Two pages is the
+    # smallest footprint that still returns something, and on the runs somebody
+    # is waiting for that is the right trade: every extra page is another
+    # chance to be turned away for the next hour, and a refused source returns
+    # nothing at all.
     max_pages = 2
+    # The nightly sweep reads it to the bottom instead. Thirty-five pages is
+    # the whole city; the repeat-guard stops the walk at the real end, and
+    # being refused halfway through costs a scan nobody is watching rather
+    # than the one on somebody's screen.
+    deep_max_pages = 35
 
     def _page_url(self, page: int) -> str:
         # No bedroom filter. Trulia spells one `/2p_beds/`, and asked for it
@@ -2492,7 +2544,17 @@ class TruliaSource:
         homes = _nested_mapping(parsed, "props", "searchData").get("homes")
         return [home for home in homes or [] if isinstance(home, dict)]
 
+    def search_for_trigger(
+        self, client: httpx.Client, preferences: Preferences, trigger: str
+    ) -> list[ListingCandidate]:
+        return self._search(client, preferences, _pages_for_trigger(self, trigger))
+
     def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        return self._search(client, preferences, self.max_pages)
+
+    def _search(
+        self, client: httpx.Client, preferences: Preferences, pages: int
+    ) -> list[ListingCandidate]:
         floor = _bedroom_floor(preferences)
         maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
         listings: list[ListingCandidate] = []
@@ -2500,7 +2562,7 @@ class TruliaSource:
         read_a_card = False
         document = ""
 
-        for page in range(1, self.max_pages + 1):
+        for page in range(1, pages + 1):
             document = _require_page(
                 client.get(self._page_url(page), headers=_BROWSER_HEADERS), self.platform
             )
@@ -2902,9 +2964,10 @@ class UloopSource:
     # The card already carries price, size, posting date and a description.
     detail_budget = 0
     empty_result_message = "The student board currently lists no San Francisco homes."
-    # San Francisco homes are scattered rather than clustered: measured over
-    # five pages, 21 then 1, 3, 4 and 7. Worth paging, worth stopping.
-    max_pages = 5
+    # San Francisco homes are scattered rather than clustered, so the board
+    # has to be read further than the first cluster: five pages found 28,
+    # twelve found 51. The walk stops on its own at a page that adds nothing.
+    max_pages = 12
 
     CARD = "div.listing-list.housing-listing"
 
@@ -3123,9 +3186,10 @@ class RentSFNowSource:
     # The unit record is complete: address, area, size, baths, rent and pets.
     detail_budget = 0
     empty_result_message = "Veritas currently lets no San Francisco homes matching this deal."
-    # Five pages of twelve today. The cap is a backstop; the server's own
-    # last_page and a page that adds nothing new are what normally stop it.
-    max_pages = 8
+    # Five pages of twelve today, and twenty pages found no more than eight
+    # did: this source is already read in full. The cap is a backstop; the
+    # server's own last_page and a page that adds nothing new stop it first.
+    max_pages = 12
 
     def _request(self, page: int, floor: int) -> dict[str, str]:
         """The search form as the page itself submits it.

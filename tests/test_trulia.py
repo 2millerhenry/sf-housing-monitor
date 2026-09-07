@@ -607,3 +607,58 @@ def test_a_page_that_repeats_the_last_one_ends_the_walk(preferences) -> None:
 
     assert len(listings) == 1
     assert len(client.requested) == 2, "the repeat should stop the walk, not six pages of it"
+
+
+def test_the_nightly_sweep_reads_far_deeper_than_a_waiting_scan(preferences) -> None:
+    """Two pages when somebody is waiting, the whole city once a day. Read
+    deeply at 10:00 this source spends its one chance and returns nothing for
+    an hour; read shallowly forever it returns 80 of 1,365 homes."""
+    from sf_housing.sources import DEEP_SWEEP_TRIGGER, _pages_for_trigger
+
+    source = TruliaSource()
+    assert _pages_for_trigger(source, "scheduled") == 2
+    assert _pages_for_trigger(source, DEEP_SWEEP_TRIGGER) == 35
+
+    shallow = FakeClient(FakeResponse(page_of(card())))
+    source.search_for_trigger(shallow, preferences, "scheduled")
+    assert len(shallow.requested) == 2
+
+    deep = FakeClient(*[
+        FakeResponse(page_of(card(typedHomeId=f"{n}_BUILDING_ID", url=f"/building/b-{n}")))
+        for n in range(40)
+    ])
+    source.search_for_trigger(deep, preferences, DEEP_SWEEP_TRIGGER)
+    assert len(deep.requested) == 35, "the sweep stopped short of its own depth"
+
+
+def test_a_plain_search_is_always_the_shallow_one(preferences) -> None:
+    """The protocol's own entry point cannot know the trigger, so it must not
+    guess deep: anything calling it gets the read that does not get refused.
+
+    Served distinct pages on purpose -- given one page repeated, the walk stops
+    at the second either way and the test proves nothing about its depth."""
+    client = FakeClient(*[
+        FakeResponse(page_of(card(typedHomeId=f"{n}_BUILDING_ID", url=f"/building/b-{n}")))
+        for n in range(40)
+    ])
+    TruliaSource().search(client, preferences)
+    assert len(client.requested) == 2
+
+
+def test_a_sweep_is_never_shallower_than_a_normal_run() -> None:
+    """`deep_max_pages` is a floor to raise, not a number to obey. Set below
+    `max_pages` by mistake it would make the nightly sweep -- the one run whose
+    whole purpose is depth -- the shallowest read of the day."""
+    from sf_housing.sources import DEEP_SWEEP_TRIGGER, _pages_for_trigger
+
+    class Backwards:
+        max_pages = 10
+        deep_max_pages = 3
+
+    assert _pages_for_trigger(Backwards(), DEEP_SWEEP_TRIGGER) == 10
+
+    class Unpaged:
+        max_pages = 4
+
+    assert _pages_for_trigger(Unpaged(), DEEP_SWEEP_TRIGGER) == 4
+    assert _pages_for_trigger(Unpaged(), "scheduled") == 4

@@ -401,9 +401,12 @@ def test_a_truncated_read_says_so(preferences, caplog) -> None:
 
     # Distinct slugs, not distinct ids: the slug is the identity, so renumbering
     # would make every page the same page and the read would stop at two.
+    # More pages than the limit, derived from it: written as a fixed number
+    # this test quietly stopped proving anything the day the limit was raised
+    # past it, because the read then finished on its own.
     pages = [
         FakeResponse(_re.sub(r"(/housing/view\.php/\d+/)", rf"\g<1>p{n}-", board_page()))
-        for n in range(9)
+        for n in range(UloopSource.max_pages + 3)
     ]
     with caplog.at_level(logging.INFO, logger="sf_housing.sources"):
         UloopSource().search(FakeClient(*pages), preferences)
