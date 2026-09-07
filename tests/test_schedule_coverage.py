@@ -280,9 +280,23 @@ def test_support_reports_the_schedule_record_rather_than_asking_to_be_trusted(tm
     assert coverage["missed"], "the slots that did not run have to be named"
 
 
+def a_week_of_slots(days: int = 5) -> tuple[list, "datetime"]:
+    """Every slot in the last `days`, and a `now` sitting just after the last.
+
+    Taken straight from the clock, the newest slot can be sixteen hours back --
+    the schedule sits at 10am and 6pm, so the gap between slots alternates
+    between eight hours and sixteen -- and the page answers "checks are behind
+    schedule" before it ever looks at coverage. These tests were therefore
+    passing or failing on what time of day the suite happened to run.
+    Anchoring `now` to the last slot makes them say the same thing at any hour.
+    """
+    slots = scheduled_slots(datetime.now(UTC) - timedelta(days=days), datetime.now(UTC))
+    assert slots, "the schedule must produce slots for the window"
+    return slots, slots[-1] + SLOT_GRACE + timedelta(minutes=5)
+
+
 def test_a_complete_record_says_so_and_stays_a_pass(tmp_path) -> None:
-    now = datetime.now(UTC)
-    slots = scheduled_slots(now - timedelta(days=3), now - SLOT_GRACE - timedelta(minutes=5))
+    slots, _ = a_week_of_slots(3)
     application, client_cls = support_app(tmp_path, [slot + timedelta(minutes=2) for slot in slots])
 
     with client_cls(application) as client:
@@ -389,8 +403,7 @@ def managed_schedule_check(tmp_path, scans, now=None):
 
 def test_an_old_miss_still_appears_as_a_fact(tmp_path) -> None:
     """Not raising it must not mean hiding it."""
-    now = datetime.now(UTC)
-    slots = scheduled_slots(now - timedelta(days=5), now - SLOT_GRACE - timedelta(minutes=5))
+    slots, now = a_week_of_slots()
     # Deliberately not the first: the window floors at the app's own history, so
     # a slot before the earliest scan is correctly never judged at all.
     skipped = slots[1]
@@ -404,20 +417,37 @@ def test_an_old_miss_still_appears_as_a_fact(tmp_path) -> None:
 
 
 def test_a_recent_miss_does_raise_on_the_page(tmp_path) -> None:
-    now = datetime.now(UTC)
-    slots = scheduled_slots(now - timedelta(days=5), now - SLOT_GRACE - timedelta(minutes=5))
+    """A slot missed recently, on a week otherwise kept.
+
+    Every date here is derived rather than taken from the clock. The slots sit
+    at 10am and 6pm, so the gap between them alternates between eight hours and
+    sixteen, and "the slot before last" was inside a day or outside it
+    depending on what time the suite happened to run. Anchoring on a 10am slot
+    makes the previous slot sixteen hours back every time.
+
+    The missed slot is also deliberately not the most recent one: dropping that
+    leaves the newest scan half a day old, and "checks are behind schedule"
+    answers before coverage is ever consulted.
+    """
+    slots, _ = a_week_of_slots(6)
+    latest = next(slot for slot in reversed(slots) if slot.astimezone(PACIFIC).hour == 10)
+    now = latest + SLOT_GRACE + timedelta(minutes=5)
+    due = [slot for slot in slots if slot <= latest]
+    assert len(due) >= 4, "six days must span several slots"
+    missed = due[-2]
+    assert now - missed < timedelta(days=1), "a lone old miss is not worth raising, by design"
+
     check = managed_schedule_check(
-        tmp_path, [slot + timedelta(minutes=2) for slot in slots[:-1]], now
+        tmp_path, [slot + timedelta(minutes=2) for slot in due if slot != missed], now
     )
 
     assert check.status == "attention", check.explanation
-    assert "did not run" in check.label
+    assert "did not run" in check.label, check.label
     assert "Missed:" in check.explanation
 
 
 def test_a_complete_record_reads_as_a_pass_and_says_so(tmp_path) -> None:
-    now = datetime.now(UTC)
-    slots = scheduled_slots(now - timedelta(days=5), now - SLOT_GRACE - timedelta(minutes=5))
+    slots, now = a_week_of_slots()
     check = managed_schedule_check(tmp_path, [slot + timedelta(minutes=2) for slot in slots], now)
 
     assert check.status == "pass"
