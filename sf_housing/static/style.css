@@ -1240,7 +1240,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    lightness and chroma across the set keeps eleven different hues reading as
    one family rather than eleven decisions. */
 .source-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.8rem; font-weight: 600; color: var(--ink); }
-.source-mark { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: oklch(52% 0.13 var(--mark-hue)); color: oklch(99% 0.004 var(--mark-hue)); font-size: 0.62rem; font-weight: 760; letter-spacing: -0.01em; }
+.source-mark { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: oklch(var(--mark-light, 54%) 0.13 var(--mark-hue)); color: oklch(99% 0.004 var(--mark-hue)); font-size: 0.62rem; font-weight: 760; letter-spacing: -0.01em; }
 .already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
 .connect-sources { margin: 12px 0 18px; }
 .connect-cost { max-width: 68ch; margin: -8px 0 18px; color: var(--muted); font-size: 0.83rem; line-height: 1.55; }

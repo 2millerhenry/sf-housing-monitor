@@ -652,24 +652,63 @@ def test_every_source_the_page_names_is_in_the_mark_table() -> None:
 
     # The fallback hue must belong to no source, or an unlisted name would be
     # indistinguishable from a listed one rather than merely plain.
-    fallback = re.search(r"source_marks\.get\(name, \(name\[0\], '(\d+)'\)\)", page).group(1)
-    assert fallback not in re.findall(r"\('[^']+',\s*'(\d+)'\)", block)
+    fallback = re.search(r"source_marks\.get\(name, \(name\[0\], '(\d+)', '(\d+)'\)\)", page).groups()
+    taken = set(re.findall(r"\('[^']+',\s*'(\d+)',\s*'(\d+)'\)", block))
+    assert fallback not in taken, "an unlisted name must not wear a listed source's colour"
 
 
 def test_no_two_sources_share_a_colour() -> None:
     """The mark exists so a source can be found at a glance, which two sources
-    in the same colour defeats."""
+    in the same colour defeats.
+
+    Hue alone stopped being enough at seventeen names: a circle holds eighteen
+    at the twenty degrees it takes to tell two apart. Lightness is the second
+    dimension, so the rule is now that no two share *both*, and that within one
+    lightness the hues are still twenty apart -- which is the thing an eye
+    actually does."""
     import pathlib
     import re
 
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
     block = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
-    hues = [int(hue) for _, hue in re.findall(r"\('([^']+)',\s*'(\d+)'\)", block)]
+    marks = [
+        (int(hue), int(light))
+        for _, hue, light in re.findall(r"\('([^']+)',\s*'(\d+)',\s*'(\d+)'\)", block)
+    ]
+    assert marks, "the mark table must parse"
 
-    assert len(hues) == len(set(hues)), "two sources share a hue"
-    ordered = sorted(hues)
-    gaps = [b - a for a, b in zip(ordered, ordered[1:])]
-    assert min(gaps) >= 20, f"two hues are only {min(gaps)} degrees apart"
+    assert len(marks) == len(set(marks)), "two sources share a hue and a lightness"
+    by_light: dict[int, list[int]] = {}
+    for hue, light in marks:
+        by_light.setdefault(light, []).append(hue)
+    for light, hues in by_light.items():
+        ordered = sorted(hues)
+        gaps = [b - a for a, b in zip(ordered, ordered[1:])]
+        assert len(hues) == len(set(hues)), f"two sources share hue at lightness {light}"
+        if gaps:
+            assert min(gaps) >= 20, f"two hues are {min(gaps)} degrees apart at lightness {light}"
+
+
+def test_the_wheel_has_room_to_grow() -> None:
+    """The point of the second dimension. Eighteen positions at two lightnesses
+    is thirty-six sources, and a source keeps its colour for good rather than
+    every mark shifting each time one is added."""
+    import pathlib
+    import re
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    block = re.search(r"\{% set source_marks = \{(.*?)\} %\}", page, re.S).group(1)
+    marks = [
+        (int(hue), int(light))
+        for _, hue, light in re.findall(r"\('([^']+)',\s*'(\d+)',\s*'(\d+)'\)", block)
+    ]
+    lightnesses = {light for _, light in marks}
+    positions = {hue for hue, _ in marks}
+
+    assert len(positions) <= 18, "the wheel is eighteen positions wide"
+    assert all(hue % 20 == 10 for hue in positions), "every mark sits on a fixed position"
+    assert len(marks) <= 18 * 2, "past thirty-six, lightness needs a third tier"
+    assert lightnesses <= {54, 33}, f"unexpected lightness tier: {lightnesses}"
 
 
 # --------------------------------------------------------------------------

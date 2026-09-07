@@ -2,31 +2,35 @@
     the companies' logos: the page has to work offline and tell no third party
     it was opened, so nothing may be hotlinked, and shipping other people's
     trademarks inside an MIT repository is a liability the project does not
-    need. Distinct hues at one lightness read as a family, re-spaced to
-    twenty-one degrees so all seventeen names fit and none collides with the
-    hue an unlisted name falls back to. -#}
+    need.
+
+    Hue alone ran out. Eighteen names is all a circle holds at the twenty
+    degrees it takes to tell two of them apart, and the seventeenth was already
+    in. So the wheel is fixed at eighteen positions and lightness carries the
+    rest: thirty-six slots, each a colour a source keeps for good, and nothing
+    is ever re-spaced to make room again. -#}
 {% set source_marks = {
-  'Roomies':                  ('R', '2'),
-  'Craigslist':               ('CL', '23'),
-  'Abacus (small buildings)': ('AB', '44'),
-  'Listings Project':         ('LP', '65'),
-  'HotPads':                  ('HP', '86'),
-  'Redfin':                   ('Rf', '107'),
-  'Uloop':                    ('Ul', '128'),
-  'RentSFNow':                ('RS', '149'),
-  'SF Housing Portal':        ('SF', '170'),
-  'SpareRoom':                ('SR', '191'),
-  'Apartment List':           ('AL', '212'),
-  'Furnished Finder':         ('FF', '233'),
-  'Zillow':                   ('Z', '254'),
-  'Facebook Marketplace':     ('FB', '275'),
-  'Zumper':                   ('Zu', '296'),
-  'Apartments.com':           ('A', '317'),
-  'Rent.com':                 ('Rc', '338')
+  'Roomies':                  ('R', '10', '54'),
+  'Craigslist':               ('CL', '30', '54'),
+  'Abacus (small buildings)': ('AB', '50', '54'),
+  'Listings Project':         ('LP', '70', '54'),
+  'HotPads':                  ('HP', '90', '54'),
+  'Redfin':                   ('Rf', '110', '54'),
+  'Uloop':                    ('Ul', '130', '54'),
+  'RentSFNow':                ('RS', '150', '54'),
+  'SF Housing Portal':        ('SF', '170', '54'),
+  'SpareRoom':                ('SR', '190', '54'),
+  'Apartment List':           ('AL', '210', '54'),
+  'Furnished Finder':         ('FF', '230', '54'),
+  'Zillow':                   ('Z', '250', '54'),
+  'Facebook Marketplace':     ('FB', '270', '54'),
+  'Zumper':                   ('Zu', '290', '54'),
+  'Apartments.com':           ('A', '310', '54'),
+  'Rent.com':                 ('Rc', '330', '54')
 } %}
 {% macro source_chip(name) %}
-  {%- set mark = source_marks.get(name, (name[0], '162')) -%}
-  <span class="source-chip"><span class="source-mark" style="--mark-hue: {{ mark[1] }}" aria-hidden="true">{{ mark[0] }}</span>{{ name }}</span>
+  {%- set mark = source_marks.get(name, (name[0], '165', '54')) -%}
+  <span class="source-chip"><span class="source-mark" style="--mark-hue: {{ mark[1] }}; --mark-light: {{ mark[2] }}%" aria-hidden="true">{{ mark[0] }}</span>{{ name }}</span>
 {% endmacro %}
 {% extends "base.html" %}
 {% block title %}Add sources · SF Housing Monitor{% endblock %}
