@@ -34,6 +34,55 @@ from .preferences import Preferences
 WHOLE_HOME_PATHS = frozenset({STUDIO, ONE_BEDROOM, *SPLIT_PATHS})
 
 
+# Below these, a monthly figure is more likely to be something other than a
+# month's rent -- a weekly rate, a deposit, a per-person share posted as the
+# whole, a typo -- than a cheap home. They are absolute, and deliberately not a
+# fraction of what somebody said they could pay.
+#
+# A fraction is what this used to be: half the deal's ceiling for a whole home,
+# 45% for a shared one. Raising a budget to $8,000 therefore made every San
+# Francisco studio under $4,000 "unusually low", and a four-bedroom deal --
+# whose ceiling is four people's shares added together -- called everything
+# under $14,400 suspicious, which is every four-bedroom in the city. Each one
+# was capped at 79 against a cut-off of 80, so the whole category missed the
+# shortlist by a single point.
+#
+# Cheap is the thing being searched for. Only implausible is worth a question.
+_WHOLE_UNIT_SIZES = {
+    STUDIO: 0,
+    ONE_BEDROOM: 1,
+    TWO_BEDROOM: 2,
+    THREE_BEDROOM: 3,
+    FOUR_BEDROOM: 4,
+}
+
+IMPLAUSIBLE_RENT_FLOOR = {0: 900, 1: 1100, 2: 1400, 3: 1700, 4: 2000}
+DEFAULT_RENT_FLOOR = 900
+
+
+def _bedrooms_of(listing: ListingCandidate) -> int | None:
+    """How many bedrooms this home has, as far as anything here knows."""
+    stated = listing.metadata.get("bedrooms")
+    if isinstance(stated, bool) or not isinstance(stated, (int, float)):
+        return _WHOLE_UNIT_SIZES.get(str(listing.unit_type or ""))
+    return int(stated)
+
+
+def _implausible_rent(listing: ListingCandidate, bedrooms: int | None) -> bool:
+    """Is this figure too small to be a month's rent for a home this size?
+
+    A home let below market on purpose is exempt: the city's own portal and
+    two of the building sources publish rents that are a third of market, and
+    those are the finds, not the mistakes.
+    """
+    if listing.price is None:
+        return False
+    if listing.metadata.get("below_market_rate"):
+        return False
+    floor = IMPLAUSIBLE_RENT_FLOOR.get(bedrooms if bedrooms is not None else -1, DEFAULT_RENT_FLOOR)
+    return int(listing.price) < floor
+
+
 PRIVATE_POSITIVE = (
     "private room",
     "own room",
@@ -957,10 +1006,7 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         and int(listing.price) < 1000
     )
     per_person_monthly = ceil(int(listing.price) / occupants) if is_split_unit and listing.price is not None else None
-    unusually_low = bool(
-        listing.price is not None
-        and int(listing.price) < round(max_monthly * (0.45 if is_split_unit else 0.5))
-    )
+    unusually_low = _implausible_rent(listing, _bedrooms_of(listing))
     stay_text = " ".join(filter(None, [listing.title, listing.summary]))
     stay_match = SHORT_STAY_RANGE_PATTERN.search(stay_text)
     numeric_stay_match = SHORT_STAY_NUMERIC_RANGE_PATTERN.search(stay_text)

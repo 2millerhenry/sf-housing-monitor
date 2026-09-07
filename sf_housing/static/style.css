@@ -210,6 +210,26 @@ main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
 }
 .scan-progress-meta { flex-wrap: wrap; color: var(--muted); font-size: 0.69rem; font-variant-numeric: tabular-nums; }
 .scan-progress-meta > span:last-child { flex: 0 0 auto; color: var(--faint); }
+/* The line that changes every eight seconds. Sized and coloured below the
+   numbers above it: it is something to read while waiting, not a second
+   status. min-height holds the row so a shorter sentence does not make the
+   whole panel jump. */
+.scan-progress-note {
+  margin: 0;
+  min-height: 1.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.15rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* Fade and a few pixels of travel, once per message. Any more movement than
+     this reads as the panel doing something rather than a sentence changing. */
+  .scan-progress-note.is-fresh { animation: scan-note-in 340ms cubic-bezier(0.16, 1, 0.3, 1); }
+}
+@keyframes scan-note-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
 
 .housing-tabs {
   max-width: 910px;

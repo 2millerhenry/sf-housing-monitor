@@ -1101,3 +1101,97 @@ def test_the_page_it_opens_says_the_same_thing(tmp_path: Path) -> None:
 
     assert "<title>Add sources" in page
     assert '<p class="eyebrow">Add sources</p>' in page
+
+
+# --------------------------------------------------------------------------
+# something to read while the scan runs
+# --------------------------------------------------------------------------
+
+
+def scan_progress_script() -> str:
+    return (Path(__file__).resolve().parents[1] / "sf_housing/static/scan-progress.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def rotating_notes() -> list[str]:
+    """The message table as written, one entry per line."""
+    script = scan_progress_script()
+    block = script[script.index("const NOTES = [") : script.index("];", script.index("const NOTES = ["))]
+    return [line.strip() for line in block.splitlines() if line.strip().startswith("(")]
+
+
+def test_the_scan_panel_carries_a_line_that_changes_while_it_runs(tmp_path: Path) -> None:
+    """A three-minute wait needs something to read. The bar moving says the
+    scan is alive; it does not say what it is doing."""
+    settings = app_settings(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        response = client.post("/scan", follow_redirects=False)
+        page = client.get(response.headers["location"]).text
+
+    assert "data-scan-note" in page
+
+
+def test_the_changing_line_is_hidden_from_screen_readers(tmp_path: Path) -> None:
+    """It sits inside an aria-live region. Announced, it would interrupt with
+    a new sentence every eight seconds for three minutes, while the real
+    status -- the heading and the counts -- is already spoken."""
+    settings = app_settings(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        client.post("/scan", follow_redirects=False)
+        page = client.get("/").text
+
+    note = page[page.index("data-scan-note") - 60 : page.index("data-scan-note") + 60]
+    assert 'aria-hidden="true"' in note, note
+
+
+def test_there_are_enough_messages_to_last_a_whole_scan() -> None:
+    """A scan runs about 176 seconds, which is twenty-two changes at eight
+    seconds each. Too few and the reader watches the same three sentences
+    cycle four times over."""
+    assert len(rotating_notes()) >= 8
+
+
+def test_each_message_says_something_the_scan_is_really_doing() -> None:
+    """These describe the run in progress rather than filling space, so the
+    numbers in them have to come from the live payload rather than being
+    baked in when the page loaded."""
+    notes = rotating_notes()
+    live = [note for note in notes if "${p." in note]
+
+    assert len(live) >= 3, "no message reports anything about the actual scan"
+    for note in notes:
+        assert "TODO" not in note and "..." not in note
+
+
+def test_the_line_changes_on_its_own_clock_not_on_every_poll() -> None:
+    """The poll runs twice a second. Re-rendering the same sentence restarts
+    its fade, which reads as a flicker rather than a change."""
+    script = scan_progress_script()
+
+    assert "Math.floor(elapsed / 8) % NOTES.length" in script
+    assert "if (index === shownNote) return;" in script
+
+
+def test_the_fade_is_dropped_for_a_reader_who_asked_for_no_motion() -> None:
+    style = (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
+        encoding="utf-8"
+    )
+    fade = style[style.index(".scan-progress-note") :]
+
+    assert "prefers-reduced-motion: no-preference" in fade[: fade.index("@keyframes")]
+
+
+def test_the_line_holds_its_row_so_the_panel_does_not_jump() -> None:
+    """The messages are different lengths. Without a reserved row a shorter
+    one shortens the panel and everything below it moves."""
+    style = (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
+        encoding="utf-8"
+    )
+    rule = style[style.index(".scan-progress-note {") : style.index("}", style.index(".scan-progress-note {"))]
+
+    assert "min-height" in rule

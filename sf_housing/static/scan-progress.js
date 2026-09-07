@@ -8,7 +8,41 @@
   const bar = root.querySelector("[data-scan-bar]");
   const detail = root.querySelector("[data-scan-detail]");
   const estimate = root.querySelector("[data-scan-estimate]");
+  const note = root.querySelector("[data-scan-note]");
   let finished = false;
+  let shownNote = -1;
+
+  // What the scan is actually doing, for the three minutes it takes. Every one
+  // of these is true of the run in progress rather than filler: a reader who
+  // watches the whole rotation should come away knowing how their homes are
+  // collected. Written as functions so the ones with numbers in them are the
+  // live numbers, not the ones from when the page loaded.
+  const NOTES = [
+    (p) => `Reading ${p.current_source || "each source"} for homes it has not shown before.`,
+    (p) => `${p.listings_seen || 0} listings read so far across ${p.sources_total || 0} sources.`,
+    () => "Ranking every home against your deal: budget, area, size and timing.",
+    () => "Homes you have already been shown are updated rather than listed twice.",
+    () => "Matching addresses, so one building on three sites stays one home.",
+    () => "Sources are read one at a time, so none of them starts turning us away.",
+    () => "Homes appear as each source finishes. Nothing waits for the last one.",
+    () => "Re-checking whether the homes on your shortlist are still going.",
+    (p) => `${p.sources_completed || 0} sources done, the rest still to read.`,
+  ];
+
+  // Eight seconds a message, taken from the scan's own clock rather than a
+  // timer of its own: the poll runs twice a second, and re-rendering the same
+  // sentence restarts its fade and makes the line flicker.
+  const rotateNote = (progress) => {
+    if (!note) return;
+    const elapsed = Number(progress.elapsed_seconds) || 0;
+    const index = Math.floor(elapsed / 8) % NOTES.length;
+    if (index === shownNote) return;
+    shownNote = index;
+    note.textContent = NOTES[index](progress);
+    note.classList.remove("is-fresh");
+    void note.offsetWidth;
+    note.classList.add("is-fresh");
+  };
 
   const update = (progress) => {
     const percent = Math.max(0, Math.min(100, Number(progress.percent) || 0));
@@ -27,6 +61,7 @@
     estimate.textContent = progress.typical_seconds
       ? `Usually about ${progress.typical_seconds}s`
       : `Up to ${progress.maximum_seconds || 120}s`;
+    rotateNote(progress);
 
     if (!progress.running && !finished) {
       finished = true;
@@ -36,6 +71,11 @@
         : hasErrors
           ? "Check finished with a source error"
           : "Check complete";
+      if (note) {
+        note.textContent = progress.status === "failed"
+          ? "Whatever was collected before it stopped has been kept."
+          : `${progress.listings_seen || 0} listings read. Showing the best of them now.`;
+      }
       if (progress.status === "completed" || hasErrors) {
         percentLabel.textContent = "100%";
         track.setAttribute("aria-valuenow", "100");

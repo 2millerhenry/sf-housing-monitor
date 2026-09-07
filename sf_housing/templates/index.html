@@ -53,6 +53,11 @@
     <span data-scan-detail>{{ scan_progress.elapsed_seconds }}s elapsed · {{ scan_progress.sources_completed }} of {{ scan_progress.sources_total }} sources · {{ scan_progress.listings_seen }} listings checked</span>
     <span data-scan-estimate>{% if typical_scan_seconds %}Usually about {{ typical_scan_seconds }}s{% else %}May take up to 2 minutes{% endif %}</span>
   </div>
+  {#- Something to read during the three minutes this takes. Hidden from
+      screen readers on purpose: the heading and the line above already carry
+      the real status, and a region that re-announces itself every eight
+      seconds is worse than silence. -#}
+  <p class="scan-progress-note" data-scan-note aria-hidden="true">Reading every source for homes you have not seen.</p>
 </section>
 <script src="{{ url_for('static', path='scan-progress.js') }}?v={{ app_version }}" defer></script>
 {% endif %}

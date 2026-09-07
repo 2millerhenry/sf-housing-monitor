@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from sf_housing.classification import ROOM, UNKNOWN, classify_listing
 from sf_housing.models import ListingCandidate
 import pytest
@@ -478,7 +480,15 @@ def test_explicit_outside_sf_address_overrides_a_bad_target_area_label() -> None
     assert "Mill Valley (outside SF)" in result.concern
 
 
-def test_unusually_low_two_bedroom_stays_visible_but_is_flagged_for_verification() -> None:
+def test_a_cheap_two_bedroom_is_a_find_rather_than_a_warning() -> None:
+    """This used to assert the opposite: that $1,780 for a two-bedroom was
+    "unusually low" and had to be held back for verification.
+
+    It was, against half the deal's ceiling -- which is what the rule measured
+    and what made it wrong. A rent-controlled two-bedroom at $1,780 is the best
+    thing this app could find in San Francisco, and capping it at 79 against a
+    cut-off of 80 pushed it out of the shortlist and into near matches. Only a
+    figure too small to be a month's rent at all is worth a question now."""
     profile = load_preferences(BENCHMARK_PROFILE)
     listing = ListingCandidate(
         platform="Facebook Marketplace",
@@ -492,8 +502,26 @@ def test_unusually_low_two_bedroom_stays_visible_but_is_flagged_for_verification
 
     result = score_listing(listing, profile)
 
-    assert profile.minimum_score <= result.score <= 79
-    assert "unusually low" in result.concern
+    assert result.score > 79
+    assert "unusually low" not in (result.concern or "")
+
+
+def test_a_two_bedroom_priced_like_a_single_room_is_still_flagged() -> None:
+    """The case the rule above exists for, kept."""
+    profile = load_preferences(BENCHMARK_PROFILE)
+    listing = ListingCandidate(
+        platform="Facebook Marketplace",
+        source_id="room-priced-two-bedroom",
+        title="2 Beds 1 Bath Apartment",
+        original_url="https://example.test/room-priced-two-bedroom",
+        price=800,
+        neighborhood="Potrero Hill",
+        summary="Entire apartment with two bedrooms and one bathroom.",
+    )
+
+    result = score_listing(listing, profile)
+
+    assert "unusually low" in (result.concern or "")
     assert "room price or deposit" in result.concern
 
 
@@ -1466,3 +1494,121 @@ def test_every_shared_path_has_the_defaults_the_scorer_reads() -> None:
         assert path in DEFAULT_OCCUPANTS, path
         assert path in DEFAULT_PER_PERSON, path
         assert path in WHOLE_HOME_PATHS, path
+
+
+# --------------------------------------------------------------------------
+# cheap is what is being searched for; only implausible is worth a question
+# --------------------------------------------------------------------------
+
+
+def _priced(bedrooms: int, price: int, **metadata) -> ListingCandidate:
+    from sf_housing.classification import WHOLE_UNIT
+
+    return ListingCandidate(
+        platform="Rent.com",
+        source_id=f"{bedrooms}-{price}",
+        title=f"A {bedrooms}-bedroom",
+        original_url=f"https://example.test/{bedrooms}/{price}",
+        price=price,
+        neighborhood="Mission District",
+        listing_type="Condo",
+        summary=f"Listed as a {bedrooms}-bedroom. Asking ${price:,} a month.",
+        metadata={"address": "1 Valencia St", "bedrooms": bedrooms, **metadata},
+        housing_kind=WHOLE_UNIT,
+    )
+
+
+def _flagged_low(result) -> bool:
+    return any(
+        "unusually low" in text
+        for text in [*result.eligibility_reasons, result.concern or ""]
+    )
+
+
+@pytest.mark.parametrize(
+    "bedrooms,price",
+    [(0, 2300), (0, 3852), (0, 3702), (1, 4000), (4, 7000), (4, 9500)],
+)
+def test_an_ordinary_san_francisco_rent_is_not_treated_as_suspicious(bedrooms, price) -> None:
+    """This was a fraction of the deal's own ceiling: half of it for a whole
+    home, 45% for a shared one. Raising a budget to $8,000 therefore made
+    every studio under $4,000 "unusually low", and a four-bedroom deal --
+    whose ceiling is four shares added together -- called everything under
+    $14,400 suspicious, which is every four-bedroom in the city.
+
+    Each one was capped at 79 against a cut-off of 80, so an entire category
+    of home missed the shortlist by a single point and landed in near matches
+    with "confirm that this unusually low amount is the full monthly rent"."""
+    result = score_listing(_priced(bedrooms, price), _deal("studio", "one_bedroom", "four_bedroom"))
+
+    assert not _flagged_low(result), result.eligibility_reasons
+    assert result.eligibility == "eligible"
+    assert result.score > 79
+
+
+@pytest.mark.parametrize("bedrooms,price", [(0, 600), (1, 700), (4, 1200)])
+def test_a_figure_too_small_to_be_a_months_rent_is_still_questioned(bedrooms, price) -> None:
+    """A weekly rate, a deposit, one person's share posted as the whole, a
+    typo. The check is worth keeping; it was only measuring the wrong thing."""
+    result = score_listing(_priced(bedrooms, price), _deal("studio", "one_bedroom", "four_bedroom"))
+
+    assert _flagged_low(result)
+
+
+def test_raising_a_budget_never_makes_a_listing_look_worse() -> None:
+    """The property the old rule broke. A ceiling is what somebody is willing
+    to pay; it says nothing about which rents are real."""
+    listing = _priced(0, 2300)
+    modest = score_listing(listing, _deal("studio", maximum=3000))
+    generous = score_listing(listing, _deal("studio", maximum=20000))
+
+    assert generous.score >= modest.score
+    assert not _flagged_low(generous)
+
+
+def test_a_home_let_below_market_on_purpose_is_never_called_implausible() -> None:
+    """The city's own portal and two building sources publish rents a third of
+    market. Those are the finds, not the mistakes."""
+    result = score_listing(
+        _priced(0, 700, below_market_rate=True), _deal("studio")
+    )
+
+    assert not _flagged_low(result)
+
+
+def test_the_floor_rises_with_the_size_of_the_home() -> None:
+    """$1,500 is a plausible studio and an implausible four-bedroom."""
+    deal = _deal("studio", "four_bedroom")
+
+    assert not _flagged_low(score_listing(_priced(0, 1500), deal))
+    assert _flagged_low(score_listing(_priced(4, 1500), deal))
+
+
+def test_a_home_with_no_stated_size_still_gets_a_floor() -> None:
+    """An unstated bedroom count must not switch the check off entirely."""
+    from sf_housing.classification import WHOLE_UNIT
+
+    unsized = ListingCandidate(
+        platform="Rent.com",
+        source_id="unsized",
+        title="An apartment",
+        original_url="https://example.test/unsized",
+        price=300,
+        neighborhood="Mission District",
+        summary="An apartment.",
+        metadata={"address": "1 Valencia St"},
+        housing_kind=WHOLE_UNIT,
+    )
+
+    assert _flagged_low(score_listing(unsized, _deal("studio")))
+
+
+def test_a_flag_in_the_bedroom_field_is_not_a_bedroom_count() -> None:
+    """`True` is an int in Python and `int(True)` is 1, so a boolean here
+    would quietly pick the one-bedroom floor for a home of unknown size."""
+    from sf_housing.scoring import _bedrooms_of
+
+    listing = _priced(0, 3000)
+    assert _bedrooms_of(replace(listing, metadata={"bedrooms": True})) is None
+    assert _bedrooms_of(replace(listing, metadata={"bedrooms": 2})) == 2
+    assert _bedrooms_of(replace(listing, metadata={})) is None
