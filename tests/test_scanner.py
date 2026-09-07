@@ -391,3 +391,104 @@ def test_detail_enrichment_is_preserved_and_advances_on_later_scans(
     assert "full detail" in after_second["1"]["summary"]
     assert "full detail" in after_second["2"]["summary"]
     assert after_second["1"]["metadata"]["enriched"] is True
+
+
+def test_a_source_that_stops_answering_does_not_take_the_scan_with_it(
+    repository: Repository, preferences: Preferences, monkeypatch
+) -> None:
+    """An HTTP read timeout bounds each chunk of a response, not the whole of
+    it, so a server that trickles bytes holds its connection for as long as it
+    likes. One did: AvalonBay took 200 seconds over a single request that
+    normally takes two, and the sixteen sources queued behind it were skipped
+    to keep the scan inside its limit. A stall has to cost one source, never
+    the rest of them."""
+    import sf_housing.scanner as scanner_module
+
+    monkeypatch.setattr(scanner_module, "SOURCE_HARD_CEILING_SECONDS", 1.0)
+
+    class Stalled:
+        platform = "Stalled"
+        mode = "automatic"
+        search_url = "https://example.test"
+        manual_reason = None
+        detail_budget = 0
+
+        def search(self, client, preferences):
+            time.sleep(30)
+            return []
+
+    started = time.monotonic()
+    scanner = Scanner(
+        repository, lambda: preferences, [Stalled(), GoodSource()], detail_delay_seconds=0
+    )
+    outcome = scanner.run_scan("test")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 20, "the scan waited out the stall instead of walking away"
+    assert outcome.listings_added == 1, "the healthy source lost its results too"
+    assert outcome.sources_failed == 1
+    statuses = {item["platform"]: item for item in repository.latest_source_runs()}
+    assert statuses["Good"]["status"] == "success"
+    assert statuses["Stalled"]["status"] == "error"
+    assert "stopped answering" in statuses["Stalled"]["message"]
+
+
+def test_a_healthy_source_is_never_cut_off_by_the_stall_ceiling(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """The ceiling sits well above the slowest healthy source. Set near one
+    instead, it would start failing Craigslist, which reads several searches
+    and their detail pages and wants about a minute."""
+    from sf_housing.scanner import SOURCE_HARD_CEILING_SECONDS
+
+    assert SOURCE_HARD_CEILING_SECONDS >= 70
+
+
+def test_a_source_that_raises_still_reports_its_own_error(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """Running the search on a worker thread must not swallow or reshape what
+    it raised: the message a reader sees is the source's own."""
+    scanner = Scanner(
+        repository, lambda: preferences, [BrokenSource(), GoodSource()], detail_delay_seconds=0
+    )
+    outcome = scanner.run_scan("test")
+
+    assert outcome.listings_added == 1
+    statuses = {item["platform"]: item for item in repository.latest_source_runs()}
+    assert "upstream unavailable" in statuses["Broken"]["message"]
+
+
+def test_the_stall_ceiling_never_outlasts_the_scan_itself(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """A scan with ten seconds left must not wait seventy-five for a stalled
+    source. The ceiling is whichever is smaller, floored at one request's
+    timeout so a healthy source is never cut off mid-fetch."""
+
+    class Stalled:
+        platform = "Stalled"
+        mode = "automatic"
+        search_url = "https://example.test"
+        manual_reason = None
+        detail_budget = 0
+
+        def search(self, client, preferences):
+            time.sleep(30)
+            return []
+
+    started = time.monotonic()
+    scanner = Scanner(
+        repository,
+        lambda: preferences,
+        [Stalled()],
+        detail_delay_seconds=0,
+        timeout_seconds=1.0,
+        max_scan_seconds=4.0,
+    )
+    scanner.run_scan("test")
+    elapsed = time.monotonic() - started
+
+    assert elapsed < 15, "the scan's own budget did not bound the wait"
+    statuses = {item["platform"]: item for item in repository.latest_source_runs()}
+    assert statuses["Stalled"]["status"] == "error"

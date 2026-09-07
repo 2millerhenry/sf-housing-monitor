@@ -17,13 +17,14 @@ class Settings:
     # Public-source work stays inside one bounded scan even with separate room,
     # small-unit, and 2–3 bedroom searches plus their detail reads.
     #
-    # Raised from 110 when Movoto began reading its whole inventory. A scan was
-    # using 96 of those 110 seconds, so the fourteen left were not enough for a
-    # source that reads forty pages, and the sources ordered after it would
-    # have started recording "skipped to keep this scan within the budget"
-    # instead of results.
+    # Raised from 110 when Movoto began reading its whole inventory, and again
+    # when raising the per-source cap let Craigslist double what it collects:
+    # one scan spent 65 seconds there and skipped sixteen later sources. No
+    # single source can run away with this now -- SOURCE_HARD_CEILING_SECONDS
+    # bounds each one -- so the budget only has to cover the healthy total,
+    # which measures around 140 seconds across 23 sources.
     request_timeout_seconds: float = 8.0
-    scan_max_seconds: float = 180.0
+    scan_max_seconds: float = 300.0
     gmail_client_secret_path: Path | None = None
     gmail_token_path: Path | None = None
     gmail_pending_state_path: Path | None = None

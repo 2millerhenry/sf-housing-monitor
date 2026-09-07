@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import json
+import queue
 import threading
 import time
 from collections.abc import Callable
@@ -20,7 +21,12 @@ from .freshness import source_is_in_backoff, source_key as watchdog_source_key
 from .models import ListingCandidate, ScanOutcome
 from .preferences import Preferences
 from .scoring import score_listing
-from .sources import ListingSource, facebook_coordinate_neighborhood, visible_sf_area_hint
+from .sources import (
+    ListingSource,
+    SourceError,
+    facebook_coordinate_neighborhood,
+    visible_sf_area_hint,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -43,6 +49,16 @@ FULL_SOURCE_TRIGGERS = AUTOMATIC_TRIGGERS | {"connector_test"}
 # cannot spend the whole allowance and starve the rest, and each is guaranteed a
 # small floor so it always makes progress even when the share is thin.
 RECHECK_FLOOR_PER_SOURCE = 3
+# The longest any one source may hold the scan. An HTTP read timeout bounds
+# each chunk of a response, not the whole of it, so a server that trickles
+# bytes keeps its connection open for as long as it likes: AvalonBay took 200
+# seconds over a single request that normally takes two, and the sixteen
+# sources queued behind it were all skipped to keep the scan inside its limit.
+# Set above the slowest healthy source rather than near it -- Craigslist reads
+# several searches and their detail pages and wants about a minute -- so this
+# only ever catches a source that has stopped behaving.
+SOURCE_HARD_CEILING_SECONDS = 75.0
+
 RECHECK_HARD_CEILING = 250
 
 # Scans run at 10:00 and 18:00, so the gaps are eight hours and sixteen. The
@@ -282,6 +298,66 @@ class Scanner:
                 LOGGER.info("%s is holding %s listings", platform, count)
             except Exception:
                 LOGGER.warning("Could not store the %s count", platform, exc_info=True)
+
+    def _search_within_ceiling(
+        self,
+        source: ListingSource,
+        client: httpx.Client,
+        preferences: Preferences,
+        trigger: str,
+        *,
+        deadline: float,
+    ) -> list[ListingCandidate]:
+        """Search a source, and stop waiting on it if it stops answering.
+
+        A stalled source cannot be interrupted from outside: it is sitting in a
+        socket read, and the read timeout applies to each chunk rather than to
+        the whole response, so a server sending one byte at a time holds the
+        connection for as long as it likes. Left alone that is not one slow
+        source, it is every source after it -- one 200-second stall skipped
+        sixteen of them in a single scan.
+
+        So the search runs on a worker thread the scan can walk away from. The
+        stalled source loses its own results and reports why; nothing else
+        loses anything. The thread is a daemon and shares the client, which
+        httpx supports, so an abandoned read finishes into a queue nobody is
+        listening to and the interpreter can still exit.
+        """
+        def run() -> tuple[str, Any]:
+            trigger_search = getattr(source, "search_for_trigger", None)
+            return (
+                trigger_search(client, preferences, trigger)
+                if callable(trigger_search)
+                else source.search(client, preferences)
+            )
+
+        # Never longer than the scan has left, and never so short that a
+        # healthy source is cut off by a ceiling meant for a broken one.
+        remaining = deadline - time.monotonic()
+        ceiling = min(SOURCE_HARD_CEILING_SECONDS, max(self.timeout_seconds, remaining))
+        outcome: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
+
+        def worker() -> None:
+            try:
+                outcome.put(("listings", run()))
+            except BaseException as error:  # reported on the scan's thread
+                outcome.put(("error", error))
+
+        thread = threading.Thread(
+            target=worker, name=f"search-{source.platform}", daemon=True
+        )
+        thread.start()
+        try:
+            kind, payload = outcome.get(timeout=ceiling)
+        except queue.Empty:
+            raise SourceError(
+                f"{source.platform} stopped answering partway through and was left after "
+                f"{int(ceiling)} seconds, so the rest of this scan could still run. "
+                "The next check tries it again."
+            ) from None
+        if kind == "error":
+            raise payload
+        return payload
 
     def _recheck_absent(
         self,
@@ -680,11 +756,8 @@ class Scanner:
                     source_fetched = source_parsed = source_classified = source_deduplicated = 0
                     source_hard_filtered = source_active = source_archived = 0
                     try:
-                        trigger_search = getattr(source, "search_for_trigger", None)
-                        listings = (
-                            trigger_search(client, preferences, trigger)
-                            if callable(trigger_search)
-                            else source.search(client, preferences)
+                        listings = self._search_within_ceiling(
+                            source, client, preferences, trigger, deadline=deadline
                         )
                         source_fetched = len(listings)
                         source_parsed = len(listings)
