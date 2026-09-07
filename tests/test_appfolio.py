@@ -228,3 +228,18 @@ def test_the_ready_check_still_probes_the_same_four() -> None:
         if getattr(source, "mode", "setup") == "automatic" and not getattr(source, "connector_key", None)
     ][:4]
     assert probed == ["Craigslist", "Listings Project", "Abacus (small buildings)", "SpareRoom"]
+
+
+def test_a_street_named_after_the_city_is_not_the_city() -> None:
+    """Real listing, real trap: "43632 San Francisco Ave, Lancaster, CA" is a
+    home in Lancaster. One manager on this platform publishes three hundred
+    homes and four of them say San Francisco in the street line; none is in it."""
+    page = listings_page()
+    assert "San Francisco Ave" in page and "Lancaster" in page, "the fixture must carry the trap"
+
+    listings, _ = found()
+
+    assert listings, "the real San Francisco homes are still read"
+    for listing in listings:
+        assert "Lancaster" not in listing.summary
+        assert not listing.title.lower().startswith("lancaster")
