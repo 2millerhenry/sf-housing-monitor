@@ -108,13 +108,15 @@
       <div class="size-choice">
         <div class="size-choice-ask">
           <strong>Largest building you would live in</strong>
-          <small>Applies to every whole home above. A private room is unaffected.</small>
+          <small>Applies to every whole home above, never to a private room. Smaller usually means an older building and fewer neighbours.</small>
         </div>
         <div class="size-options" role="radiogroup" aria-label="Largest building you would live in">
-          {% for units, label, note in [('25', '25 homes', 'A small building'), ('50', '50 homes', ''), ('100', '100 homes', ''), ('', 'Any size', 'Towers included')] %}
+          {# Four identical pills. A hint under two of them and not the others
+             made them different heights and read as an accident. #}
+          {% for units, label in [('25', 'Up to 25'), ('50', 'Up to 50'), ('100', 'Up to 100'), ('', 'Any size')] %}
           <label class="size-option">
             <input type="radio" name="building_units" value="{{ units }}" {% if chosen_units == units %}checked{% endif %}>
-            <span>{{ label }}{% if note %}<small>{{ note }}</small>{% endif %}</span>
+            <span>{{ label }}</span>
           </label>
           {% endfor %}
         </div>
