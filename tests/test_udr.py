@@ -184,3 +184,32 @@ def test_the_ready_check_still_probes_the_same_four() -> None:
         if getattr(source, "mode", "setup") == "automatic" and not getattr(source, "connector_key", None)
     ][:4]
     assert probed == ["Craigslist", "Listings Project", "Abacus (small buildings)", "SpareRoom"]
+
+
+def test_an_available_size_with_no_rent_is_not_a_two_dollar_home() -> None:
+    """A size with nothing free reads "0 Available Apartments"; a size that has
+    some but publishes no rent reads "3 Available Apartments". Read as a
+    number, the second is a home going for three dollars a month -- and the
+    zero is caught by being falsy, which is luck rather than a guard."""
+    assert "3 Available Apartments" in page(), "the fixture must carry one"
+
+    listings, _ = found()
+    priceless = [x for x in listings if x.source_id.startswith("priceless-place")]
+
+    assert priceless, "the building's other sizes are still read"
+    assert "priceless-place:1" not in {x.source_id for x in listings}
+    for listing in listings:
+        assert listing.price and listing.price > 1000, listing.title
+
+
+def test_a_building_in_another_city_is_dropped_on_the_city() -> None:
+    """The out-of-city card is a building of its own, with its own link. Sharing
+    a link with a San Francisco building would have it deduplicated away
+    instead, which looks like the filter working and is not."""
+    assert "1200 Broadway" in page() and "Oakland, CA" in page()
+
+    listings, _ = found()
+
+    assert not any(x.source_id.startswith("1200-broadway") for x in listings)
+    assert not any("across the bay" in x.title for x in listings)
+    assert listings, "and the San Francisco buildings are still read"

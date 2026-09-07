@@ -2850,8 +2850,12 @@ class UDRSource:
         offers = []
         for label, rent in zip(cells, cells[1:]):
             size = cls.SIZES.get(_normal_text(label))
-            if size is None or "$" not in rent:
+            if size is None:
                 continue
+            # A rent has to be money. Without that, "3 Available Apartments" --
+            # a size that has some free and publishes no rent -- reads as a
+            # home going for three dollars a month, and "0 Available
+            # Apartments" is only caught by nought being falsy, which is luck.
             price = _parse_price(rent, require_currency=True)
             if price:
                 offers.append((size, price))
