@@ -1420,3 +1420,22 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   background: var(--caution-soft, oklch(96% 0.035 82)); color: var(--ink); font-size: 0.82rem; }
 .liveness-warning strong { font-weight: 660; }
 
+/* One shared building-size answer, sitting under the paths it applies to.
+   Pills rather than a select: four options are worth one click, not two, and
+   the choice is a stance ("a small building") more than a number. */
+.size-choice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 13px 16px; border-top: 1px solid var(--line); }
+.size-choice-ask { display: grid; gap: 2px; min-width: 0; }
+.size-choice-ask strong { color: var(--ink); font-size: 0.8rem; font-weight: 650; }
+.size-choice-ask small { color: var(--muted); font-size: 0.68rem; font-weight: 450; }
+.size-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.size-option { position: relative; display: block; }
+.size-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.size-option > span { display: grid; gap: 1px; justify-items: center; min-height: 40px; padding: 6px 14px; align-content: center;
+  border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
+  color: var(--muted); font-size: 0.74rem; font-weight: 560; text-align: center; white-space: nowrap;
+  transition: border-color 160ms var(--ease-state), background-color 160ms var(--ease-state), color 160ms var(--ease-state); }
+.size-option > span small { color: var(--muted); font-size: 0.61rem; font-weight: 450; }
+.size-option:hover > span { border-color: var(--line-strong); background: var(--surface-muted); }
+.size-option input:checked + span { border-color: var(--accent-line); background: var(--accent-soft); color: var(--ink); font-weight: 640; }
+.size-option input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 620px) { .size-choice { flex-direction: column; align-items: flex-start; } }

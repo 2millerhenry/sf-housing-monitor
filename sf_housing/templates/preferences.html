@@ -97,10 +97,27 @@
             {% endif %}
           </div>
           {% if split %}<p class="path-row-total" data-split-total="{{ key }}">The total maximum is calculated from the per-person limit and group size.</p>{% endif %}
-          {% if key != 'private_room' %}<input type="hidden" name="{{ key }}_building_units" value="50">{% endif %}
         </div>
       </article>
       {% endfor %}
+      </div>
+      {# One question, not one per row: nobody wants a different answer for a
+         studio than for a four-bedroom. It sat here as a hidden 50 for long
+         enough that homes were being refused on a limit nobody had chosen. #}
+      {% set chosen_units = '' if deal_values.building_units is none else deal_values.building_units|string %}
+      <div class="size-choice">
+        <div class="size-choice-ask">
+          <strong>Largest building you would live in</strong>
+          <small>Applies to every whole home above. A private room is unaffected.</small>
+        </div>
+        <div class="size-options" role="radiogroup" aria-label="Largest building you would live in">
+          {% for units, label, note in [('25', '25 homes', 'A small building'), ('50', '50 homes', ''), ('100', '100 homes', ''), ('', 'Any size', 'Towers included')] %}
+          <label class="size-option">
+            <input type="radio" name="building_units" value="{{ units }}" {% if chosen_units == units %}checked{% endif %}>
+            <span>{{ label }}{% if note %}<small>{{ note }}</small>{% endif %}</span>
+          </label>
+          {% endfor %}
+        </div>
       </div>
       <p class="field-help">
         Tick a home type to use its budget. Untouched rows are ignored entirely.

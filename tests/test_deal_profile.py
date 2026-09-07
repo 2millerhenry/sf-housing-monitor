@@ -679,7 +679,10 @@ def test_a_new_deal_asks_for_far_less_than_it_can_hold(tmp_path: Path) -> None:
         page = client.get("/preferences?welcome=1").text
 
     total, visible = visible_control_count(page)
-    assert total > 55, "nothing was removed from the form"
+    # A floor, not a count: it catches a section going missing. It came down by
+    # one when five hidden building-size fields became four visible choices,
+    # which is a question being asked rather than a question being dropped.
+    assert total >= 55, "a section has gone missing from the form"
     assert visible <= total * 0.55, f"{visible} of {total} controls still meet the reader at once"
 
 

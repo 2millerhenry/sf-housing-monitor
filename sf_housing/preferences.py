@@ -89,6 +89,12 @@ class Preferences:
         return not self.profile_active
 
 
+# A building-size ceiling is the one number here that may be absent on
+# purpose: None means "any size", which is a real answer and not a missing one.
+def _valid_unit_ceiling(value: object) -> bool:
+    return value is None or (isinstance(value, int) and not isinstance(value, bool) and value > 0)
+
+
 def parse_preferences(text: str) -> Preferences:
     try:
         data = yaml.safe_load(text)
@@ -170,6 +176,10 @@ def parse_preferences(text: str) -> Preferences:
             raise PreferenceError("whole_unit.enabled must be true or false.")
         for name in ("max_monthly", "max_building_units"):
             value = whole_unit.get(name)
+            if name == "max_building_units":
+                if not _valid_unit_ceiling(value):
+                    raise PreferenceError("whole_unit.max_building_units must be a positive whole number or empty for any size.")
+                continue
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise PreferenceError(f"whole_unit.{name} must be a positive whole number.")
         unit_types = whole_unit.get("unit_types", [])
@@ -187,6 +197,14 @@ def parse_preferences(text: str) -> Preferences:
             raise PreferenceError("two_bedroom.enabled must be true or false.")
         for name in ("occupants", "max_per_person", "max_building_units"):
             value = two_bedroom.get(name)
+            if name == "max_building_units":
+                # Absent on purpose means "any size"; anything else is still a
+                # number, so skipping the check outright would let junk through.
+                if not _valid_unit_ceiling(value):
+                    raise PreferenceError(
+                        f"two_bedroom.max_building_units must be a positive whole number or empty for any size."
+                    )
+                continue
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise PreferenceError(f"two_bedroom.{name} must be a positive whole number.")
 
@@ -196,6 +214,14 @@ def parse_preferences(text: str) -> Preferences:
             raise PreferenceError("three_bedroom.enabled must be true or false.")
         for name in ("occupants", "max_per_person", "max_building_units"):
             value = three_bedroom.get(name)
+            if name == "max_building_units":
+                # Absent on purpose means "any size"; anything else is still a
+                # number, so skipping the check outright would let junk through.
+                if not _valid_unit_ceiling(value):
+                    raise PreferenceError(
+                        f"three_bedroom.max_building_units must be a positive whole number or empty for any size."
+                    )
+                continue
             if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                 raise PreferenceError(f"three_bedroom.{name} must be a positive whole number.")
 

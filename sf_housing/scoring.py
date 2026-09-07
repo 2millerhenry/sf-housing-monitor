@@ -910,7 +910,12 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
     canonical_budget = preferences.deal_profile.budgets.get(str(listing.unit_type or ""))
     if canonical_budget is not None:
         max_monthly = canonical_budget.total_maximum
-    max_building_units = int(settings.get("max_building_units", 50))
+    # None is a real answer: "any size". Kept apart from a number rather than
+    # standing in for one, so nothing prints a ceiling the reader never chose
+    # and nothing is refused for a size they said they did not mind.
+    raw_building_limit = settings.get("max_building_units", 50)
+    max_building_units = None if raw_building_limit in (None, "") else int(raw_building_limit)
+    building_size_matters = max_building_units is not None
     allowed_types = {listing.unit_type} if is_split_unit else {
         str(value).strip().casefold() for value in settings.get("unit_types", [STUDIO, ONE_BEDROOM]) if str(value).strip()
     }
@@ -920,7 +925,9 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
     price_known = listing.price is not None
     price_matches = price_known and int(listing.price) <= max_monthly
     building_known = listing.building_units is not None
-    building_matches = building_known and int(listing.building_units) <= max_building_units
+    building_matches = not building_size_matters or (
+        building_known and int(listing.building_units) <= max_building_units
+    )
     verified_inactive = listing.metadata.get("verified_inactive") is True
     is_sublet, sublet_months = _targeted_sublet_term(listing, _text(listing))
     sublet_term_eligible = (
@@ -979,7 +986,13 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         "neighborhood": neighborhood.value,
         "unit_type": 1.0 if type_matches else 0.5 if listing.unit_type is None else 0.0,
         "price": 1.0 if price_matches else 0.5 if not price_known else 0.0,
-        "building_size": 1.0 if building_matches else 0.5 if not building_known else 0.0,
+        # A size nobody set a limit on is not a half-known fact: it is a
+        # question the reader chose not to ask.
+        "building_size": (
+            1.0
+            if not building_size_matters or building_matches
+            else 0.5 if not building_known else 0.0
+        ),
     }
     weights = {"neighborhood": 35.0, "unit_type": 25.0, "price": 25.0, "building_size": 15.0}
     for item in active_amenities:
@@ -1006,7 +1019,7 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
             score = min(score, 39)
     if price_known and not price_matches:
         score = min(score, 49)
-    if building_known and not building_matches:
+    if building_size_matters and building_known and not building_matches:
         score = min(score, 49)
     # A secondary area remains available as a fallback, but it must not look
     # equally strong as a dream or strong neighborhood simply because the card
@@ -1045,7 +1058,7 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
             else f"${listing.price:,}/month is within your ${max_monthly:,} cap."
         )
         reasons.append((weights["price"], price_reason))
-    if building_matches and listing.building_units is not None:
+    if building_size_matters and building_matches and listing.building_units is not None:
         reasons.append(
             (
                 weights["building_size"],
@@ -1109,12 +1122,12 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
             f"{type_label.casefold()}; "
             "confirm it is the total rent, not a room price or deposit."
         )
-    elif building_known and not building_matches:
+    elif building_size_matters and building_known and not building_matches:
         concern = (
             f"The listing states {listing.building_units} units, above your "
             f"{max_building_units}-unit maximum."
         )
-    elif not building_known:
+    elif building_size_matters and not building_known:
         concern = (
             f"Unknown: building size is not stated; verify it has {max_building_units} units or fewer."
         )
@@ -1209,7 +1222,9 @@ def _score_whole_unit(listing: ListingCandidate, preferences: Preferences) -> Sc
         constraints.append({"status": "unknown", "check": "price", "reason": "Confirm the monthly price."})
     elif not price_matches:
         constraints.append({"status": "fail", "check": "price", "reason": "The monthly price exceeds this path's maximum."})
-    if not building_known:
+    if not building_size_matters:
+        pass
+    elif not building_known:
         constraints.append({"status": "unknown", "check": "building size", "reason": f"Confirm the building has {max_building_units} units or fewer."})
     elif not building_matches:
         constraints.append({"status": "fail", "check": "building size", "reason": "The stated building size exceeds your maximum."})

@@ -96,6 +96,30 @@ def _clean_strings(values: Iterable[object]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(str(value).strip() for value in values if str(value).strip()))
 
 
+def _shared_unit_ceiling(profile: DealProfile) -> int | None:
+    """The one building-size answer the form shows for every whole home."""
+    limits = [
+        budget.maximum_building_units
+        for path, budget in profile.budgets.items()
+        if path != "private_room"
+    ]
+    if not limits:
+        return 50
+    return None if any(limit is None for limit in limits) else max(limits)
+
+
+def _unit_ceiling(value: object) -> int | None:
+    """A building-size ceiling, where "no limit" is one of the real answers.
+
+    Stored as None rather than as a number large enough to never match, so the
+    difference between "I want a small building" and "I do not mind" survives
+    a save, and so nothing has to print a ceiling nobody chose.
+    """
+    if value in (None, "", "any", "Any"):
+        return None
+    return _positive_int(value, "maximum building units")
+
+
 def _positive_int(value: object, field_name: str, *, required: bool = True) -> int | None:
     if value in (None, "") and not required:
         return None
@@ -381,7 +405,7 @@ class DealProfile:
                     enabled.append(path)
                     budgets[path] = PathBudget(
                         maximum_monthly=int(whole.get("max_monthly", 3000)),
-                        maximum_building_units=int(whole.get("max_building_units", 50)),
+                        maximum_building_units=_unit_ceiling(whole.get("max_building_units", 50)),
                     )
         for path in SPLIT_PATHS:
             section = data.get(path)
@@ -396,7 +420,7 @@ class DealProfile:
                 budgets[path] = PathBudget(
                     maximum_monthly=int(settings.get("max_per_person", DEFAULT_PER_PERSON[path])),
                     occupants=int(settings.get("occupants", DEFAULT_OCCUPANTS[path])),
-                    maximum_building_units=int(settings.get("max_building_units", 50)),
+                    maximum_building_units=_unit_ceiling(settings.get("max_building_units", 50)),
                 )
         availability = data.get("availability") if isinstance(data.get("availability"), dict) else {}
         lease = data.get("lease") if isinstance(data.get("lease"), dict) else {}
@@ -550,7 +574,14 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
             "enabled": True,
             "max_monthly": max(item.maximum_monthly for item in whole_budgets),
             "unit_types": whole_paths,
-            "max_building_units": max(item.maximum_building_units or 50 for item in whole_budgets),
+            # One path saying "no limit" makes the collection ceiling no
+            # limit: it is the most permissive of the enabled paths, and
+            # scoring still checks each path's own answer.
+            "max_building_units": (
+                None
+                if any(item.maximum_building_units is None for item in whole_budgets)
+                else max(item.maximum_building_units for item in whole_budgets)
+            ),
         }
         result["path_maximums"] = {
             path: profile.budgets[path].maximum_monthly for path in whole_paths
@@ -570,7 +601,7 @@ def legacy_view(profile: DealProfile, technical: Mapping[str, Any] | None = None
                 "enabled": True,
                 "occupants": budget.occupants,
                 "max_per_person": budget.maximum_monthly,
-                "max_building_units": budget.maximum_building_units or 50,
+                "max_building_units": budget.maximum_building_units,
             }
             if budget and path in profile.enabled_paths
             else {
@@ -623,6 +654,12 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
     def value(name: str, default: object = "") -> object:
         return form.get(name, default)
 
+    # One question, not one per path. Nobody wants a different building-size
+    # answer for a studio than for a four-bedroom split, and asking six times
+    # would be six chances to disagree with yourself. The per-path field is
+    # still read when the shared one is absent, so an older form still posts.
+    shared_units = value("building_units") if "building_units" in form else None
+
     enabled = tuple(path for path in HOUSING_PATHS if path in set(values("housing_paths")))
     budgets: dict[str, PathBudget] = {}
     for path in enabled:
@@ -638,7 +675,7 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
             else 1
         )
         building_limit = (
-            _positive_int(value(f"{path}_building_units", 50), "maximum building units")
+            _unit_ceiling(shared_units if shared_units is not None else value(f"{path}_building_units", 50))
             if path != "private_room"
             else None
         )
@@ -688,13 +725,18 @@ def deal_profile_from_form(form: Any, *, state: str = "active") -> DealProfile:
 def profile_form_values(profile: DealProfile) -> dict[str, Any]:
     return {
         "enabled_paths": set(profile.enabled_paths),
+        # The single answer the building-size control shows. Whole-home paths
+        # share it; a profile that somehow disagrees with itself shows the
+        # most permissive of them rather than picking a winner silently.
+        "building_units": _shared_unit_ceiling(profile),
         "budgets": {
             path: {
                 "maximum": budget.maximum_monthly,
                 "minimum": budget.minimum_monthly or "",
                 "ideal": budget.ideal_monthly or "",
                 "occupants": budget.occupants,
-                "building_units": budget.maximum_building_units or 50,
+                "building_units": budget.maximum_building_units,
+                # Rendered as one control, so the form needs one answer.
                 "total_maximum": budget.total_maximum,
             }
             for path, budget in profile.budgets.items()
