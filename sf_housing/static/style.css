@@ -1259,9 +1259,40 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    page still works offline and still tells no third party it was opened. One
    lightness and chroma across the set keeps eleven different hues reading as
    one family rather than eleven decisions. */
-.source-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 11px 4px 4px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.8rem; font-weight: 600; color: var(--ink); }
-.source-mark { width: 24px; height: 24px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: oklch(var(--mark-light, 54%) 0.13 var(--mark-hue)); color: oklch(99% 0.004 var(--mark-hue)); font-size: 0.62rem; font-weight: 760; letter-spacing: -0.01em; }
-.already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 10px; }
+/* Tightened so seventeen of these sit on two lines rather than three. The
+   saving is in the padding and the gap, not the type: the names still have to
+   be read at a glance, and the logos are the thing being recognised. */
+.source-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); font-size: 0.76rem; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.source-mark { width: 22px; height: 22px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 50%; background: oklch(var(--mark-light, 54%) 0.13 var(--mark-hue)); color: oklch(99% 0.004 var(--mark-hue)); font-size: 0.6rem; font-weight: 760; letter-spacing: -0.01em; }
+/* Every logo gets the same round tile, whatever it arrived as. Several of
+   these are dark marks drawn on their own white square, and without an edge
+   they float in the middle of a white chip looking like a mistake. */
+.source-logo {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--surface-muted);
+  box-shadow: inset 0 0 0 1px oklch(0% 0 0 / 0.08);
+}
+.already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+/* The two sentences under the chips. The first is reassurance and carries the
+   number that proves it; the second is the only invitation on the page that a
+   reader who is happy already needs to see. */
+.already-note { margin: 0 0 6px; }
+.already-note strong { color: var(--accent-hover); font-weight: 660; }
+.already-more { max-width: 74ch; margin: 0; color: var(--muted); font-size: 0.83rem; line-height: 1.55; }
+.already-more strong { color: var(--ink); font-weight: 620; }
+
+/* Seventeen chips are about 1,940px laid end to end, so two lines needs a
+   little over 970px to put them on. Below that they tighten rather than
+   spilling onto a third line, because the panel is a reassurance -- "these
+   already work" -- and a three-line block of names reads as a chore. */
+@media (max-width: 1300px) {
+  .already-list .source-chip { gap: 5px; padding: 3px 7px 3px 3px; font-size: 0.72rem; }
+  .already-list .source-logo, .already-list .source-mark { width: 20px; height: 20px; }
+}
 .connect-sources { margin: 12px 0 18px; }
 .connect-cost { max-width: 68ch; margin: -8px 0 18px; color: var(--muted); font-size: 0.83rem; line-height: 1.55; }
 .connect-cost strong { color: var(--accent-hover); font-weight: 660; }

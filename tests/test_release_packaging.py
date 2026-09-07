@@ -87,7 +87,23 @@ def test_release_wheel_never_packages_a_profile_or_mutable_data() -> None:
     patterns = sorted(
         {glob for globs in project["tool"]["setuptools"]["package-data"].values() for glob in globs}
     )
-    assert patterns == ["*.css", "*.html", "*.js", "*.zip", "data/*.json"]
+    assert patterns == [
+        "*.css",
+        "*.html",
+        "*.js",
+        "*.zip",
+        "data/*.json",
+        # Each source's own icon, fetched once and served locally rather than
+        # hotlinked. Public brand marks, identical in every install.
+        "source-icons/*.png",
+    ]
+
+    # And that directory is named file by file too, for the same reason the
+    # data directory is: a glob is only safe while somebody is watching what
+    # lands under it.
+    icons = sorted(p.name for p in (ROOT / "sf_housing" / "static" / "source-icons").iterdir())
+    assert all(name.endswith(".png") for name in icons), icons
+    assert len(icons) == 22, icons
 
     # The shipped data directory is named file by file, because anything else
     # appearing there would be packaged silently. Each one has to be reference
@@ -212,3 +228,44 @@ def test_project_metadata_declares_the_license() -> None:
 
     assert 'license = "MIT"' in project
     assert 'license-files = ["LICENSE"]' in project
+
+
+def test_the_source_logos_travel_in_the_wheel() -> None:
+    """They are served from the app's own static directory, so a wheel without
+    them shows a page of broken images -- and only in an installed copy, never
+    when running from the repository, which is the worst way to find out.
+
+    source-icons is a directory of assets rather than a package, so nothing
+    picks it up unless the sub-path is listed by hand."""
+    import tomllib
+
+    with open(ROOT / "pyproject.toml", "rb") as handle:
+        config = tomllib.load(handle)
+    static = config["tool"]["setuptools"]["package-data"]["sf_housing.static"]
+
+    assert "source-icons/*.png" in static
+
+
+def test_every_source_the_page_names_has_the_icon_it_asks_for() -> None:
+    """The template maps a source to an icon file. A name in that map without
+    a file on disk is a broken image on the page, and a file nobody maps is
+    weight in the wheel for nothing."""
+    import re
+
+    page = (ROOT / "sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    block = page[page.index("{% set source_icons = {") : page.index("} %}", page.index("{% set source_icons = {"))]
+    mapped = set(re.findall(r"':\s*'([a-z0-9-]+)'", block))
+    on_disk = {path.stem for path in (ROOT / "sf_housing/static/source-icons").glob("*.png")}
+
+    assert mapped, "the icon map is empty"
+    assert mapped - on_disk == set(), f"named with no file: {sorted(mapped - on_disk)}"
+    assert on_disk - mapped == set(), f"shipped but never used: {sorted(on_disk - mapped)}"
+
+
+def test_a_source_without_an_icon_still_gets_a_mark() -> None:
+    """Zumper serves a bot wall to every request, icon included, so it has no
+    logo and must fall back rather than render an empty chip."""
+    page = (ROOT / "sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+    assert "{%- if icon -%}" in page
+    assert "source-mark" in page.split("{%- else -%}")[1][:400]

@@ -1195,3 +1195,17 @@ def test_the_line_holds_its_row_so_the_panel_does_not_jump() -> None:
     rule = style[style.index(".scan-progress-note {") : style.index("}", style.index(".scan-progress-note {"))]
 
     assert "min-height" in rule
+
+
+def test_the_source_chips_tighten_rather_than_taking_a_third_line() -> None:
+    """Seventeen chips are about 1,940px laid end to end, so two lines needs a
+    little over 970px. The panel is a reassurance -- "these already work" --
+    and a three-line block of names reads as a chore instead."""
+    style = (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert "@media (max-width: 1300px)" in style
+    narrow = style[style.index("@media (max-width: 1300px)") :]
+    assert ".already-list .source-chip" in narrow[:400]
+    assert "font-size: 0.72rem" in narrow[:400]

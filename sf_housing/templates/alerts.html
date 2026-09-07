@@ -34,9 +34,46 @@
   'Trulia':                   ('Tr', '70', '33'),
   'Movoto':                   ('Mo', '90', '33')
 } %}
+{#- Each source's own icon, fetched once and served from here rather than
+    hotlinked: hotlinking would tell every one of these sites when this page is
+    opened, break the page offline, and put the look of a local tool at the
+    mercy of somebody else's CDN. A source with no icon keeps its letter mark,
+    which is why that mark is still the thing underneath. -#}
+{% set source_icons = {
+  'Craigslist': 'craigslist',
+  'Listings Project': 'listings-project',
+  'Abacus (small buildings)': 'abacus',
+  'SpareRoom': 'spareroom',
+  'SF Housing Portal': 'sf-housing-portal',
+  'Apartment List': 'apartment-list',
+  'Uloop': 'uloop',
+  'UDR': 'udr',
+  'AppFolio': 'appfolio',
+  'AvalonBay': 'avalonbay',
+  'RentSFNow': 'rentsfnow',
+  'Redfin': 'redfin',
+  'Rent.com': 'rent-com',
+  'ApartmentGuide': 'apartmentguide',
+  'Movoto': 'movoto',
+  'Trulia': 'trulia',
+  'Zillow': 'zillow',
+  'HotPads': 'hotpads',
+  'Apartments.com': 'apartments-com',
+  'Roomies': 'roomies',
+  'Furnished Finder': 'furnished-finder',
+  'Facebook Marketplace': 'facebook',
+  'Facebook Groups': 'facebook'
+} %}
 {% macro source_chip(name) %}
   {%- set mark = source_marks.get(name, (name[0], '165', '54')) -%}
-  <span class="source-chip"><span class="source-mark" style="--mark-hue: {{ mark[1] }}; --mark-light: {{ mark[2] }}%" aria-hidden="true">{{ mark[0] }}</span>{{ name }}</span>
+  {%- set icon = source_icons.get(name) -%}
+  <span class="source-chip">
+    {%- if icon -%}
+    <img class="source-logo" src="{{ url_for('static', path='source-icons/' ~ icon ~ '.png') }}?v={{ app_version }}" alt="" width="20" height="20" loading="lazy" decoding="async">
+    {%- else -%}
+    <span class="source-mark" style="--mark-hue: {{ mark[1] }}; --mark-light: {{ mark[2] }}%" aria-hidden="true">{{ mark[0] }}</span>
+    {%- endif -%}
+    {{ name }}</span>
 {% endmacro %}
 {% extends "base.html" %}
 {% block title %}Add sources · SF Housing Monitor{% endblock %}
@@ -58,7 +95,15 @@
     <p class="already-list">
       {% for name in no_setup_sources %}{{ source_chip(name) }}{% endfor %}
     </p>
-    <p>They run on their own twice a day. No account, no setup, nothing on this page is required.</p>
+    {#- The promise is kept on one line on purpose: a test guards the exact
+        words, and a line break through the middle of them would slip past it. -#}
+    <p class="already-note">Checked twice a day on their own. No account, no password, nothing on this page is required{% if delivered_total %} &mdash; they brought you <strong>{{ "{:,}".format(delivered_total) }} homes</strong> in the last {{ delivery_days }} days{% endif %}.</p>
+    {% if not email_connected and not gmail_connected %}
+    <p class="already-more">Four more sites will email you theirs once an inbox is connected:
+      {% for name in email_providers %}<strong>{{ name }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}.
+      One app password, about two minutes each, and their homes arrive beside the rest.
+      <a href="#gmail-title">Start there</a>, or leave it &mdash; the {{ no_setup_count_word|lower }} above keep running either way.</p>
+    {% endif %}
   </div>
 </section>
 
@@ -90,7 +135,7 @@
           or not any of those sites will answer a script. -#}
       {% if delivered_total %}
       <p class="half-done-do">
-        For scale: the {{ delivering_sources }} sources that need no setup brought you
+        For scale: the {{ no_setup_count_word|lower }} sources that need no setup brought you
         <strong>{{ "{:,}".format(delivered_total) }} homes</strong> in the last {{ delivery_days }} days.
         These {{ gmail_providers|length }} have brought none.
       </p>
@@ -149,8 +194,9 @@
         one. -#}
     {% if delivered_total %}
     <p class="connect-cost">
-      The {{ delivering_sources }} sources that run on their own brought you
-      <strong>{{ "{:,}".format(delivered_total) }} homes</strong> in the last {{ delivery_days }} days.
+      The {{ no_setup_count_word|lower }} sources that run on their own brought you
+      <strong>{{ "{:,}".format(delivered_total) }} homes</strong> in the last {{ delivery_days }} days,
+      {{ delivering_sources }} of them contributing.
       These {{ email_providers|length }} brought <strong>none</strong>, because they are not connected.
       {%- set counted = gmail_providers|selectattr('coverage')|list %}
       {%- if counted %}

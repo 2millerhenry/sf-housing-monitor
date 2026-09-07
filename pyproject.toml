@@ -46,7 +46,10 @@ namespaces = true
 # has to be inside the wheel, not just in the repository.
 "sf_housing" = ["data/*.json"]
 "sf_housing.templates" = ["*.html"]
-"sf_housing.static" = ["*.css", "*.js", "*.zip"]
+# The source logos are served from here, so they have to travel in the wheel.
+# Listed as an explicit sub-path because source-icons is a directory of assets
+# rather than a package, and packages.find will never see it.
+"sf_housing.static" = ["*.css", "*.js", "*.zip", "source-icons/*.png"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

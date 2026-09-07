@@ -600,14 +600,30 @@ def test_every_named_source_carries_a_mark(tmp_path) -> None:
 
 def test_no_source_mark_reaches_outside_this_computer() -> None:
     """The page must keep working offline and must tell no third party it was
-    opened, so a mark can never be a remote image."""
+    opened.
+
+    This used to say "no <img> at all", which was the same thing while the only
+    way to show a site's logo was to hotlink it. The chips carry real logos
+    now, fetched once and served from this app's own static directory, so the
+    check is the property itself: every image on the chip comes from here, and
+    no absolute URL to anyone else appears anywhere in it. Hotlinking would
+    tell twenty-two companies each time this page is opened and leave the page
+    blank on a train."""
     import pathlib
     import re
 
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
     chip = re.search(r'<span class="source-chip">.*?</span>\s*\{% endmacro %\}', page, re.S).group(0)
 
-    assert "<img" not in chip and "http" not in chip, chip
+    assert "http://" not in chip and "https://" not in chip, chip
+    assert "//" not in chip.replace("https://", "").replace("http://", ""), chip
+    for source in re.findall(r'src="([^"]*)"', chip):
+        assert source.startswith("{{ url_for('static'"), source
+
+    # And the files those paths point at are really in the repository, not
+    # fetched at render time from somewhere.
+    icons = pathlib.Path("sf_housing/static/source-icons")
+    assert icons.is_dir() and list(icons.glob("*.png"))
 
 
 def test_the_gmail_steps_lead_with_the_thing_that_blocks_people() -> None:
@@ -764,3 +780,40 @@ def test_the_furnished_finder_steps_match_what_the_extension_can_do() -> None:
     assert "Developer mode" in page
     assert "Load unpacked" in page
     assert "Save this search &amp; sync" in page, "the button the popup actually shows"
+
+
+def test_the_page_says_what_connecting_an_inbox_would_add() -> None:
+    """Somebody who has connected nothing needs to know what the other four
+    are and what they cost before deciding. "Here is how to add more" in the
+    heading and nothing under the chips left the offer unstated."""
+    import pathlib
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+    tease = page[page.index('class="already-more"') : page.index("</p>", page.index('class="already-more"'))]
+
+    assert "{% for name in email_providers %}" in tease, "the four are named from the real list"
+    assert "two minutes" in tease, "say what it costs"
+    assert "either way" in tease, "say it is optional"
+    assert 'href="#gmail-title"' in tease, "and where to start"
+
+    # Only offered to somebody who has not already done it.
+    before = page[: page.index('class="already-more"')]
+    assert "{% if not email_connected and not gmail_connected %}" in before[-260:]
+
+
+def test_the_page_never_miscounts_the_sources_that_run_on_their_own() -> None:
+    """Two sentences said "the 6 sources that run on their own" beside a
+    heading saying seventeen do. Six was how many had delivered a home in the
+    window, which is a different fact and a good one -- it just is not that
+    one."""
+    import pathlib
+    import re
+
+    page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
+
+    for phrase in ("sources that run on their own", "sources that need no setup"):
+        for match in re.finditer(re.escape(phrase), page):
+            before = page[max(0, match.start() - 90) : match.start()]
+            assert "no_setup_count_word" in before, (
+                f'"{phrase}" is counted with something other than the no-setup list'
+            )
