@@ -159,6 +159,12 @@ case "${HEALTH:-}" in
   *) fail "the service did not become healthy. Run Repair; details are in $LOG_DIR/service-error.log" ;;
 esac
 
+# Deliberately last, and only past the health check above: until the new
+# runtime has actually served a request, the old one is the way back.
+if [ -x "$TOOLS_DIR/reclaim.sh" ]; then
+  SF_HOUSING_APP_ROOT="$APP_ROOT" "$TOOLS_DIR/reclaim.sh" || true
+fi
+
 say "Installed. Your profile and history stay in: $DATA_DIR"
 if [ "${SF_HOUSING_NO_BROWSER:-0}" != "1" ]; then
   /usr/bin/open "http://127.0.0.1:$PORT/"
