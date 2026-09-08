@@ -2982,6 +2982,65 @@ class ZillowSource:
 
     FOR_RENT = "FOR_RENT"
 
+    # Rent bands, measured against live Zillow rather than guessed. The cap is
+    # on results, not on requests, so the only way past it is to ask several
+    # narrower questions -- and that only works while each one lands under it:
+    #
+    #     under 2000    84      4000-5500   671
+    #     2000-2600    122      5500-7000   482
+    #     2600-3200    149      7000-9000   260
+    #     3200-4000    367      9000 up     162
+    #
+    # 2,297 homes against the 2,565 Zillow states, where one unsliced search
+    # reaches 984. San Francisco rent is skewed high, which is why these are
+    # not evenly spaced: an even split puts well over a thousand homes in one
+    # band, and the overflow is lost exactly as silently as before.
+    PRICE_BANDS: tuple[tuple[int | None, int | None], ...] = (
+        (None, 2000),
+        (2000, 2600),
+        (2600, 3200),
+        (3200, 4000),
+        (4000, 5500),
+        (5500, 7000),
+        (7000, 9000),
+        (9000, None),
+    )
+
+    def _band_url(self, band: tuple[int | None, int | None], page: int) -> str:
+        """One rent band's search, written as Zillow's own query state.
+
+        The path forms that look like filters -- ``2500-3500_price/`` and
+        ``2500-3500_mp/`` -- are accepted and then ignored: both answer 200
+        with the same unfiltered page, 12 of 94 prices inside the band asked
+        for. Slicing on those would have produced eight copies of one search,
+        every one of them looking right. Redfin's page URL carries the same
+        warning, learned the same way.
+        """
+        money: dict[str, int] = {}
+        low, high = band
+        if low is not None:
+            money["min"] = low
+        if high is not None:
+            money["max"] = high
+        state: dict[str, Any] = {
+            "filterState": {
+                "mp": money,
+                # Rentals only. Without these the bands fill with homes for
+                # sale, whose prices mean something else entirely.
+                "fr": {"value": True},
+                "fsba": {"value": False},
+                "fsbo": {"value": False},
+                "nc": {"value": False},
+                "cmsn": {"value": False},
+                "auc": {"value": False},
+                "fore": {"value": False},
+            },
+            "isListVisible": True,
+        }
+        if page > 1:
+            state["pagination"] = {"currentPage": page}
+        return f"{self.search_url}?searchQueryState={quote(json.dumps(state, separators=(',', ':')))}"
+
     def _page_url(self, page: int) -> str:
         return self.search_url if page == 1 else f"{self.search_url}{page}_p/"
 
@@ -3003,13 +3062,21 @@ class ZillowSource:
     def search_for_trigger(
         self, client: httpx.Client, preferences: Preferences, trigger: str
     ) -> list[ListingCandidate]:
-        return self._search(client, preferences, _pages_for_trigger(self, trigger))
+        # Slicing costs several times the requests, so it belongs to the run
+        # nobody is waiting on. A check somebody pressed reads the one plain
+        # search and stays inside ten seconds.
+        bands = self.PRICE_BANDS if trigger == DEEP_SWEEP_TRIGGER else (None,)
+        return self._search(client, preferences, _pages_for_trigger(self, trigger), bands)
 
     def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
         return self._search(client, preferences, self.max_pages)
 
     def _search(
-        self, client: httpx.Client, preferences: Preferences, pages: int
+        self,
+        client: httpx.Client,
+        preferences: Preferences,
+        pages: int,
+        bands: tuple[tuple[int | None, int | None] | None, ...] = (None,),
     ) -> list[ListingCandidate]:
         wanted = _wanted_bedroom_counts(preferences)
         maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
@@ -3018,33 +3085,52 @@ class ZillowSource:
         read_a_card = False
         document = ""
 
-        for page in range(1, pages + 1):
-            response = client.get(self._page_url(page), headers=_BROWSER_HEADERS)
-            # Past its last page Zillow refuses outright rather than answering
-            # with an empty one. Once cards have been read that is the end of
-            # the results, not the loss of them: raising here would throw away
-            # every home already collected to report the page after the last.
-            if read_a_card and response.status_code >= 400:
-                break
-            document = _require_page(response, self.platform)
-            results = self._results(document)
-            if not results:
-                break
-            fresh = 0
-            for home in results:
-                identifier = _clean_text(home.get("id") or home.get("zpid"), 60)
-                if not identifier or identifier in seen:
-                    continue
-                seen.add(identifier)
-                fresh += 1
-                read_a_card = True
-                candidate = self._candidate(home, identifier, wanted)
-                if candidate is not None:
-                    listings.append(candidate)
-                    if len(listings) >= maximum:
-                        return listings
-            if not fresh:
-                break
+        # ``seen`` spans every band on purpose: a building whose rents straddle
+        # a boundary is returned on both sides of it, and the pool wants it once.
+        for band in bands:
+            # Whether a page is the band's last is a question about that band's
+            # own pages. Asking it of the global set ended a band the moment it
+            # returned anything an earlier band had already produced, which cost
+            # roughly a thousand homes before it was measured.
+            band_seen: set[str] = set()
+            for page in range(1, pages + 1):
+                url = self._page_url(page) if band is None else self._band_url(band, page)
+                response = client.get(url, headers=_BROWSER_HEADERS)
+                # Past its last page Zillow answers 400 rather than serving an
+                # empty one. Once cards have been read that is the end of this
+                # search, not the loss of it -- raising would throw away every
+                # home already collected, and with bands the bands still to
+                # come. Deliberately only 400: a 403 is Zillow turning us away
+                # rather than running out of homes, and reading it as an ending
+                # would collect a little, report success, and come back
+                # tomorrow to be turned away again. That one is left to
+                # _require_page, which names it and lets the backoff hear it.
+                if read_a_card and response.status_code == 400:
+                    break
+                document = _require_page(response, self.platform)
+                results = self._results(document)
+                if not results:
+                    break
+                fresh = 0
+                for home in results:
+                    identifier = _clean_text(home.get("id") or home.get("zpid"), 60)
+                    if not identifier or identifier in band_seen:
+                        continue
+                    band_seen.add(identifier)
+                    fresh += 1
+                    read_a_card = True
+                    if identifier in seen:
+                        continue
+                    seen.add(identifier)
+                    candidate = self._candidate(home, identifier, wanted)
+                    if candidate is not None:
+                        listings.append(candidate)
+                        if len(listings) >= maximum:
+                            return listings
+                # A page that repeats this band's own results is its last,
+                # whatever its numbering claims.
+                if not fresh:
+                    break
 
         if not read_a_card:
             raise _read_nothing(self.platform, document, "rentals on its search page")

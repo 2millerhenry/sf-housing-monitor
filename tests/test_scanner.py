@@ -782,3 +782,25 @@ def test_a_scanner_given_no_sweep_budget_keeps_the_one_it_has(tmp_path) -> None:
     )
 
     assert scanner._budget_for(DEEP_SWEEP_TRIGGER) == 99.0
+
+
+def test_a_sliced_source_is_not_cut_off_at_a_waiting_scan_s_ceiling() -> None:
+    """On the sweep a source is asked several narrower questions instead of
+    one wide one: Zillow's eight rent bands measured about a minute against
+    the seventy-five seconds a waiting scan allows. Cutting it there abandons
+    the source and returns nothing, which is worse than slow."""
+    from sf_housing.scanner import (
+        DEEP_SOURCE_CEILING_SECONDS,
+        SOURCE_HARD_CEILING_SECONDS,
+    )
+    from sf_housing.settings import Settings
+
+    from sf_housing.scanner import DEEP_SWEEP_TRIGGER, Scanner
+
+    assert DEEP_SOURCE_CEILING_SECONDS > SOURCE_HARD_CEILING_SECONDS
+    # And still a ceiling: it has to fit inside the sweep's own budget.
+    assert DEEP_SOURCE_CEILING_SECONDS < Settings.from_environment().deep_scan_max_seconds
+    # The constants are only worth having if the run actually asks for them.
+    assert Scanner._source_ceiling_for(DEEP_SWEEP_TRIGGER) == DEEP_SOURCE_CEILING_SECONDS
+    for waited_on in ("manual", "scheduled", "catch_up", "startup_catchup"):
+        assert Scanner._source_ceiling_for(waited_on) == SOURCE_HARD_CEILING_SECONDS, waited_on

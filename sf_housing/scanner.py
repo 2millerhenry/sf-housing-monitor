@@ -68,6 +68,13 @@ RECHECK_FLOOR_PER_SOURCE = 3
 # several searches and their detail pages and wants about a minute -- so this
 # only ever catches a source that has stopped behaving.
 SOURCE_HARD_CEILING_SECONDS = 75.0
+# The same idea on the nightly sweep, where a source is asked several narrower
+# questions instead of one wide one and honestly needs longer: Zillow's eight
+# rent bands take about a minute against the seventy-five a waiting scan
+# allows. Cutting it there would abandon the whole source and return nothing,
+# which is the one outcome worse than a slow one. Still a ceiling, so a source
+# that stops answering at 3am cannot hold the sweep until morning.
+DEEP_SOURCE_CEILING_SECONDS = 300.0
 # The same stall one level down. The ceiling above was written to cover a
 # source's whole turn -- "several searches and their detail pages" -- but it
 # only ever wrapped the search, so a single detail page that trickled bytes
@@ -382,7 +389,7 @@ class Scanner:
         # Never longer than the scan has left, and never so short that a
         # healthy source is cut off by a ceiling meant for a broken one.
         remaining = deadline - time.monotonic()
-        ceiling = min(SOURCE_HARD_CEILING_SECONDS, max(self.timeout_seconds, remaining))
+        ceiling = min(self._source_ceiling_for(trigger), max(self.timeout_seconds, remaining))
         return self._within_ceiling(
             f"search-{source.platform}",
             ceiling,
@@ -803,6 +810,20 @@ class Scanner:
             return self.repository.abandon_interrupted_scans()
         finally:
             self._release_scan_locks()
+
+    @staticmethod
+    def _source_ceiling_for(trigger: str) -> float:
+        """The longest any one source may hold this kind of run.
+
+        On the sweep a source is asked several narrower questions instead of
+        one wide one -- Zillow's eight rent bands measured about a minute
+        against the seventy-five seconds a waiting scan allows. Cutting it
+        there abandons the source and returns nothing, which is the one outcome
+        worse than a slow one.
+        """
+        if trigger == DEEP_SWEEP_TRIGGER:
+            return DEEP_SOURCE_CEILING_SECONDS
+        return SOURCE_HARD_CEILING_SECONDS
 
     def _budget_for(self, trigger: str) -> float:
         """How long this scan may take.
