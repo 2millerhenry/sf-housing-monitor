@@ -732,3 +732,53 @@ def test_a_source_running_long_cannot_show_progress_that_has_not_happened(
         f"the bar read {percent}% while only the first source, worth 40%, had run"
     )
     assert percent >= 35, "a source well past its estimate should read near its full share"
+
+
+def test_a_sweep_is_not_held_to_the_budget_a_person_is_waiting_on() -> None:
+    """Four minutes is what somebody watching a spinner will sit through. A
+    sweep inherits that and is no longer a sweep: it spends the four minutes on
+    the first few sources and skips the ones it exists to read deeply."""
+    from sf_housing.settings import Settings
+
+    settings = Settings.from_environment()
+
+    assert settings.deep_scan_max_seconds > settings.scan_max_seconds
+
+
+def test_only_the_sweep_gets_the_longer_budget(tmp_path) -> None:
+    """A setting nothing reads is a setting that does nothing, and a longer
+    budget handed to an interactive scan is a four-minute promise broken."""
+    from sf_housing.scanner import DEEP_SWEEP_TRIGGER, Scanner
+    from sf_housing.database import Repository
+    from sf_housing.preferences import parse_preferences
+    from tests.conftest import TEST_PREFERENCES
+
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    scanner = Scanner(
+        repository,
+        lambda: parse_preferences(TEST_PREFERENCES),
+        [],
+        max_scan_seconds=240.0,
+        deep_scan_max_seconds=900.0,
+    )
+
+    assert scanner._budget_for(DEEP_SWEEP_TRIGGER) == 900.0
+    for waited_on in ("manual", "scheduled", "catch_up", "startup_catchup"):
+        assert scanner._budget_for(waited_on) == 240.0, waited_on
+
+
+def test_a_scanner_given_no_sweep_budget_keeps_the_one_it_has(tmp_path) -> None:
+    """Every existing caller constructs a Scanner without it."""
+    from sf_housing.scanner import DEEP_SWEEP_TRIGGER, Scanner
+    from sf_housing.database import Repository
+    from sf_housing.preferences import parse_preferences
+    from tests.conftest import TEST_PREFERENCES
+
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    scanner = Scanner(
+        repository, lambda: parse_preferences(TEST_PREFERENCES), [], max_scan_seconds=99.0
+    )
+
+    assert scanner._budget_for(DEEP_SWEEP_TRIGGER) == 99.0

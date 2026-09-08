@@ -23,6 +23,7 @@ from sf_housing.models import ListingCandidate, ScoreResult
 from sf_housing.preferences import load_preferences
 from sf_housing.scoring import score_listing
 from sf_housing.settings import Settings
+from tests.test_deal_profile import block_body, stylesheet
 from tests.conftest import TEST_PREFERENCES
 
 def already_works_headline(html: str) -> str:
@@ -1331,3 +1332,53 @@ def test_a_broken_source_says_what_went_wrong_not_only_what_to_do(
     assert "Turned away an unattended request (HTTP 403)." in alerts
     # The row is headed "Craigslist" already.
     assert "Craigslist turned away" not in alerts
+
+
+# --------------------------------------------------------------------------
+# the views a person actually moves between
+# --------------------------------------------------------------------------
+
+
+def view_tabs(page: str) -> list[str]:
+    """The tab labels, in the order the page puts them in."""
+    import re
+
+    start = page.index('class="view-tabs"')
+    nav = page[start : page.index("</nav>", start)]
+    return [text.strip() for text in re.findall(r">([^<>]+)</a>", nav)]
+
+
+def dashboard(tmp_path: Path) -> str:
+    application = create_app(settings=app_settings(tmp_path), sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        return client.get("/").text
+
+
+def test_the_two_views_a_person_moves_between_come_first(tmp_path: Path) -> None:
+    """What fits, and what nearly did. Saved, Passed and Archive are history,
+    and history was sitting between the two live questions."""
+    tabs = view_tabs(dashboard(tmp_path))
+
+    assert tabs[:2] == ["Shortlist", "Near matches"]
+    assert set(tabs[2:]) == {"Saved", "Passed", "Archive"}
+
+
+def test_those_two_read_as_a_pair_and_the_rest_recede(tmp_path: Path) -> None:
+    """Subtly, not loudly: the three behind them are still one click away."""
+    page = dashboard(tmp_path)
+    style = stylesheet()
+
+    assert page.count('class="lead-view') == 2, "exactly the two live views are marked"
+    lead = block_body(style, ".view-tabs a.lead-view {")
+    base = block_body(style, ".view-tabs a {")
+    assert "var(--ink)" in lead and "font-weight" in lead, lead
+    assert "var(--muted)" in base, "the history tabs have to stay quieter"
+
+
+def test_a_tab_is_laid_out_as_a_box_so_it_cannot_grow_into_the_line_above() -> None:
+    """An anchor is inline by default, so min-height and vertical padding did
+    nothing to its line box and the pills overlapped the sentence above."""
+    base = block_body(stylesheet(), ".view-tabs a {")
+
+    assert "display: inline-flex" in base, base
+    assert "min-height" in base

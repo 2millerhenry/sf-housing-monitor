@@ -94,10 +94,12 @@
 
 <section class="workflow-bar" aria-label="Listing controls">
   <nav class="view-tabs" aria-label="Listing views">
-    <a href="/?housing={{ housing_mode }}&amp;view=active&amp;sort=score" {% if view == 'active' %}class="active" aria-current="page"{% endif %}>Shortlist</a>
+    {#- The two a person moves between, side by side and carrying a little more
+        weight than the three that are history. -#}
+    <a class="lead-view{% if view == 'active' %} active{% endif %}" href="/?housing={{ housing_mode }}&amp;view=active&amp;sort=score" {% if view == 'active' %}aria-current="page"{% endif %}>Shortlist</a>
+    <a class="lead-view{% if view == 'near_matches' %} active{% endif %}" href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score" {% if view == 'near_matches' %}aria-current="page"{% endif %}>Near matches</a>
     <a href="/?housing={{ housing_mode }}&amp;view=saved&amp;sort=score" {% if view == 'saved' %}class="active" aria-current="page"{% endif %}>Saved</a>
     <a href="/?housing={{ housing_mode }}&amp;view=dismissed&amp;sort=newest" {% if view == 'dismissed' %}class="active" aria-current="page"{% endif %}>Passed</a>
-    <a href="/?housing={{ housing_mode }}&amp;view=near_matches&amp;sort=score" {% if view == 'near_matches' %}class="active" aria-current="page"{% endif %}>Near matches</a>
     <a href="/?housing={{ housing_mode }}&amp;view=all&amp;sort=score" {% if view == 'all' %}class="active" aria-current="page"{% endif %}>Archive</a>
   </nav>
 

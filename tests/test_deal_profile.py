@@ -1059,9 +1059,9 @@ def test_the_panel_stays_out_of_the_way_until_the_deal_is_submitted(tmp_path: Pa
     import re
 
     page = deal_page(tmp_path)
-    tag = re.search(r"<section[^>]*\bdata-deal-saving\b[^>]*>", page)
+    tag = re.search(r"<p[^>]*\bdata-deal-saving-note\b[^>]*>", page)
 
-    assert tag, "the panel is not on the page at all"
+    assert tag, "the line is not on the page at all"
     assert re.search(r"(?<!-)\bhidden\b", tag.group(0)), tag.group(0)
 
 
@@ -1126,16 +1126,16 @@ def test_the_panel_is_only_revealed_once_the_deal_is_going_to_be_saved() -> None
     assert handler.index("startSavingPanel(") > handler.rindex("event.preventDefault()")
 
 
-def test_the_heading_says_which_of_the_two_waits_this_is() -> None:
+def test_the_button_says_which_of_the_two_waits_this_is() -> None:
     """A first deal starts a check of every source afterwards; a later one
-    only reranks. They take different amounts of time, so they get different
-    sentences."""
-    panel = deal_form_script()
-    panel = panel[panel.index("const startSavingPanel") : panel.index('form.addEventListener("submit"')]
+    only reranks. They take different amounts of time, so they say so on the
+    button -- the one thing here that holds a spinner."""
+    handler = deal_form_script()
+    handler = handler[handler.index('form.addEventListener("submit"') :]
 
-    assert "firstActivation" in panel
-    assert "starting the first check" in panel
-    assert "reranking your homes" in panel
+    assert "firstActivation" in handler
+    assert "starting your first check" in handler
+    assert "Saving and reranking homes" in handler
 
 
 def test_the_line_holds_its_row_so_the_panel_does_not_jump() -> None:
@@ -1150,34 +1150,31 @@ def test_the_line_holds_its_row_so_the_panel_does_not_jump() -> None:
     assert float(reserved.group(1)) > 0, "a row of zero height reserves nothing"
 
 
-def test_the_sweeping_bar_is_held_still_for_a_reader_who_asked_for_no_motion() -> None:
-    """The changing sentence already says the save is alive. An endlessly
-    sweeping bar for someone who asked for stillness says it again, badly."""
+def test_the_sentence_swaps_without_a_fade_for_a_reader_who_asked_for_no_motion() -> None:
+    """The sentence changing is the whole signal. Someone who asked for
+    stillness gets the new sentence, not a cross-fade to it."""
     style = stylesheet()
     gated = motion_gated(style)
     ungated = style
     for body in gated:
         ungated = ungated.replace(body, "")
 
-    assert any("deal-saving-sweep" in body for body in gated), "the sweep is not gated at all"
-    assert "deal-saving-sweep" not in block_body(
-        ungated, ".deal-saving-track > span {"
-    ), "the bar sweeps for a reader who asked it not to"
+    assert any("transition: opacity" in body for body in gated), "the fade is not gated at all"
+    assert "transition" not in block_body(
+        ungated, ".deal-saving-note {"
+    ), "the sentence fades for a reader who asked it not to"
 
 
-def test_the_bar_never_claims_to_know_how_far_along_the_save_is() -> None:
-    """It is a synchronous post with no progress to report. A bar that fills
-    to a number would be inventing one."""
-    page_style = (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
-        encoding="utf-8"
-    )
-    sweep = page_style[
-        page_style.index("@keyframes deal-saving-sweep") : page_style.index(
-            "}", page_style.index("to {", page_style.index("@keyframes deal-saving-sweep"))
-        )
-    ]
+def test_one_wait_gets_one_loading_indicator(tmp_path: Path) -> None:
+    """The button already holds a spinner and already says what is happening.
+    A bordered panel under it, with its own indeterminate bar and its own copy
+    of that sentence, was a second loading indicator for a single wait."""
+    page = deal_page(tmp_path)
 
-    assert "translateX" in sweep and "width" not in sweep
+    assert "deal-saving-track" not in page, "a second bar is back"
+    assert "deal-saving-heading" not in page, "a second heading is back"
+    assert 'role="progressbar"' not in page, "nothing here knows how far along it is"
+    assert "data-deal-saving-note" in page, "the rotating line still has to be there"
 
 
 def test_the_clear_button_posts_the_very_form_the_panel_lives_in(tmp_path: Path) -> None:
@@ -1243,7 +1240,7 @@ def test_a_second_submit_never_starts_a_second_clock() -> None:
     panel = script[script.index("const startSavingPanel") :]
 
     assert "savingTimer = window.setInterval" in panel, "the clock has to be held to be stopped"
-    assert "savingTimer) return" in panel[: panel.index("savingPanel.hidden = false")]
+    assert "savingTimer) return" in panel[: panel.index("savingNote.hidden = false")]
 
 
 def test_coming_back_with_the_back_button_leaves_a_form_you_can_use() -> None:
@@ -1270,3 +1267,13 @@ def test_the_sentences_name_the_words_the_screen_actually_uses() -> None:
     assert "Secondary" in notes and "Dream" in notes
     assert "marked okay" not in notes
     assert "Near matches" in notes, "the shortlist calls that view Near matches"
+
+
+def test_the_sentence_fades_out_before_the_next_one_fades_in() -> None:
+    """Swapping the text outright is a pop. The fade is the whole reason this
+    reads as one calm wait rather than a line stuttering under the button."""
+    script = deal_form_script()
+    panel = script[script.index("const startSavingPanel") :]
+
+    assert 'opacity = "0"' in panel, "nothing ever fades out"
+    assert "setTimeout(show" in panel, "the swap does not wait for the fade"

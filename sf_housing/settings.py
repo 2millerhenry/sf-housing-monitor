@@ -31,6 +31,10 @@ class Settings:
     # what collects anything a bounded scan had to leave.
     request_timeout_seconds: float = 8.0
     scan_max_seconds: float = 240.0
+    # Nobody is waiting on the nightly sweep, and its whole job is to reach the
+    # depth a four-minute scan cannot. Held to a budget all the same, so a
+    # source that stops answering at 3am cannot run until morning.
+    deep_scan_max_seconds: float = 900.0
     gmail_client_secret_path: Path | None = None
     gmail_token_path: Path | None = None
     gmail_pending_state_path: Path | None = None

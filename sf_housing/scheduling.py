@@ -36,6 +36,7 @@ CATCH_UP_INTERVAL_MINUTES = 15
 SCAN_JOB_ID = "housing-scans-pacific"
 CATCH_UP_JOB_ID = "housing-catch-up"
 DEEP_SWEEP_JOB_ID = "housing-deep-sweep"
+DEEP_SWEEP_CATCH_UP_JOB_ID = "housing-deep-sweep-catch-up"
 
 # When the nightly deep sweep runs. Most sources are read in full on every
 # scan because doing so costs seconds; two cannot be. Trulia and Redfin answer
@@ -46,6 +47,16 @@ DEEP_SWEEP_JOB_ID = "housing-deep-sweep"
 # every other scheduled thing on a machine fires.
 DEEP_SWEEP_HOUR = 3
 DEEP_SWEEP_MINUTE = 20
+
+# A sweep is worth catching up, but only once the day it belonged to is gone.
+# The original reasoning against catching one up was that running eight hours
+# late is worth less than the next one on time -- true, and it assumed there
+# would be a next one. On a Mac that is asleep at 03:20 there never is: over
+# this app's whole history the nightly sweep has run zero times. So the cron
+# stays the normal path, and this is the floor under it: a day and a bit,
+# so a machine that is awake at 03:20 always uses the cron and one that is
+# not still gets a sweep rather than none.
+DEEP_SWEEP_MAX_AGE = timedelta(hours=26)
 
 # How far back the schedule reports on itself. A week is long enough to expose a
 # pattern and short enough that a fault shows up while it still matters.
@@ -225,6 +236,33 @@ def scheduled_scan_due(recent_scans: list[dict], now: datetime | None = None) ->
     return True
 
 
+def deep_sweep_due(recent_scans: list[dict], now: datetime | None = None) -> bool:
+    """Has it been more than a day since a deep sweep finished?
+
+    Asked on the same heartbeat as the scheduled-slot check. Deliberately about
+    age rather than about a slot: a sweep collects the long tail, so what
+    matters is that one happened recently, not which night it belonged to.
+    """
+    current = (now or datetime.now(UTC)).astimezone(UTC)
+    for scan in recent_scans:
+        if str(scan.get("trigger") or "") != DEEP_SWEEP_TRIGGER:
+            continue
+        if scan.get("status") not in {"completed", "completed_with_errors"}:
+            continue
+        timestamp = scan.get("started_at")
+        if not timestamp:
+            continue
+        try:
+            started = datetime.fromisoformat(str(timestamp))
+        except ValueError:
+            continue
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        if current - started.astimezone(UTC) < DEEP_SWEEP_MAX_AGE:
+            return False
+    return True
+
+
 def catch_up_if_due(scanner: Scanner) -> bool:
     """Run one scan if a scheduled slot went unserved. Returns whether it did.
 
@@ -252,6 +290,39 @@ def catch_up_if_due(scanner: Scanner) -> bool:
         return started
     except Exception:  # pragma: no cover - defensive, see docstring
         LOGGER.warning("Catch-up check failed", exc_info=True)
+        return False
+
+
+def sweep_if_due(scanner: Scanner) -> bool:
+    """Run the nightly sweep if a day has gone by without one.
+
+    Its own job rather than part of the catch-up heartbeat, because the two
+    answer different questions: that one is "is the shortlist current", this is
+    "has the long tail been collected lately". Sharing a function would have
+    made a fresh install's first heartbeat start a fifteen-minute sweep.
+
+    Failures are swallowed for the same reason they are there: a heartbeat that
+    raises is logged and dropped, and its job is to make scanning more
+    reliable, never less.
+    """
+    try:
+        if scanner.is_running:
+            return False
+        if not scanner.preference_loader().profile_active:
+            return False
+        recent = scanner.repository.recent_scans(40)
+        # A current shortlist beats a complete tail: if an ordinary check is
+        # owed, that runs first and this waits for the next heartbeat.
+        if scheduled_scan_due(recent):
+            return False
+        if not deep_sweep_due(recent):
+            return False
+        started = scanner.start_scan(DEEP_SWEEP_TRIGGER)
+        if started:
+            LOGGER.info("Deep sweep started; the nightly one did not run")
+        return started
+    except Exception:  # pragma: no cover - defensive, see docstring
+        LOGGER.warning("Deep sweep check failed", exc_info=True)
         return False
 
 
@@ -295,6 +366,18 @@ def build_scheduler(scanner: Scanner) -> BackgroundScheduler:
         args=[scanner],
         id=CATCH_UP_JOB_ID,
         name="Catch up a missed scheduled check",
+        replace_existing=True,
+        coalesce=True,
+        max_instances=1,
+    )
+    # The same safety net under the sweep. Hourly rather than quarter-hourly:
+    # what it is checking changes once a day.
+    scheduler.add_job(
+        sweep_if_due,
+        IntervalTrigger(hours=1, timezone=PACIFIC),
+        args=[scanner],
+        id=DEEP_SWEEP_CATCH_UP_JOB_ID,
+        name="Catch up a missed deep sweep",
         replace_existing=True,
         coalesce=True,
         max_instances=1,

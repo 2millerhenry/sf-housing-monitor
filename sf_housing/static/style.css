@@ -391,10 +391,30 @@ main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
   gap: 16px;
   flex-wrap: wrap;
 }
-.view-tabs { display: inline-flex; gap: 5px; padding: 0; }
-.view-tabs a { min-height: 34px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); text-decoration: none; color: var(--muted); font-size: 0.84rem; font-weight: 620; }
+.view-tabs { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0; }
+/* Inline by default, so min-height and vertical padding did nothing to the
+   line box and the pills grew up into the sentence above them. */
+.view-tabs a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 560;
+  text-decoration: none;
+  white-space: nowrap;
+}
+/* What fits, and what nearly did. The other three are history: still one
+   click away, and not competing for the eye on the way there. */
+.view-tabs a.lead-view { color: var(--ink); font-weight: 650; border-color: var(--line-strong); }
+/* A wider gap after the pair than within it, so they read as a pair. */
+.view-tabs a.lead-view + a:not(.lead-view) { margin-left: 7px; }
 .view-tabs a:hover { color: var(--ink); border-color: var(--line-strong); }
-.view-tabs a.active { background: var(--surface-muted); border-color: var(--line-strong); color: var(--ink); box-shadow: none; }
+.view-tabs a.active { background: var(--surface-muted); border-color: var(--line-strong); color: var(--ink); font-weight: 680; box-shadow: none; }
 .filters { display: flex; align-items: end; gap: 9px; flex-wrap: wrap; }
 .filters label { display: grid; gap: 5px; color: var(--muted); font-size: 0.72rem; font-weight: 650; }
 select {
@@ -1433,46 +1453,22 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   box-shadow: inset 0 0 0 1px var(--logo-edge);
 }
 .already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
-/* Saving a deal reranks every stored home before the page can answer. There is
-   no percentage to show -- it is one ordinary form post, and the browser
-   navigates when it returns -- so the bar sweeps rather than fills, and the
-   sentence underneath does the explaining. */
-.deal-saving {
-  display: grid;
-  gap: 8px;
-  margin: 12px 0 0;
-  padding: 11px 14px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow-low);
-}
-.deal-saving-heading strong { font-size: 0.82rem; letter-spacing: -0.005em; }
-.deal-saving-track { height: 4px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
-.deal-saving-track > span {
-  display: block;
-  width: 40%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent);
-}
+/* One line under the button that already holds the spinner. It replaced a
+   bordered panel with its own indeterminate bar, which was a second loading
+   indicator for a single wait. The row is reserved so the sentences, which are
+   different lengths, cannot move the button under the cursor. */
 .deal-saving-note {
-  margin: 0;
+  margin: 8px 0 0;
   min-height: 1.15rem;
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.15rem;
 }
 @media (prefers-reduced-motion: no-preference) {
-  /* The sweep says "still working" without claiming to know how far along it
-     is. Held still for a reader who asked for no motion, where the changing
-     sentence carries that on its own. */
-  .deal-saving-track > span { animation: deal-saving-sweep 1400ms ease-in-out infinite; }
-  .deal-saving-note.is-fresh { animation: scan-note-in 340ms cubic-bezier(0.16, 1, 0.3, 1); }
+  /* A cross-fade rather than a pop: the sentence is the only thing changing,
+     so the change should be the quietest part of the page. */
+  .deal-saving-note { transition: opacity 240ms var(--ease-state); }
 }
-@keyframes deal-saving-sweep {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(250%); }
 }
 
 /* The two sentences under the chips. The first is reassurance and carries the
@@ -1663,7 +1659,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 /* Liveness is a statement of fact, so it is quiet when true and unmissable when
    the schedule has actually stopped. */
 .liveness-behind { display: block; margin-top: 3px; color: var(--muted); }
-.liveness-line { margin: 12px 0 0; color: var(--muted); font-size: 0.76rem; }
+.liveness-line { margin: 12px 0 14px; color: var(--muted); font-size: 0.76rem; line-height: 1.4; }
 .liveness-warning { margin: 12px 0 0; padding: 11px 14px; display: flex; flex-wrap: wrap; gap: 6px;
   align-items: baseline; border: 1px solid var(--amber-line); border-radius: 10px;
   background: var(--amber-soft); color: var(--ink); font-size: 0.82rem; }

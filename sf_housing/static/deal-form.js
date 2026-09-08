@@ -202,8 +202,6 @@
   const submitButton = form.querySelector("[data-deal-submit]");
   const submitLabel = form.querySelector("[data-deal-submit-label]");
   const submitStatus = form.querySelector("[data-submit-status]");
-  const savingPanel = form.querySelector("[data-deal-saving]");
-  const savingTitle = form.querySelector("[data-deal-saving-title]");
   const savingNote = form.querySelector("[data-deal-saving-note]");
 
   // What saving a deal actually does, for the wait it actually takes. Every one
@@ -232,7 +230,7 @@
   const stopSavingPanel = () => {
     window.clearInterval(savingTimer);
     savingTimer = null;
-    if (savingPanel) savingPanel.hidden = true;
+    if (savingNote) savingNote.hidden = true;
     if (submitButton) {
       submitButton.disabled = false;
       delete submitButton.dataset.submitting;
@@ -245,27 +243,25 @@
     if (event.persisted) stopSavingPanel();
   });
 
-  const startSavingPanel = (firstActivation) => {
+  const startSavingPanel = () => {
     // A second submit must not start a second clock over the same sentence.
-    if (!savingPanel || savingTimer) return;
-    savingPanel.hidden = false;
-    if (savingTitle) {
-      savingTitle.textContent = firstActivation
-        ? "Saving your deal and starting the first check"
-        : "Saving your deal and reranking your homes";
-    }
-    if (!savingNote) return;
+    if (!savingNote || savingTimer) return;
+    savingNote.hidden = false;
     const homes = Number(savingNote.dataset.listingCount) || 0;
     const lines = savingNotes(homes);
     let shown = -1;
-    const rotate = () => {
+    const show = () => {
       shown = (shown + 1) % lines.length;
       savingNote.textContent = lines[shown];
-      savingNote.classList.remove("is-fresh");
-      void savingNote.offsetWidth;
-      savingNote.classList.add("is-fresh");
+      savingNote.style.opacity = "1";
     };
-    rotate();
+    // Out, swap, back in. Reduced motion drops the transition in CSS, so the
+    // same code simply swaps the sentence with no fade at all.
+    const rotate = () => {
+      savingNote.style.opacity = "0";
+      window.setTimeout(show, 240);
+    };
+    show();
     // Eight seconds, the same beat as the scan panel, so the two waits in this
     // app read as one thing rather than two.
     savingTimer = window.setInterval(rotate, 8000);
@@ -296,7 +292,7 @@
       if (submitStatus) submitStatus.textContent = firstActivation
         ? "Your search is being saved. The shortlist will show live check progress next."
         : "Your deal is being saved and every stored home is being reranked.";
-      startSavingPanel(firstActivation);
+      startSavingPanel();
     }
   });
 })();

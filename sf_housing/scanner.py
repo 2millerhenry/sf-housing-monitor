@@ -104,6 +104,7 @@ class Scanner:
         timeout_seconds: float = 15.0,
         detail_delay_seconds: float = 0.25,
         max_scan_seconds: float = 110.0,
+        deep_scan_max_seconds: float | None = None,
     ):
         self.repository = repository
         self.preference_loader = preference_loader
@@ -111,6 +112,9 @@ class Scanner:
         self.timeout_seconds = timeout_seconds
         self.detail_delay_seconds = detail_delay_seconds
         self.max_scan_seconds = max_scan_seconds
+        # A sweep that inherits the interactive budget is not a sweep: it would
+        # spend four minutes and skip the sources it exists to read deeply.
+        self.deep_scan_max_seconds = deep_scan_max_seconds or max_scan_seconds
         self._scan_lock = threading.Lock()
         self._process_lock_handle = None
         self._progress_lock = threading.Lock()
@@ -800,6 +804,19 @@ class Scanner:
         finally:
             self._release_scan_locks()
 
+    def _budget_for(self, trigger: str) -> float:
+        """How long this scan may take.
+
+        Four minutes is what somebody watching a spinner will sit through.
+        Nobody is watching the nightly sweep, and its whole job is the depth
+        that four minutes cannot reach -- inheriting the interactive budget
+        would have it spend the time on the first few sources and skip the ones
+        it exists for.
+        """
+        if trigger == DEEP_SWEEP_TRIGGER:
+            return self.deep_scan_max_seconds
+        return self.max_scan_seconds
+
     def _acquire_scan_locks(self) -> bool:
         if not self._scan_lock.acquire(blocking=False):
             return False
@@ -830,7 +847,8 @@ class Scanner:
     def _run_locked_scan(self, trigger: str, sources: list[ListingSource] | None = None) -> ScanOutcome:
         """Run a scan while the caller holds ``_scan_lock``."""
         run_id: int | None = None
-        deadline = time.monotonic() + self.max_scan_seconds
+        budget = self._budget_for(trigger)
+        deadline = time.monotonic() + budget
         scan_started_at = utc_now()
         total_seen = total_added = total_updated = sources_failed = 0
         final_status = "failed"
@@ -901,7 +919,7 @@ class Scanner:
                             source_run_id,
                             "skipped",
                             message=(
-                                f"Skipped to keep this scan within the {int(self.max_scan_seconds)}-second "
+                                f"Skipped to keep this scan within the {int(budget)}-second "
                                 "time limit."
                             ),
                             source_key=self._source_key(source),

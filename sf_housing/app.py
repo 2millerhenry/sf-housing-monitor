@@ -512,6 +512,7 @@ def create_app(
         active_sources,
         timeout_seconds=active_settings.request_timeout_seconds,
         max_scan_seconds=active_settings.scan_max_seconds,
+        deep_scan_max_seconds=active_settings.deep_scan_max_seconds,
     )
     # A check that was in flight when the app was last stopped is still
     # recorded as running. Settling it here, before anything can start a new

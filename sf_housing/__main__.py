@@ -40,6 +40,7 @@ def main() -> None:
             ),
             timeout_seconds=settings.request_timeout_seconds,
             max_scan_seconds=settings.scan_max_seconds,
+            deep_scan_max_seconds=settings.deep_scan_max_seconds,
         )
         outcome = scanner.run_scan("command_line")
         print(json.dumps(asdict(outcome), indent=2))
