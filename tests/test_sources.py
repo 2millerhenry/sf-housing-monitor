@@ -404,3 +404,91 @@ def test_craigslist_detail_page_records_the_posting_time() -> None:
     from datetime import datetime
 
     datetime.fromisoformat(enriched.metadata["listing_timestamp"])
+
+
+def test_the_app_has_one_idea_of_what_it_calls_itself() -> None:
+    """The scanner kept its own copy of the request headers, and a checker
+    written to verify the sources kept a third. Zumper answers this app
+    honestly and serves a browser string a bot challenge, so the copy that
+    drifted reported a working source as broken -- a checker asking a different
+    question than the app is worse than no checker at all."""
+    from pathlib import Path
+
+    from sf_housing.sources import MONITOR_HEADERS
+
+    root = Path(__file__).resolve().parents[1]
+    assert "SFHousingMonitor" in MONITOR_HEADERS["User-Agent"]
+
+    # Imported is not the same as used: the checker passed its client no
+    # headers at all for a while and still mentioned the name.
+    for owner, usage in (
+        ("sf_housing/scanner.py", "headers = dict(MONITOR_HEADERS)"),
+        ("scripts/check_sources.py", "headers=dict(MONITOR_HEADERS)"),
+    ):
+        body = (root / owner).read_text(encoding="utf-8")
+        assert usage in body, f"{owner} does not read with the shared headers"
+        assert "SFHousingMonitor/" not in body, f"{owner} still spells out its own user agent"
+
+
+def test_the_source_check_asks_about_a_fresh_download() -> None:
+    """It exists to answer "would somebody downloading this today get
+    listings". Handed a mailbox it would check sources a new person does not
+    have, and a narrow deal would report a working source as empty."""
+    from pathlib import Path
+
+    body = (Path(__file__).resolve().parents[1] / "scripts/check_sources.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "default_sources()" in body, "the check must run the no-account source set"
+    assert 'mode == "automatic"' in body
+    assert "max_results_per_source" in body, "a per-source cap would truncate the answer"
+
+
+def test_a_site_declining_today_is_not_reported_as_a_broken_reader() -> None:
+    """ApartmentGuide answered with 488 homes and then, twenty minutes later,
+    with HTTP 202. Both times the reader was fine; the second time the site had
+    simply had enough of being asked. A check that calls that broken teaches
+    you to distrust the check, and it is the thing this app is built to
+    survive rather than a thing to fix."""
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    from check_sources import THROTTLE_MARKERS, check
+
+    from sf_housing.sources import SourceError
+
+    class Declining:
+        platform = "ApartmentGuide"
+
+        def search(self, client, preferences):
+            raise SourceError(
+                "ApartmentGuide answered HTTP 202 rather than a page of results, "
+                "which is how it turns away an unattended request."
+            )
+
+    class Broken:
+        platform = "Somewhere"
+
+        def search(self, client, preferences):
+            raise KeyError("listResults")
+
+    assert any("202" in marker for marker in THROTTLE_MARKERS)
+    assert check(Declining(), None)[0] == "THROTTLED"
+    assert check(Broken(), None)[0] == "FAILING"
+
+
+def test_only_a_broken_reader_fails_the_check() -> None:
+    """It is meant to gate a release. Failing it every time a site throttles
+    would make it noise, and the throttling is usually the check's own doing."""
+    import sys
+    from pathlib import Path
+
+    body = (Path(__file__).resolve().parents[1] / "scripts/check_sources.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "return 1 if failing else 0" in body
+    assert "THROTTLED" in body

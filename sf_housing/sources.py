@@ -1433,6 +1433,18 @@ _WHOLE_UNIT_BEDROOMS = {
 # that does not state one, with the same 403 it gives the honest User-Agent:
 # browser string without this header is 403, with it is 200. The other three
 # are indifferent to it, so it is set here once rather than special-cased.
+# What this app calls itself when it asks. Kept here beside the browser string
+# because which one a source is read with is a property of the reading, and
+# having a second copy of it in the scanner meant a check written to verify the
+# sources could quietly ask a different question than the app does: Zumper
+# answers this honestly and serves the browser string a bot challenge, so a
+# checker holding its own copy reported a working source as broken.
+MONITOR_HEADERS = {
+    "User-Agent": "SFHousingMonitor/0.1 (local personal-use monitor)",
+    "Accept": "text/html,application/xhtml+xml",
+    "Accept-Language": "en-US,en;q=0.8",
+}
+
 _BROWSER_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

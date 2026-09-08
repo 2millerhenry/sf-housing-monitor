@@ -22,6 +22,7 @@ from .models import ListingCandidate, ScanOutcome
 from .preferences import Preferences
 from .scoring import score_listing
 from .sources import (
+    MONITOR_HEADERS,
     ListingSource,
     SourceError,
     facebook_coordinate_neighborhood,
@@ -912,11 +913,7 @@ class Scanner:
             self._update_progress(run_id=run_id)
             LOGGER.info("Starting %s scan (run %s)", trigger, run_id)
             preferences = self.preference_loader()
-            headers = {
-                "User-Agent": "SFHousingMonitor/0.1 (local personal-use monitor)",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "en-US,en;q=0.8",
-            }
+            headers = dict(MONITOR_HEADERS)
             timeout = httpx.Timeout(self.timeout_seconds, connect=min(5.0, self.timeout_seconds))
             limits = httpx.Limits(max_connections=4, max_keepalive_connections=2)
             with httpx.Client(headers=headers, timeout=timeout, limits=limits, follow_redirects=True) as client:
