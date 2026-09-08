@@ -755,3 +755,39 @@ def test_zillow_asks_not_to_be_read_again_within_the_quarter_hour() -> None:
     assert floor_minutes >= 10, "a press still costs a full read"
     # Roughly ten a minute sustained is what drew the block being defended against.
     assert worst_case_per_minute < 3, worst_case_per_minute
+
+
+def test_the_page_leads_with_the_names_somebody_recognises(tmp_path) -> None:
+    """The order on the page is not the order the sources are read in. Scan
+    order opened the pitch with Craigslist, Listings Project and a small
+    landlord nobody has heard of, and put Zillow fourteenth."""
+    import re as _re
+
+    from fastapi.testclient import TestClient
+
+    from sf_housing.app import create_app
+    from sf_housing.preferences import ensure_preferences
+    from sf_housing.settings import Settings
+    from tests.test_named_checks import PREFERENCES
+
+    data = tmp_path / "data"
+    settings = Settings(
+        data_dir=data,
+        preferences_path=data / "config" / "preferences.yaml",
+        database_path=data / "housing.sqlite3",
+        log_path=data / "housing.log",
+    )
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "config").mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(PREFERENCES, encoding="utf-8")
+    ensure_preferences(settings.preferences_path)
+    with TestClient(create_app(settings=settings, sources=None, enable_scheduler=False)) as client:
+        page = client.get("/alerts").text
+
+    start = page.index('class="already-list"')
+    already = page[start : page.index("</p>", start)]
+    # The name is the chip's own trailing text, after its logo or letter mark.
+    shown = [n.strip() for n in _re.findall(r">\s*([A-Za-z][^<>]*?)\s*</span>", already) if n.strip()]
+
+    assert shown[:3] == ["Zillow", "Trulia", "Redfin"], shown[:6]
+    assert shown.index("Zillow") < shown.index("AvalonBay"), shown

@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import UTC, datetime
 from dataclasses import replace
 from html import unescape
+from collections.abc import Iterable
 from typing import Protocol
 from urllib.parse import quote, unquote, urlencode, urljoin, urlsplit
 
@@ -1439,6 +1440,45 @@ _WHOLE_UNIT_BEDROOMS = {
 # sources could quietly ask a different question than the app does: Zumper
 # answers this honestly and serves the browser string a bot challenge, so a
 # checker holding its own copy reported a working source as broken.
+# The order the free sources are shown in, which is not the order they are read
+# in. Scan order is chosen for speed and politeness and reads on the page as a
+# jumble; this leads with the names somebody recognises before asking them to
+# believe the rest, then keeps like with like -- the portals, the rental
+# marketplaces, the landlords who publish their own buildings, and the local
+# boards. Anything not named here is appended alphabetically rather than
+# dropped, so adding a source can never silently remove it from the page.
+SHOWCASE_ORDER = (
+    # The ones a renter has already heard of.
+    "Zillow",
+    "Trulia",
+    "Redfin",
+    "Craigslist",
+    "Movoto",
+    "ApartmentGuide",
+    # Rental marketplaces.
+    "Zumper",
+    "Rent.com",
+    "Apartment List",
+    # Landlords publishing their own buildings.
+    "AvalonBay",
+    "UDR",
+    "AppFolio",
+    "RentSFNow",
+    "Abacus (small buildings)",
+    # Local and community boards.
+    "SF Housing Portal",
+    "SpareRoom",
+    "Uloop",
+    "Listings Project",
+)
+
+
+def showcase_sorted(platforms: Iterable[str]) -> list[str]:
+    """Order source names for the page, keeping any stranger at the end."""
+    known = {name: index for index, name in enumerate(SHOWCASE_ORDER)}
+    return sorted(platforms, key=lambda name: (known.get(name, len(known)), name))
+
+
 MONITOR_HEADERS = {
     "User-Agent": "SFHousingMonitor/0.1 (local personal-use monitor)",
     "Accept": "text/html,application/xhtml+xml",

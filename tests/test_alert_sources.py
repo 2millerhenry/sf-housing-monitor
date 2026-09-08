@@ -260,3 +260,41 @@ def test_apartments_com_opaque_alerts_are_reported_without_failing_the_scan(pref
     assert source.search(None, preferences) == []
     assert source.empty_result_message is not None
     assert "No direct listing links" in source.empty_result_message
+
+
+def test_the_free_sources_lead_with_the_names_somebody_recognises() -> None:
+    """Scan order is chosen for speed and politeness, and on the page it reads
+    as a jumble -- the pitch opened with Craigslist, Listings Project and a
+    small landlord nobody has heard of, and Zillow came fourteenth."""
+    from sf_housing.sources import default_sources, showcase_sorted
+
+    free = [s.platform for s in default_sources() if s.mode == "automatic"]
+    shown = showcase_sorted(free)
+
+    assert shown[:3] == ["Zillow", "Trulia", "Redfin"], shown[:6]
+    assert set(shown) == set(free), "reordering must never lose or invent a source"
+
+
+def test_a_source_nobody_thought_to_order_still_appears() -> None:
+    """The order is a curated list, and a curated list is a list somebody
+    forgets to update. Falling off it must cost a source its place in the
+    order, never its place on the page."""
+    from sf_housing.sources import showcase_sorted
+
+    shown = showcase_sorted(["Zillow", "Somewhere New", "Craigslist"])
+
+    assert shown == ["Zillow", "Craigslist", "Somewhere New"]
+
+
+def test_like_is_kept_with_like() -> None:
+    """The four groups are the argument the block is making: the portals you
+    know, the marketplaces, landlords publishing their own buildings, and the
+    local boards. Interleaving them makes it a list instead of a case."""
+    from sf_housing.sources import SHOWCASE_ORDER
+
+    order = list(SHOWCASE_ORDER)
+    landlords = [order.index(n) for n in ("AvalonBay", "UDR", "AppFolio", "RentSFNow")]
+    local = [order.index(n) for n in ("SF Housing Portal", "SpareRoom", "Uloop")]
+
+    assert max(landlords) < min(local), "the landlords and the local boards are interleaved"
+    assert order.index("Zillow") < min(landlords), "a household name sits below a landlord"

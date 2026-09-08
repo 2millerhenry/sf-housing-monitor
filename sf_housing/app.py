@@ -82,6 +82,7 @@ from .sources import (
     FurnishedFinderSource,
     ListingSource,
     default_sources,
+    showcase_sorted,
 )
 
 
@@ -1378,12 +1379,14 @@ def create_app(
         # added since would have widened that gap. Facebook is excluded here
         # even though checked_directly names it: it reads a mailbox or an Apify
         # actor, so it is setup, not one of the ones that just run.
-        no_setup_sources = [
+        # Shown in the order that sells them rather than the order they are
+        # read in: scan order is chosen for speed and reads as a jumble.
+        no_setup_sources = showcase_sorted(
             source.platform
             for source in active_sources
             if getattr(source, "mode", "") == "automatic"
             and not getattr(source, "connector_key", None)
-        ]
+        )
         # Facebook has its own block further down the page, and appearing in both
         # places read as a mistake rather than as two routes to the same thing.
         # The alert reader is untouched: if Facebook's own Notify me mail lands
