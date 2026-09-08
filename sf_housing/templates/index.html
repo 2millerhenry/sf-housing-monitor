@@ -150,6 +150,13 @@
       </label>
     {% endif %}
     <button class="compact-button" type="submit">Update filters</button>
+    {#- A second submit on this same form rather than a hand-built link: the
+        browser then sends whatever the filters currently say, so the file can
+        never hold different homes than the page. A link would be a second copy
+        of the filter vocabulary, and the day a filter is added the export would
+        quietly stop honouring it while still returning plausible homes. -#}
+    <button class="compact-button" type="submit" formaction="/listings.csv" formnovalidate
+            data-download-csv>Download {{ listings|length }} as CSV</button>
     {% if selected_neighborhood or selected_platform or selected_home_style or selected_unit_type or selected_area_priority %}<a class="clear-filters" href="/?housing={{ housing_mode }}&amp;view={{ view }}&amp;sort={{ sort }}">Clear</a>{% endif %}
   </form>
 </section>

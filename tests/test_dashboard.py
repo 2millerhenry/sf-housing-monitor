@@ -1382,3 +1382,146 @@ def test_a_tab_is_laid_out_as_a_box_so_it_cannot_grow_into_the_line_above() -> N
 
     assert "display: inline-flex" in base, base
     assert "min-height" in base
+
+
+# --------------------------------------------------------------------------
+# the shortlist, as a spreadsheet
+# --------------------------------------------------------------------------
+
+
+def seeded_app(tmp_path: Path, rows):
+    """An app holding real homes, so the export has something to disagree on."""
+    from sf_housing.models import ListingCandidate, ScoreResult
+
+    settings = app_settings(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    for index, (price, neighborhood, title) in enumerate(rows):
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"csv{index}",
+                title=title,
+                original_url=f"https://sfbay.craigslist.org/roo/d/csv/{index}.html",
+                price=price,
+                neighborhood=neighborhood,
+                listing_type="Room/share",
+            ),
+            ScoreResult(90, ["fits"], "check", {}),
+        )
+    return application
+
+
+def csv_rows(text: str) -> list[list[str]]:
+    import csv as _csv
+    import io as _io
+
+    return list(_csv.reader(_io.StringIO(text)))
+
+
+def test_the_file_holds_the_homes_the_page_was_showing(tmp_path: Path) -> None:
+    """The whole promise. Two routes each doing their own filtering would drift
+    apart while both went on returning plausible homes, which is the one
+    failure nobody can see by reading either of them."""
+    import re
+
+    application = seeded_app(
+        tmp_path,
+        [(2100, "Bernal Heights", "Room one"), (2200, "Mission District", "Room two")],
+    )
+    query = "?housing=room&view=active&sort=price&neighborhood=Bernal+Heights"
+    with TestClient(application) as client:
+        page = client.get("/" + query).text
+        export = client.get("/listings.csv" + query)
+
+    on_page = len(re.findall(r'<tr class="listing-row', page))
+    in_file = len(csv_rows(export.text)) - 1  # less the header
+
+    assert in_file == on_page, f"page showed {on_page}, file holds {in_file}"
+    assert on_page == 1, "the neighborhood filter did not narrow the page"
+
+
+def test_an_empty_shortlist_still_downloads_a_usable_file(tmp_path: Path) -> None:
+    """A spreadsheet that opens to a header and no rows is a clear answer. A
+    404, or an empty file, reads as the feature being broken."""
+    application = seeded_app(tmp_path, [])
+    with TestClient(application) as client:
+        export = client.get("/listings.csv?housing=room&view=saved")
+
+    rows = csv_rows(export.text)
+    assert export.status_code == 200
+    assert len(rows) == 1, rows
+    assert rows[0][0] == "Score"
+
+
+def test_a_title_with_a_comma_survives_the_round_trip(tmp_path: Path) -> None:
+    """Craigslist titles are full of them."""
+    application = seeded_app(tmp_path, [(2100, "Bernal Heights", 'Sunny room, quiet st, "big"')])
+    with TestClient(application) as client:
+        export = client.get("/listings.csv?housing=room&view=active")
+
+    addresses = [row[4] for row in csv_rows(export.text)[1:]]
+    assert addresses == ['Sunny room, quiet st, "big"'], addresses
+
+
+def test_nothing_a_source_wrote_can_become_a_spreadsheet_formula() -> None:
+    """A title beginning "=" is evaluated on open by Excel, Numbers and Sheets
+    alike. This app did not write these strings and cannot vouch for them."""
+    from sf_housing.app import listings_csv
+
+    text = listings_csv([{"title": "=1+1", "note": "@SUM(A1)", "neighborhood": "-Mission"}])
+    row = csv_rows(text)[1]
+
+    assert row[4] == "'=1+1", row
+    assert row[13] == "'@SUM(A1)", row
+    assert row[3] == "'-Mission", row
+
+
+def test_a_price_stays_a_number_a_spreadsheet_can_sort(tmp_path: Path) -> None:
+    """Exported as "$3,045" every reader treats the column as text, and
+    sorting by price silently stops working."""
+    application = seeded_app(tmp_path, [(3045, "Bernal Heights", "Room one")])
+    with TestClient(application) as client:
+        export = client.get("/listings.csv?housing=room&view=active")
+
+    price = csv_rows(export.text)[1][1]
+    assert price == "3045", price
+
+
+def test_the_file_arrives_as_a_download_named_for_the_day(tmp_path: Path) -> None:
+    """These get saved and compared, so the name has to say which day it is."""
+    application = seeded_app(tmp_path, [(2100, "Bernal Heights", "Room one")])
+    with TestClient(application) as client:
+        export = client.get("/listings.csv?housing=room&view=active")
+
+    disposition = export.headers["content-disposition"]
+    assert disposition.startswith('attachment; filename="sf-homes-')
+    assert export.headers["content-type"].startswith("text/csv")
+
+
+def test_the_export_button_submits_the_filters_rather_than_a_link(tmp_path: Path) -> None:
+    """A hand-built link is a second copy of the filter vocabulary, and the day
+    a filter is added the export stops honouring it while still returning
+    plausible homes. Submitting the form the filters already live in cannot
+    drift, because the browser sends whatever they currently say."""
+    application = seeded_app(tmp_path, [(2100, "Bernal Heights", "Room one")])
+    with TestClient(application) as client:
+        page = client.get("/?housing=room&view=active").text
+
+    start = page.index('class="filters"')
+    form = page[start : page.index("</form>", start)]
+    assert 'formaction="/listings.csv"' in form, "the export is not inside the filter form"
+    assert 'href="/listings.csv' not in page, "the export is a hand-built link"
+
+
+def test_the_export_carries_the_score_floor_the_shortlist_is_defined_by(
+    tmp_path: Path,
+) -> None:
+    """The active view is what clears the deal's minimum score. An export that
+    ignored it would hand back homes the page is deliberately holding out."""
+    import inspect
+
+    from sf_housing.app import select_listings
+
+    body = inspect.getsource(select_listings)
+    assert "minimum_score=preferences.minimum_score" in body

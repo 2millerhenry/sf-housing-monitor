@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
 import re
 import subprocess
 from copy import deepcopy
+from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from datetime import UTC, date, datetime, timedelta
 from logging.handlers import RotatingFileHandler
@@ -106,6 +109,164 @@ _SPELLED = (
 def spelled_count(value: int) -> str:
     """A small count written out, capitalised for the start of a sentence."""
     return _SPELLED[value] if 0 <= value < len(_SPELLED) else str(value)
+
+
+VALID_SORTS = frozenset({"score", "contact", "available", "newest", "price", "unopened"})
+VALID_VIEWS = frozenset({"active", "saved", "dismissed", "near_matches", "all"})
+# Older links said whole_unit or lumped the splits together; send them to the
+# first size they actually cover rather than 404ing a bookmark.
+LEGACY_HOUSING_MODES = {
+    "whole_unit": ("studio", "one_bedroom"),
+    "two_bedroom": ("two_bedroom", "three_bedroom", "four_bedroom"),
+}
+HOUSING_MODE_PATHS = (
+    ("room", "private_room"),
+    ("studio", "studio"),
+    ("one_bedroom", "one_bedroom"),
+    ("two_bedroom", "two_bedroom"),
+    ("three_bedroom", "three_bedroom"),
+    ("four_bedroom", "four_bedroom"),
+)
+
+
+@dataclass(frozen=True)
+class ListingSelection:
+    """The homes a set of filters picks out, and what those filters resolved to.
+
+    Both the page and the CSV of the page are this. Kept as one object because
+    the export's whole promise is that it holds the rows on screen, and two
+    routes each doing their own filtering would drift apart while both went on
+    returning plausible homes -- the one failure that cannot be seen by reading
+    either of them.
+    """
+
+    listings: list[dict]
+    sort: str
+    view: str
+    housing_mode: str
+    housing_kind: str
+    mode_unit_types: tuple[str, ...]
+    area_priority: str
+    enabled_housing_modes: list[str]
+
+
+def select_listings(
+    repository: Repository,
+    preferences: Preferences,
+    *,
+    sort: str = "score",
+    neighborhood: str = "",
+    platform: str = "",
+    home_style: str = "",
+    housing: str = "room",
+    area_priority: str = "",
+    view: str = "active",
+) -> ListingSelection:
+    """Resolve the dashboard's filters and read the homes they select."""
+    sort = sort if sort in VALID_SORTS else "score"
+    view = view if view in VALID_VIEWS else "active"
+    enabled_paths = set(preferences.deal_profile.enabled_paths)
+    enabled_housing_modes = [
+        mode for mode, path in HOUSING_MODE_PATHS if path in enabled_paths
+    ] or ["room"]
+    requested_mode = housing
+    if requested_mode in LEGACY_HOUSING_MODES:
+        requested_mode = next(
+            (mode for mode in LEGACY_HOUSING_MODES[requested_mode] if mode in enabled_housing_modes),
+            enabled_housing_modes[0],
+        )
+    housing_mode = (
+        requested_mode if requested_mode in enabled_housing_modes else enabled_housing_modes[0]
+    )
+    housing_kind = "room" if housing_mode == "room" else "whole_unit"
+    mode_unit_types = () if housing_mode == "room" else (housing_mode,)
+    selected_area_priority = (
+        area_priority
+        if housing_mode != "room" and area_priority in {"dream_strong", "secondary"}
+        else ""
+    )
+    listings = repository.query_listings(
+        minimum_score=preferences.minimum_score,
+        sort=sort,
+        neighborhood=neighborhood,
+        platform=platform,
+        home_style=home_style,
+        housing_kind=housing_kind,
+        # The tab is the size now, so a separate size dropdown would only be a
+        # second way to say the same thing.
+        unit_type="",
+        unit_types=mode_unit_types,
+        view=view,
+    )
+    if selected_area_priority == "dream_strong":
+        listings = [
+            listing
+            for listing in listings
+            if listing.get("neighborhood_priority") in {"dream", "strong"}
+        ]
+    elif selected_area_priority == "secondary":
+        listings = [
+            listing for listing in listings if listing.get("neighborhood_priority") == "secondary"
+        ]
+    return ListingSelection(
+        listings=listings,
+        sort=sort,
+        view=view,
+        housing_mode=housing_mode,
+        housing_kind=housing_kind,
+        mode_unit_types=mode_unit_types,
+        area_priority=selected_area_priority,
+        enabled_housing_modes=enabled_housing_modes,
+    )
+
+
+# What a person would actually use, in the order they would read it. The table
+# holds twenty-nine columns, most of them this app talking to itself --
+# match_reasons_json, score_details_json, confidence, source_id -- and a export
+# that includes them buries the eight that answer "should I go and see this".
+CSV_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("Score", "score"),
+    ("Price", "price"),
+    ("Size", "unit_type"),
+    ("Neighborhood", "neighborhood"),
+    ("Address", "title"),
+    ("Building size", "building_units"),
+    ("Move-in", "availability_state"),
+    ("Source", "platform"),
+    ("Link", "original_url"),
+    ("First seen", "first_found"),
+    ("Last seen", "last_seen"),
+    ("Status", "status"),
+    ("Check", "concern"),
+    ("Note", "note"),
+)
+# Excel, Numbers and Sheets all read a leading =, +, - or @ as the start of a
+# formula. Listing titles and notes are text this app did not write, so a title
+# beginning "=1+1" would be evaluated on open in somebody else's spreadsheet.
+# Prefixing with an apostrophe is what the spreadsheets themselves understand
+# as "this is text"; it is not shown in the cell.
+_FORMULA_LEAD = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_cell(value: object) -> str:
+    """One cell: a string a spreadsheet will read as text, never as a formula."""
+    if value is None:
+        return ""
+    text = str(value)
+    if text and text[0] in _FORMULA_LEAD:
+        return "'" + text
+    return text
+
+
+def listings_csv(listings: list[dict]) -> str:
+    """The rows on screen, as a spreadsheet a person can sort and send."""
+    buffer = io.StringIO()
+    # Windows Excel expects CRLF, and every other reader accepts it.
+    writer = csv.writer(buffer, lineterminator="\r\n")
+    writer.writerow([heading for heading, _ in CSV_COLUMNS])
+    for listing in listings:
+        writer.writerow([_csv_cell(listing.get(key)) for _, key in CSV_COLUMNS])
+    return buffer.getvalue()
 
 
 def _reveal_folder(folder: Path) -> bool:
@@ -639,75 +800,31 @@ def create_app(
         message: str = "",
         scan: str = "",
     ):
-        valid_sorts = {"score", "contact", "available", "newest", "price", "unopened"}
-        sort = sort if sort in valid_sorts else "score"
-        view = view if view in {"active", "saved", "dismissed", "near_matches", "all"} else "active"
         preferences = load_preferences(active_settings.preferences_path)
         if not preferences.profile_active:
             return RedirectResponse("/preferences?welcome=1", status_code=303)
-        enabled_paths = set(preferences.deal_profile.enabled_paths)
-        # One tab per home size the user actually chose, in the order a person
-        # thinks about them. Lumping "studios & 1-bedrooms" and "2-3 bedrooms"
-        # hid which size a result was, and left a fourth bedroom nowhere to go.
-        enabled_housing_modes = [
-            mode
-            for mode, path in (
-                ("room", "private_room"),
-                ("studio", "studio"),
-                ("one_bedroom", "one_bedroom"),
-                ("two_bedroom", "two_bedroom"),
-                ("three_bedroom", "three_bedroom"),
-                ("four_bedroom", "four_bedroom"),
-            )
-            if path in enabled_paths
-        ]
-        if not enabled_housing_modes:
-            enabled_housing_modes = ["room"]
-        # Older links said whole_unit or lumped the splits together; send them to
-        # the first size they actually cover rather than 404ing a bookmark.
-        legacy_modes = {
-            "whole_unit": ("studio", "one_bedroom"),
-            "two_bedroom": ("two_bedroom", "three_bedroom", "four_bedroom"),
-        }
-        requested_mode = housing
-        if requested_mode in legacy_modes:
-            requested_mode = next(
-                (mode for mode in legacy_modes[requested_mode] if mode in enabled_housing_modes),
-                enabled_housing_modes[0],
-            )
-        housing_mode = requested_mode if requested_mode in enabled_housing_modes else enabled_housing_modes[0]
-        housing_kind = "room" if housing_mode == "room" else "whole_unit"
-        mode_unit_types = () if housing_mode == "room" else (housing_mode,)
-        # The tab is the size now, so a separate size dropdown would only be a
-        # second way to say the same thing.
-        selected_unit_type = ""
-        selected_area_priority = (
-            area_priority
-            if housing_mode != "room" and area_priority in {"dream_strong", "secondary"}
-            else ""
-        )
-        query_unit_type = selected_unit_type
-        listings = repository.query_listings(
-            minimum_score=preferences.minimum_score,
+        # The page and its CSV are the same selection, resolved in one place.
+        selection = select_listings(
+            repository,
+            preferences,
             sort=sort,
             neighborhood=neighborhood,
             platform=platform,
             home_style=home_style,
-            housing_kind=housing_kind,
-            unit_type=query_unit_type,
-            unit_types=mode_unit_types,
+            housing=housing,
+            area_priority=area_priority,
             view=view,
         )
-        if selected_area_priority == "dream_strong":
-            listings = [
-                listing
-                for listing in listings
-                if listing.get("neighborhood_priority") in {"dream", "strong"}
-            ]
-        elif selected_area_priority == "secondary":
-            listings = [
-                listing for listing in listings if listing.get("neighborhood_priority") == "secondary"
-            ]
+        sort = selection.sort
+        view = selection.view
+        enabled_housing_modes = selection.enabled_housing_modes
+        housing_mode = selection.housing_mode
+        housing_kind = selection.housing_kind
+        mode_unit_types = selection.mode_unit_types
+        selected_unit_type = ""
+        selected_area_priority = selection.area_priority
+        listings = selection.listings
+        enabled_paths = set(preferences.deal_profile.enabled_paths)
         current_time = datetime.now(UTC)
         for listing in listings:
             listing["is_recently_posted"] = _is_recently_posted(listing, now=current_time)
@@ -858,6 +975,50 @@ def create_app(
                 "sort_urls": sort_urls,
                 "exclusion_summary": exclusion_summary,
                 "excluded_total": sum(int(item["count"]) for item in exclusion_summary),
+            },
+        )
+
+    @application.get("/listings.csv")
+    def listings_download(
+        sort: str = "score",
+        neighborhood: str = "",
+        platform: str = "",
+        home_style: str = "",
+        housing: str = "room",
+        unit_type: str = "",
+        area_priority: str = "",
+        view: str = "active",
+    ):
+        """The homes on screen, as a spreadsheet.
+
+        Takes the dashboard's own parameters and runs the dashboard's own
+        selection, so the file holds the rows the page was showing. A GET
+        because it is a read and a link the browser can simply follow; the
+        same-origin guard exists for the routes that change something.
+        """
+        preferences = load_preferences(active_settings.preferences_path)
+        if not preferences.profile_active:
+            return RedirectResponse("/preferences?welcome=1", status_code=303)
+        selection = select_listings(
+            repository,
+            preferences,
+            sort=sort,
+            neighborhood=neighborhood,
+            platform=platform,
+            home_style=home_style,
+            housing=housing,
+            area_priority=area_priority,
+            view=view,
+        )
+        # Named for the day it was taken, because these get saved and compared.
+        stamp = datetime.now(UTC).astimezone(PACIFIC).date().isoformat()
+        return Response(
+            content=listings_csv(selection.listings),
+            media_type="text/csv; charset=utf-8",
+            headers={
+                "Content-Disposition": f'attachment; filename="sf-homes-{stamp}.csv"',
+                # A shortlist is a moment, not a document to be cached.
+                "Cache-Control": "no-store",
             },
         )
 
