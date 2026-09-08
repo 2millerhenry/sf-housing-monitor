@@ -19,6 +19,7 @@ import json
 import re
 from pathlib import Path
 
+import httpx
 import pytest
 import yaml
 
@@ -268,13 +269,16 @@ def test_paging_stops_when_the_page_repeats_itself(preferences) -> None:
     assert client.requested[1] == "https://www.zillow.com/san-francisco-ca/rentals/2_p/"
 
 
-def test_the_nightly_sweep_reads_far_deeper_than_a_waiting_scan() -> None:
-    """2,568 rentals is 63 pages. Six of them is a scan's worth."""
+def test_the_nightly_sweep_reads_at_least_as_deep_as_a_waiting_scan() -> None:
+    """The page claims 2,568 rentals and hands over about a thousand: page 25
+    is refused however patiently it is asked. So the sweep's job here is to
+    probe a little past today's wall, not to chase a number paging cannot
+    reach."""
     from sf_housing.sources import DEEP_SWEEP_TRIGGER, _pages_for_trigger
 
     source = ZillowSource()
-    assert _pages_for_trigger(source, "scheduled") == 6
-    assert _pages_for_trigger(source, DEEP_SWEEP_TRIGGER) == 65
+    assert _pages_for_trigger(source, "scheduled") == source.max_pages
+    assert _pages_for_trigger(source, DEEP_SWEEP_TRIGGER) >= source.max_pages
 
 
 def test_the_per_source_cap_is_honoured() -> None:
@@ -447,3 +451,68 @@ def test_zillow_runs_before_the_sources_that_fetch_a_page_per_building(
 
     assert order.index("Zillow") < order.index("Apartment List")
     assert order.index("Zillow") < order.index("Rent.com")
+
+
+# --------------------------------------------------------------------------
+# how deep the search actually goes
+# --------------------------------------------------------------------------
+
+
+class Refused:
+    """A refusal that raises the way httpx does, rather than asserting."""
+
+    status_code = 400
+    text = ""
+
+    def raise_for_status(self):
+        raise httpx.HTTPStatusError("400", request=None, response=None)
+
+
+def renamed(page: str, suffix: str) -> str:
+    """The same page with every id changed, standing in for a later page.
+
+    Both keys, because the reader takes whichever it finds first and a page
+    whose homes are all already seen ends the search on its own.
+    """
+    for key in ("id", "zpid"):
+        page = re.sub(
+            rf'"{key}":"([^"]+)"', lambda m: f'"{key}":"{m.group(1)}{suffix}"', page
+        )
+    return page
+
+
+def test_the_wall_at_the_end_of_the_results_is_not_an_error(preferences) -> None:
+    """Zillow serves about a thousand homes and then refuses the next page
+    outright rather than answering with an empty one. Raising there would
+    throw away every home already read in order to report the page after the
+    last one."""
+    page_one = FakeResponse(search_page())
+    page_two = FakeResponse(renamed(search_page(), "b"))
+    wall = Refused()
+    client = FakeClient(page_one, page_two, wall)
+
+    listings = ZillowSource().search(client, preferences)
+
+    assert listings, "the homes read before the wall have to survive it"
+    assert len(client.requested) == 3, "it stops asking once it is refused"
+
+
+def test_a_refusal_on_the_very_first_page_is_still_a_failure(preferences) -> None:
+    """Nothing has been read yet, so this is Zillow turning the app away
+    rather than the end of the results, and it has to be reported."""
+    client = FakeClient(Refused())
+
+    with pytest.raises((SourceError, httpx.HTTPStatusError)):
+        ZillowSource().search(client, preferences)
+
+
+def test_the_search_reads_far_enough_to_reach_what_zillow_serves() -> None:
+    """Six pages was 246 homes out of the roughly one thousand Zillow will
+    actually hand over, so three quarters of the reachable inventory was
+    never asked for."""
+    source = ZillowSource()
+
+    assert source.max_pages >= 24, "the reachable pages are not being read"
+    # Page 25 is refused, so aiming far past it only buys refused requests.
+    assert source.deep_max_pages <= 40
+    assert source.deep_max_pages >= source.max_pages

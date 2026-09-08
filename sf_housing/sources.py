@@ -2969,12 +2969,16 @@ class ZillowSource:
     # Everything worth scoring is on the search page.
     detail_budget = 0
     empty_result_message = "Zillow published no San Francisco rentals on its search page."
-    # Forty-one homes a page. Six pages is about 250 homes, which is the
-    # per-source cap's worth; the nightly sweep goes deeper.
-    max_pages = 6
-    # 2,568 rentals is 63 pages. Read to the bottom once a day, at an hour
-    # where being turned away costs a run nobody is watching.
-    deep_max_pages = 65
+    # Forty-one homes a page, and Zillow serves twenty-four of them: page 25
+    # is refused outright however patiently it is asked. That is a cap on the
+    # results rather than on the request rate -- about a thousand homes -- so
+    # the 2,568 the page claims is not reachable by paging, and six pages was
+    # leaving three quarters of what is reachable unread.
+    max_pages = 24
+    # The nightly sweep asks for a few more than that. Reaching the wall is
+    # handled below rather than being an error, so probing costs one refused
+    # request and finds the extra homes on any day Zillow lifts the cap.
+    deep_max_pages = 30
 
     FOR_RENT = "FOR_RENT"
 
@@ -3015,9 +3019,14 @@ class ZillowSource:
         document = ""
 
         for page in range(1, pages + 1):
-            document = _require_page(
-                client.get(self._page_url(page), headers=_BROWSER_HEADERS), self.platform
-            )
+            response = client.get(self._page_url(page), headers=_BROWSER_HEADERS)
+            # Past its last page Zillow refuses outright rather than answering
+            # with an empty one. Once cards have been read that is the end of
+            # the results, not the loss of them: raising here would throw away
+            # every home already collected to report the page after the last.
+            if read_a_card and response.status_code >= 400:
+                break
+            document = _require_page(response, self.platform)
             results = self._results(document)
             if not results:
                 break
