@@ -50,36 +50,44 @@
   /* An explicit light choice outranks the system. */
   :root:not([data-theme="light"]) {
   color-scheme: dark;
-  --canvas: oklch(17.5% 0.008 160);
-  --surface: oklch(21.5% 0.009 160);
-  --surface-muted: oklch(26% 0.010 160);
-  --band: oklch(19.5% 0.008 160);
-  --ink: oklch(94% 0.007 95);
-  --muted: oklch(73% 0.012 150);
-  --faint: oklch(58% 0.012 150);
-  --line: oklch(30% 0.010 155);
-  --line-strong: oklch(41% 0.013 155);
-  --accent: oklch(78% 0.115 162);
-  --accent-hover: oklch(86% 0.12 162);
-  --accent-soft: oklch(29% 0.045 160);
-  --visited: oklch(24% 0.014 158);
-  --visited-hover: oklch(28% 0.022 158);
-  --accent-line: oklch(45% 0.06 158);
-  --amber: oklch(83% 0.10 78);
-  --amber-soft: oklch(29% 0.045 75);
-  --amber-line: oklch(46% 0.06 75);
-  --red: oklch(77% 0.13 25);
-  --red-soft: oklch(29% 0.055 25);
-  --red-line: oklch(45% 0.08 25);
-  --blue: oklch(83% 0.075 238);
-  --blue-soft: oklch(31% 0.05 238);
-  --amber-ink: oklch(86% 0.075 78);
-  --row-hover: oklch(24% 0.010 160);
-  --saved-hover: oklch(27% 0.030 158);
-  --tint: oklch(23% 0.012 158);
-  --scrim: oklch(8% 0.006 160 / 0.62);
-  --logo-edge: oklch(100% 0 0 / 0.16);
-  --logo-tile: oklch(95% 0.004 95);
+  /* A warm charcoal rather than a tinted one: the ground carries almost no
+     chroma, so the few coloured things on the page are the only coloured
+     things. Lightness rises for a dark ground and chroma comes down with it --
+     the first attempt kept the light theme's chroma at the higher lightness,
+     which is what makes a dark interface look fluorescent. */
+  --canvas: oklch(16.5% 0.005 100);
+  --surface: oklch(20.5% 0.006 100);
+  --surface-muted: oklch(25% 0.007 100);
+  --band: oklch(18.5% 0.005 100);
+  --ink: oklch(93% 0.005 95);
+  --muted: oklch(70.5% 0.008 100);
+  --faint: oklch(56% 0.008 100);
+  --line: oklch(28% 0.006 100);
+  --line-strong: oklch(38% 0.008 100);
+  /* Sage rather than mint: still the one active voice, at half the chroma it
+     carries on paper. */
+  --accent: oklch(74% 0.055 162);
+  --accent-hover: oklch(82% 0.062 162);
+  --accent-soft: oklch(26.5% 0.020 160);
+  --visited: oklch(23% 0.009 158);
+  --visited-hover: oklch(26.5% 0.014 158);
+  --accent-line: oklch(39% 0.028 158);
+  /* Warm sand and clay. Caution has to read as caution, not a highlighter. */
+  --amber: oklch(80% 0.050 78);
+  --amber-soft: oklch(27% 0.022 75);
+  --amber-line: oklch(40% 0.030 75);
+  --amber-ink: oklch(83% 0.042 78);
+  --red: oklch(72% 0.070 25);
+  --red-soft: oklch(27% 0.028 25);
+  --red-line: oklch(40% 0.042 25);
+  --blue: oklch(79% 0.042 238);
+  --blue-soft: oklch(27.5% 0.026 238);
+  --row-hover: oklch(23% 0.006 100);
+  --saved-hover: oklch(25.5% 0.016 158);
+  --tint: oklch(22% 0.008 158);
+  --scrim: oklch(8% 0.004 100 / 0.62);
+  --logo-edge: oklch(100% 0 0 / 0.14);
+  --logo-tile: oklch(93% 0.004 95);
   --shadow-low: 0 1px 2px oklch(0% 0 0 / 0.42);
   --shadow-focus: 0 8px 24px oklch(0% 0 0 / 0.55);
   }
@@ -87,36 +95,44 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: oklch(17.5% 0.008 160);
-  --surface: oklch(21.5% 0.009 160);
-  --surface-muted: oklch(26% 0.010 160);
-  --band: oklch(19.5% 0.008 160);
-  --ink: oklch(94% 0.007 95);
-  --muted: oklch(73% 0.012 150);
-  --faint: oklch(58% 0.012 150);
-  --line: oklch(30% 0.010 155);
-  --line-strong: oklch(41% 0.013 155);
-  --accent: oklch(78% 0.115 162);
-  --accent-hover: oklch(86% 0.12 162);
-  --accent-soft: oklch(29% 0.045 160);
-  --visited: oklch(24% 0.014 158);
-  --visited-hover: oklch(28% 0.022 158);
-  --accent-line: oklch(45% 0.06 158);
-  --amber: oklch(83% 0.10 78);
-  --amber-soft: oklch(29% 0.045 75);
-  --amber-line: oklch(46% 0.06 75);
-  --red: oklch(77% 0.13 25);
-  --red-soft: oklch(29% 0.055 25);
-  --red-line: oklch(45% 0.08 25);
-  --blue: oklch(83% 0.075 238);
-  --blue-soft: oklch(31% 0.05 238);
-  --amber-ink: oklch(86% 0.075 78);
-  --row-hover: oklch(24% 0.010 160);
-  --saved-hover: oklch(27% 0.030 158);
-  --tint: oklch(23% 0.012 158);
-  --scrim: oklch(8% 0.006 160 / 0.62);
-  --logo-edge: oklch(100% 0 0 / 0.16);
-  --logo-tile: oklch(95% 0.004 95);
+  /* A warm charcoal rather than a tinted one: the ground carries almost no
+     chroma, so the few coloured things on the page are the only coloured
+     things. Lightness rises for a dark ground and chroma comes down with it --
+     the first attempt kept the light theme's chroma at the higher lightness,
+     which is what makes a dark interface look fluorescent. */
+  --canvas: oklch(16.5% 0.005 100);
+  --surface: oklch(20.5% 0.006 100);
+  --surface-muted: oklch(25% 0.007 100);
+  --band: oklch(18.5% 0.005 100);
+  --ink: oklch(93% 0.005 95);
+  --muted: oklch(70.5% 0.008 100);
+  --faint: oklch(56% 0.008 100);
+  --line: oklch(28% 0.006 100);
+  --line-strong: oklch(38% 0.008 100);
+  /* Sage rather than mint: still the one active voice, at half the chroma it
+     carries on paper. */
+  --accent: oklch(74% 0.055 162);
+  --accent-hover: oklch(82% 0.062 162);
+  --accent-soft: oklch(26.5% 0.020 160);
+  --visited: oklch(23% 0.009 158);
+  --visited-hover: oklch(26.5% 0.014 158);
+  --accent-line: oklch(39% 0.028 158);
+  /* Warm sand and clay. Caution has to read as caution, not a highlighter. */
+  --amber: oklch(80% 0.050 78);
+  --amber-soft: oklch(27% 0.022 75);
+  --amber-line: oklch(40% 0.030 75);
+  --amber-ink: oklch(83% 0.042 78);
+  --red: oklch(72% 0.070 25);
+  --red-soft: oklch(27% 0.028 25);
+  --red-line: oklch(40% 0.042 25);
+  --blue: oklch(79% 0.042 238);
+  --blue-soft: oklch(27.5% 0.026 238);
+  --row-hover: oklch(23% 0.006 100);
+  --saved-hover: oklch(25.5% 0.016 158);
+  --tint: oklch(22% 0.008 158);
+  --scrim: oklch(8% 0.004 100 / 0.62);
+  --logo-edge: oklch(100% 0 0 / 0.14);
+  --logo-tile: oklch(93% 0.004 95);
   --shadow-low: 0 1px 2px oklch(0% 0 0 / 0.42);
   --shadow-focus: 0 8px 24px oklch(0% 0 0 / 0.55);
 }
