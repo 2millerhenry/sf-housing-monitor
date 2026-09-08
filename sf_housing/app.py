@@ -67,7 +67,13 @@ from .potrero import (
     shortlist,
 )
 from .scanner import Scanner
-from .scheduling import CATCH_UP_INTERVAL_MINUTES, PACIFIC, build_scheduler, scheduled_scan_due
+from .scheduling import (
+    CATCH_UP_INTERVAL_MINUTES,
+    PACIFIC,
+    build_scheduler,
+    scheduled_scan_due,
+    sweep_if_due,
+)
 from .settings import Settings
 from .sources import (
     FacebookGroupsSource,
@@ -533,6 +539,13 @@ def create_app(
             ):
                 scanner.start_scan("startup_catchup")
                 logging.getLogger(__name__).info("Started catch-up scan for a missed schedule")
+            # The hourly net does not fire until an hour after this process
+            # starts, so on a Mac restarted more often than that it would never
+            # fire at all -- which is the shape of the fault it exists to fix.
+            # Unconditional because it decides for itself: it declines while a
+            # check is running, while a scheduled one is owed, and unless a day
+            # has gone by without a sweep.
+            sweep_if_due(scanner)
         yield
         if enable_scheduler and scheduler.running:
             scheduler.shutdown(wait=False)

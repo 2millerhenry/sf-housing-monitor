@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pathlib
 from datetime import UTC, datetime
 
 from sf_housing.scheduling import build_scheduler, latest_scheduled_time, scheduled_scan_due
@@ -263,3 +264,15 @@ def test_a_sweep_is_not_started_while_a_check_is_already_running() -> None:
 
     assert sweep_if_due(Scanner()) is False
     assert started == []
+
+
+def test_the_safety_net_is_also_checked_the_moment_the_app_starts() -> None:
+    """The hourly job does not fire until an hour after this process starts,
+    so on a Mac restarted more often than that it would never fire -- which is
+    the exact shape of the fault it exists to fix."""
+    app_source = (
+        pathlib.Path(__file__).resolve().parents[1] / "sf_housing/app.py"
+    ).read_text(encoding="utf-8")
+    lifespan = app_source[app_source.index("async def lifespan") : app_source.index("yield")]
+
+    assert "sweep_if_due(scanner)" in lifespan
