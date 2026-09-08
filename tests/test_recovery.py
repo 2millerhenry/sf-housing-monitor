@@ -805,3 +805,21 @@ def test_a_source_that_is_refusing_us_is_asked_no_more_often_than_one_that_is_no
         scanner.run_scan("manual")
 
     assert source.reads == 1, f"a refusing source was asked {source.reads} times"
+
+
+def test_a_brand_new_install_reads_the_source_straight_away(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The floor asks when this source was last read. On a fresh install the
+    answer is never, and a floor that mistook that for "just now" would leave
+    somebody's first check collecting nothing at all from it."""
+    source = CountingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+
+    assert scanner._seconds_until_readable(source, "manual") == 0.0
+    scanner.run_scan("manual")
+
+    assert source.reads == 1, "a new install read nothing from a floored source"
+    with repository.connection() as connection:
+        kept = [r["source_id"] for r in connection.execute("SELECT source_id FROM listings")]
+    assert sorted(kept) == ["z1", "z2"]
