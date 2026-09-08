@@ -30,8 +30,8 @@ EXTENSION_FILES = (
     "popup.css",
 )
 COMMAND_FILES = (
-    "Install SF Housing Monitor.command",
-    "Open SF Housing Monitor.command",
+    "2 Install SF Housing Monitor.command",
+    "3 Open SF Housing Monitor.command",
     "Repair SF Housing Monitor.command",
     "Verify SF Housing Monitor.command",
     "Uninstall SF Housing Monitor.command",
@@ -175,7 +175,7 @@ def main() -> None:
         tools = payload / "tools"
         tools.mkdir(parents=True)
         assets = ROOT / "release_assets"
-        shutil.copy2(assets / "START_HERE.txt", release_root / "START_HERE.txt")
+        shutil.copy2(assets / "1 START HERE.txt", release_root / "1 START HERE.txt")
         shutil.copy2(assets / "RELEASE_NOTES.txt", release_root / "RELEASE_NOTES.txt")
         # .txt so it opens with a double-click on a machine with no editor set up.
         shutil.copy2(ROOT / "LICENSE", release_root / "LICENSE.txt")

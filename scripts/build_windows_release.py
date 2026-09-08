@@ -26,8 +26,8 @@ from build_release import (
 
 RELEASE_NAME = f"SF-Housing-Monitor-{VERSION}-Windows-x64"
 COMMAND_FILES = (
-    "Install SF Housing Monitor.cmd",
-    "Open SF Housing Monitor.cmd",
+    "2 Install SF Housing Monitor.cmd",
+    "3 Open SF Housing Monitor.cmd",
     "Repair SF Housing Monitor.cmd",
     "Verify SF Housing Monitor.cmd",
     "Uninstall SF Housing Monitor.cmd",
@@ -70,7 +70,7 @@ def main() -> None:
         payload = release_root / "payload"
         tools = payload / "tools"
         tools.mkdir(parents=True)
-        for name in ("START_HERE.txt", "RELEASE_NOTES.txt"):
+        for name in ("1 START HERE.txt", "RELEASE_NOTES.txt"):
             shutil.copy2(windows_assets / name, release_root / name)
         shutil.copy2(ROOT / "LICENSE", release_root / "LICENSE.txt")
         for name in COMMAND_FILES:

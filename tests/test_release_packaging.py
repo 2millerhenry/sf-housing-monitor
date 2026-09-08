@@ -51,10 +51,14 @@ def test_release_assets_are_generic_and_preserve_private_data_by_default() -> No
 
     assert "/Users/henrymiller" not in text
     assert "Library/Application Support/SF Housing Monitor" in text
-    assert "does not use sudo" in text
+    # The promise that matters on each platform: setup never asks for an
+    # administrator. Asserted where it is made rather than anywhere in the
+    # folder, so rewording the page cannot quietly drop it.
+    assert "never uses sudo" in (release_assets / "1 START HERE.txt").read_text()
+    assert "no admin rights" in (release_assets / "windows" / "1 START HERE.txt").read_text()
     assert "Your private data remains" in text
     assert 'if [ "$CONFIRMATION" = "DELETE" ]' in text
-    assert "Verify SF Housing Monitor.command" in (release_assets / "START_HERE.txt").read_text()
+    assert "Verify SF Housing Monitor.command" in (release_assets / "1 START HERE.txt").read_text()
     assert (release_assets / "Verify SF Housing Monitor.command").stat().st_mode & 0o100
     assert (release_assets / "payload" / "tools" / "doctor.sh").stat().st_mode & 0o100
     assert 'support/report.json' in (release_assets / "payload" / "tools" / "doctor.sh").read_text()
@@ -66,7 +70,7 @@ def test_release_assets_are_generic_and_preserve_private_data_by_default() -> No
     ).read_text()
     assert '"ok": true' in (release_assets / "payload" / "tools" / "open.sh").read_text()
     for command in (
-        "Open SF Housing Monitor.command",
+        "3 Open SF Housing Monitor.command",
         "Verify SF Housing Monitor.command",
         "Repair SF Housing Monitor.command",
         "Uninstall SF Housing Monitor.command",
@@ -269,3 +273,39 @@ def test_a_source_without_an_icon_still_gets_a_mark() -> None:
 
     assert "{%- if icon -%}" in page
     assert "source-mark" in page.split("{%- else -%}")[1][:400]
+
+
+def visible_release_files(command_files, extras) -> list[str]:
+    """What the downloaded folder shows, in the order a file browser shows it."""
+    return sorted([*command_files, *extras])
+
+
+def test_the_folder_reads_itself_top_to_bottom() -> None:
+    """A file browser sorts alphabetically, which put START_HERE.txt sixth of
+    eight -- the page telling somebody what to do, below the release notes and
+    beside Uninstall. Numbering the first-run path is the whole fix, so it is
+    worth a test that fails if the numbers come off."""
+    import sys
+
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from build_release import COMMAND_FILES
+
+    shown = visible_release_files(
+        COMMAND_FILES, ["1 START HERE.txt", "RELEASE_NOTES.txt", "LICENSE.txt"]
+    )
+
+    assert shown[0] == "1 START HERE.txt", shown
+    assert shown[1].startswith("2 Install"), shown
+    assert shown[2].startswith("3 Open"), shown
+    # The destructive one must never be mistaken for a step.
+    assert not any(name[0].isdigit() for name in shown if "Uninstall" in name)
+
+
+def test_neither_builder_writes_the_page_back_under_its_buried_name() -> None:
+    """The ordering only holds if the builders copy it out under the numbered
+    name. Nothing else in the release would notice if they stopped: the file
+    would still be there, still be read, and still sort sixth."""
+    for builder in ("build_release.py", "build_windows_release.py"):
+        source = (ROOT / "scripts" / builder).read_text(encoding="utf-8")
+        assert '"1 START HERE.txt"' in source, builder
+        assert '"START_HERE.txt"' not in source, f"{builder} still writes the buried name"

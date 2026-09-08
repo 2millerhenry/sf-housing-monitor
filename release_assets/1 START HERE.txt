@@ -1,0 +1,42 @@
+SF Housing Monitor for macOS
+============================
+
+Double-click "2 Install SF Housing Monitor.command".
+
+That is the whole setup. It takes a few minutes: the first install downloads a
+private Python runtime that belongs only to this app. It never uses sudo,
+Homebrew, Git, or the Python that came with your Mac. Your browser opens when
+it is ready. Build Your deal, save it, and the free public-source check starts
+straight away.
+
+If macOS blocks it, Control-click the file, choose Open, then Open again. That
+happens because this release is unsigned, not because anything is wrong.
+
+Afterwards
+----------
+
+The monitor runs only on this Mac, at http://127.0.0.1:8000. Closing the
+browser does not stop it. The Mac has to be awake and logged in for checks to
+run.
+
+- "3 Open SF Housing Monitor.command" reopens the dashboard.
+- "Verify SF Housing Monitor.command" opens a private Ready Check that names
+  one recovery step for each problem it finds.
+- "Repair SF Housing Monitor.command" if the dashboard will not open. It keeps
+  your deal, your listings and your connectors.
+- "Uninstall SF Housing Monitor.command" removes the app. Your private data
+  stays unless you explicitly type DELETE when asked.
+
+What this build supports
+------------------------
+
+- macOS 15.6 or later on Apple Silicon (arm64), the exact configuration
+  smoke-tested for this release.
+- Internet access during the first install, and for listing checks.
+- Chrome, only for optional Furnished Finder coverage.
+- Gmail and Facebook coverage are optional and need their own one-time setup.
+- This ZIP carries no Google OAuth client, so Gmail reads "Owner setup
+  required" until that file is supplied.
+
+RELEASE_NOTES.txt has the exact tested scope and the remaining connector
+limitations.

@@ -1,0 +1,44 @@
+SF Housing Monitor for Windows
+==============================
+
+Extract this ZIP first, then double-click
+"2 Install SF Housing Monitor.cmd".
+
+Extracting first matters: Windows will let you open files while they are still
+inside the ZIP, and the install cannot finish from in there.
+
+That is the whole setup. It takes a few minutes: the first install downloads a
+private Python runtime that belongs only to this app. It needs no admin rights,
+no Python, no Git and no terminal. Your browser opens when it is ready.
+Build Your deal, save it, and the account-free public source check starts.
+
+If Windows shows a SmartScreen warning, choose More info, then Run anyway --
+but only if you received this exact ZIP from the person who made it for you.
+The warning appears because this release is unsigned, not because anything is
+wrong.
+
+Afterwards
+----------
+
+The monitor runs only on this PC, at http://127.0.0.1:8000. Closing the browser
+does not stop it. The PC has to be awake and signed in for scheduled checks.
+
+- "3 Open SF Housing Monitor.cmd" reopens the dashboard.
+- "Verify SF Housing Monitor.cmd" opens a private Ready Check that names one
+  clear next action for each problem it finds.
+- "Repair SF Housing Monitor.cmd" if the dashboard will not open. It keeps your
+  deal, your listings and your connectors.
+- "Uninstall SF Housing Monitor.cmd" removes the app, and only removes your
+  private data if you explicitly confirm it.
+
+What this build supports
+------------------------
+
+- Windows 10 or Windows 11, 64-bit (x64).
+- Internet access during the first install, and for listing checks.
+- Chrome, only for optional Furnished Finder coverage.
+- Gmail and Facebook coverage are optional and need their own setup.
+- This ZIP carries no Google OAuth client. Gmail clearly shows the one owner
+  setup step until that file is supplied.
+
+RELEASE_NOTES.txt has the exact tested scope and connector limitations.

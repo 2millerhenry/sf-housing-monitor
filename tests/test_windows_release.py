@@ -9,12 +9,12 @@ WINDOWS = ROOT / "release_assets" / "windows"
 
 def test_windows_release_has_normal_user_handoff_commands() -> None:
     expected = {
-        "Install SF Housing Monitor.cmd",
-        "Open SF Housing Monitor.cmd",
+        "2 Install SF Housing Monitor.cmd",
+        "3 Open SF Housing Monitor.cmd",
         "Repair SF Housing Monitor.cmd",
         "Verify SF Housing Monitor.cmd",
         "Uninstall SF Housing Monitor.cmd",
-        "START_HERE.txt",
+        "1 START HERE.txt",
         "RELEASE_NOTES.txt",
     }
     assert expected.issubset({path.name for path in WINDOWS.iterdir()})
@@ -56,3 +56,22 @@ def test_windows_installer_clears_the_mark_of_the_web_once() -> None:
     assert "-Recurse -File" in installer
     assert "SilentlyContinue" in installer, "unblocking must never abort the install"
     assert installer.index("Unblock-File") < installer.index("Get-FileHash")
+
+
+def test_the_windows_folder_reads_itself_top_to_bottom() -> None:
+    """Explorer sorts the same way Finder does, and the same page was buried."""
+    import sys
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    sys.path.insert(0, str(root / "scripts"))
+    from build_windows_release import COMMAND_FILES
+
+    shown = sorted(
+        [*COMMAND_FILES, "1 START HERE.txt", "RELEASE_NOTES.txt", "LICENSE.txt"]
+    )
+
+    assert shown[0] == "1 START HERE.txt", shown
+    assert shown[1].startswith("2 Install"), shown
+    assert shown[2].startswith("3 Open"), shown
+    assert not any(name[0].isdigit() for name in shown if "Uninstall" in name)

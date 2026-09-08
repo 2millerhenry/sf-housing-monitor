@@ -27,7 +27,7 @@ project has neither, so it asks for one approval instead of hiding the fact.
 
 **macOS** (Apple Silicon, macOS 15.6 or later):
 
-1. Double-click `Install SF Housing Monitor.command`.
+1. Double-click `2 Install SF Housing Monitor.command`.
 2. macOS blocks it. Control-click the same file, choose **Open**, then **Open** again.
 3. The installer clears the download quarantine flag for the rest of the release, so Open,
    Verify, Repair, and Uninstall do not each ask again.
@@ -35,7 +35,7 @@ project has neither, so it asks for one approval instead of hiding the fact.
 **Windows** (x64, Windows 10 or later):
 
 1. Extract the ZIP first — do not run it from inside the ZIP.
-2. Double-click `Install SF Housing Monitor.cmd`.
+2. Double-click `2 Install SF Housing Monitor.cmd`.
 3. If SmartScreen appears, choose **More info**, then **Run anyway**.
 
 The installer verifies every payload file against a checksum before using it, and stops without
