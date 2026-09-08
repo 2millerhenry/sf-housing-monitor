@@ -7,6 +7,7 @@ into a clear user-facing state and a safe retry decision.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
@@ -66,6 +67,27 @@ def _parse_time(value: object) -> datetime | None:
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
 
+# Errors reach the page as "SourceError: Trulia turned away ..." or
+# "ReadTimeout: The read operation timed out". The class name in front is the
+# one part of that a reader gains nothing from.
+_RAISED_BY = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*(?:Error|Exception|Timeout|TimedOut):\s*")
+
+
+def _first_sentence(message: str, platform: str = "") -> str:
+    """The cause, without the traceback vocabulary or the paragraph after it.
+
+    The platform is dropped from the front for the same reason the labels no
+    longer carry it: the row it appears in is already headed by that name, and
+    "Trulia: Trulia turned away ..." is the name twice.
+    """
+    text = _RAISED_BY.sub("", (message or "").strip())
+    head = text.split(". ")[0].strip().rstrip(".")
+    if platform and head.startswith(f"{platform} "):
+        head = head[len(platform) + 1 :]
+        head = head[:1].upper() + head[1:]
+    return f"{head}." if head else ""
+
+
 def _format_time(value: datetime | None) -> str:
     return value.astimezone(PACIFIC).strftime("%b %-d at %-I:%M %p") if value else "an unknown time"
 
@@ -102,6 +124,17 @@ class SourceFreshness:
     failure_streak: int = 0
     next_retry_at: str | None = None
     listings_seen: int = 0
+    reason: str = ""
+
+    @property
+    def panel_note(self) -> str:
+        """Why this source is not working, for the panel that shows the state.
+
+        The panel said a source was paused and when it would retry, and never
+        once said what had gone wrong -- so the only question it reliably
+        provoked was the one it did not answer.
+        """
+        return " ".join(part for part in (self.reason, self.action) if part)
 
     @property
     def short_label(self) -> str:
@@ -193,12 +226,14 @@ def evaluate_source_freshness(
 
     failure_streak = 0
     last_error_at: datetime | None = None
+    last_error: dict[str, Any] | None = None
     for run in terminal:
         if run.get("status") != "error":
             break
         failure_streak += 1
         if last_error_at is None:
             last_error_at = _parse_time(run.get("finished_at") or run.get("started_at"))
+            last_error = run
     retry_at = _backoff_until(last_error_at, failure_streak)
     latest_status = str(latest.get("status") or "") if latest else ""
     success_time = _parse_time(last_success_at)
@@ -222,7 +257,12 @@ def evaluate_source_freshness(
         )
 
     if failure_streak:
-        message = str((latest or {}).get("message") or "The latest source request did not complete.")
+        # Deliberately the last run that actually failed, not the last run.
+        # A source deferred by backoff records its own deferral notice as that
+        # run's message, so reading "latest" here quoted "Retries automatically
+        # after ..." back as the reason the source was failing.
+        failed = last_error or latest or {}
+        message = str(failed.get("message") or "The latest source request did not complete.")
         last_good = (
             f" The last good result is preserved from {_format_time(success_time)}."
             if success_time
@@ -236,11 +276,12 @@ def evaluate_source_freshness(
                 "backoff",
                 f"{platform} is paused briefly",
                 f"{failure_streak} consecutive checks failed. {message}{last_good}",
-                f"Automatic retry resumes after {_format_time(retry_at)}. You can use Check for new homes once now if you want an earlier retry.",
+                f"Retries automatically after {_format_time(retry_at)}, or use Check for new homes now.",
                 latest,
                 last_success_at,
                 failure_streak,
                 retry_at.isoformat(),
+                reason=_first_sentence(message, platform),
             )
         return SourceFreshness(
             key,
@@ -254,6 +295,7 @@ def evaluate_source_freshness(
             last_success_at,
             failure_streak,
             retry_at.isoformat() if retry_at else None,
+            reason=_first_sentence(message, platform),
         )
 
     if success_time:

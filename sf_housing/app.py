@@ -753,6 +753,7 @@ def create_app(
                     "short_label": health.short_label,
                     "freshness_seen": health.listings_seen,
                     "recovery_action": health.action,
+                    "panel_note": health.panel_note,
                     "failure_streak": health.failure_streak,
                     "last_success_at": health.last_success_at,
                     "next_retry_at": health.next_retry_at,

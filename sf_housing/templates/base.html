@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}SF Housing Monitor{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ asset_version() }}">
+  {# Deliberately not deferred: it has to run before the first paint, or a dark
+     reader watches the page load light and turn over. A file rather than an
+     inline script because no page here carries inline script. #}
+  <script src="{{ url_for('static', path='/theme-init.js') }}?v={{ asset_version() }}"></script>
 </head>
 <body>
   <header class="site-header">
@@ -21,6 +25,10 @@
         <a href="/preferences" {% if request.url.path == '/preferences' %}class="active" aria-current="page"{% endif %}>Your deal</a>
         <a href="/support" {% if request.url.path == '/support' %}class="active" aria-current="page"{% endif %}>Support</a>
       </nav>
+      {# Pressed means dark is on, which is what a toggle button is for. With no
+         stored choice this follows the Mac, and the script keeps the pressed
+         state honest about that. #}
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false">Dark mode</button>
     </div>
   </header>
   <main>{% block content %}{% endblock %}</main>
@@ -38,6 +46,7 @@
       {% endif %}
     </div>
   </footer>
+  <script src="{{ url_for('static', path='/theme-toggle.js') }}?v={{ asset_version() }}" defer></script>
   {% if donate_url %}
   {# The panel is an iframe rather than Ko-fi's own script, so their code never
      runs on this page, and its src is left empty until somebody clicks: opening

@@ -151,7 +151,18 @@ def test_repeated_failures_back_off_automatic_scans_but_manual_retry_recovers(
     paused = evaluate_source_freshness(repository, flaky)
     assert paused.status == "backoff"
     assert paused.failure_streak == 2
-    assert "Automatic retry resumes" in paused.action
+    assert "Retries automatically after" in paused.action
+    # The panel used to say a source was paused and when it would retry, and
+    # never what had gone wrong.
+    assert paused.reason, "a paused source has to say what failed"
+    assert paused.reason in paused.panel_note
+    assert paused.action in paused.panel_note
+    # The deferral writes its own notice as that run's message, so reading the
+    # newest run quoted "Retries automatically after ..." back as the cause.
+    assert "Retries automatically" not in paused.reason
+    assert "recognizable result cards" in paused.reason, "quote the failure itself"
+    # The row is already headed by the platform, so the cause does not repeat it.
+    assert not paused.reason.startswith("Craigslist")
 
     flaky.fail = False
     recovered = scanner.run_scan("manual")

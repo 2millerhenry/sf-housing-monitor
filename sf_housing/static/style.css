@@ -25,10 +25,100 @@
   --red: oklch(48% 0.14 25);
   --red-soft: oklch(96% 0.025 25);
   --red-line: oklch(82% 0.06 25);
+  --blue: oklch(34% 0.075 238);
+  --blue-soft: oklch(92% 0.035 238);
+  --amber-ink: oklch(39% 0.065 73);
+  --row-hover: oklch(98% 0.008 100);
+  --saved-hover: oklch(93% 0.03 155);
+  --tint: oklch(98.6% 0.01 155);
+  --scrim: oklch(21% 0.018 160 / 0.44);
+  --logo-edge: oklch(0% 0 0 / 0.08);
+  /* Brand marks are drawn for a light page. In the dark theme they keep their
+     own pale tile rather than vanishing into the surface behind them. */
+  --logo-tile: var(--surface-muted);
   --shadow-low: 0 1px 2px oklch(21% 0.018 160 / 0.05);
   --shadow-focus: 0 8px 24px oklch(21% 0.018 160 / 0.08);
   --ease-state: cubic-bezier(0.25, 1, 0.5, 1);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+}
+
+/* The same palette twice, because a media query cannot be merged with an
+   attribute selector: the first answers a Mac set to dark, the second answers
+   somebody who chose dark here. A test asserts the two stay identical, so
+   neither can drift from the other unnoticed. */
+@media (prefers-color-scheme: dark) {
+  /* An explicit light choice outranks the system. */
+  :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --canvas: oklch(17.5% 0.008 160);
+  --surface: oklch(21.5% 0.009 160);
+  --surface-muted: oklch(26% 0.010 160);
+  --band: oklch(19.5% 0.008 160);
+  --ink: oklch(94% 0.007 95);
+  --muted: oklch(73% 0.012 150);
+  --faint: oklch(58% 0.012 150);
+  --line: oklch(30% 0.010 155);
+  --line-strong: oklch(41% 0.013 155);
+  --accent: oklch(78% 0.115 162);
+  --accent-hover: oklch(86% 0.12 162);
+  --accent-soft: oklch(29% 0.045 160);
+  --visited: oklch(24% 0.014 158);
+  --visited-hover: oklch(28% 0.022 158);
+  --accent-line: oklch(45% 0.06 158);
+  --amber: oklch(83% 0.10 78);
+  --amber-soft: oklch(29% 0.045 75);
+  --amber-line: oklch(46% 0.06 75);
+  --red: oklch(77% 0.13 25);
+  --red-soft: oklch(29% 0.055 25);
+  --red-line: oklch(45% 0.08 25);
+  --blue: oklch(83% 0.075 238);
+  --blue-soft: oklch(31% 0.05 238);
+  --amber-ink: oklch(86% 0.075 78);
+  --row-hover: oklch(24% 0.010 160);
+  --saved-hover: oklch(27% 0.030 158);
+  --tint: oklch(23% 0.012 158);
+  --scrim: oklch(8% 0.006 160 / 0.62);
+  --logo-edge: oklch(100% 0 0 / 0.16);
+  --logo-tile: oklch(95% 0.004 95);
+  --shadow-low: 0 1px 2px oklch(0% 0 0 / 0.42);
+  --shadow-focus: 0 8px 24px oklch(0% 0 0 / 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: oklch(17.5% 0.008 160);
+  --surface: oklch(21.5% 0.009 160);
+  --surface-muted: oklch(26% 0.010 160);
+  --band: oklch(19.5% 0.008 160);
+  --ink: oklch(94% 0.007 95);
+  --muted: oklch(73% 0.012 150);
+  --faint: oklch(58% 0.012 150);
+  --line: oklch(30% 0.010 155);
+  --line-strong: oklch(41% 0.013 155);
+  --accent: oklch(78% 0.115 162);
+  --accent-hover: oklch(86% 0.12 162);
+  --accent-soft: oklch(29% 0.045 160);
+  --visited: oklch(24% 0.014 158);
+  --visited-hover: oklch(28% 0.022 158);
+  --accent-line: oklch(45% 0.06 158);
+  --amber: oklch(83% 0.10 78);
+  --amber-soft: oklch(29% 0.045 75);
+  --amber-line: oklch(46% 0.06 75);
+  --red: oklch(77% 0.13 25);
+  --red-soft: oklch(29% 0.055 25);
+  --red-line: oklch(45% 0.08 25);
+  --blue: oklch(83% 0.075 238);
+  --blue-soft: oklch(31% 0.05 238);
+  --amber-ink: oklch(86% 0.075 78);
+  --row-hover: oklch(24% 0.010 160);
+  --saved-hover: oklch(27% 0.030 158);
+  --tint: oklch(23% 0.012 158);
+  --scrim: oklch(8% 0.006 160 / 0.62);
+  --logo-edge: oklch(100% 0 0 / 0.16);
+  --logo-tile: oklch(95% 0.004 95);
+  --shadow-low: 0 1px 2px oklch(0% 0 0 / 0.42);
+  --shadow-focus: 0 8px 24px oklch(0% 0 0 / 0.55);
 }
 
 * { box-sizing: border-box; }
@@ -100,7 +190,29 @@ button:focus-visible, .button:focus-visible, a:focus-visible, select:focus-visib
   font-weight: 760;
   letter-spacing: 0.02em;
 }
-.site-header nav { display: flex; align-items: center; gap: 4px; }
+.site-header nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+/* Sized to the navigation beside it so the header reads as one row of controls
+   rather than a row with a button bolted on the end. */
+.theme-toggle {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 560;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.theme-toggle:hover { color: var(--ink); background: var(--surface-muted); }
+.theme-toggle[aria-pressed="true"] {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 680;
+}
+.theme-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .site-header nav a { min-height: 36px; padding: 8px 12px; border-radius: 9px; color: var(--muted); font-size: 0.88rem; font-weight: 560; }
 .site-header nav a:hover { color: var(--ink); background: var(--surface-muted); }
 .site-header nav a.active { color: var(--ink); background: var(--surface-muted); font-weight: 680; }
@@ -115,7 +227,7 @@ main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
    visible for the close button and so cannot clip anything. Everything visible
    belongs to .donate-surface, which clips the frame cleanly. */
 .donate-dialog { width: min(94vw, 464px); padding: 0; border: 0; background: none; overflow: visible; }
-.donate-dialog::backdrop { background: oklch(21% 0.018 160 / 0.44); }
+.donate-dialog::backdrop { background: var(--scrim); }
 .donate-surface { position: relative; border-radius: 18px; overflow: hidden; background: var(--surface); box-shadow: 0 1px 0 oklch(21% 0.018 160 / 0.06), 0 30px 74px oklch(21% 0.018 160 / 0.28); }
 /* Ko-fi's panel is about 645px tall and cannot be measured from here, since the
    frame is another origin. 664 clears it without leaving a band of empty
@@ -358,7 +470,7 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
   line-height: 1.15;
 }
 .area-priority-dream { background: var(--accent-soft); color: var(--accent-hover); }
-.area-priority-strong { background: oklch(92% 0.035 238); color: oklch(34% 0.075 238); }
+.area-priority-strong { background: var(--blue-soft); color: var(--blue); }
 .area-priority-secondary { background: var(--amber-soft); color: var(--amber); }
 .listing-table tbody tr:last-child td { border-bottom: 0; }
 /* A row is white until you have done something with it.
@@ -374,7 +486,7 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .listing-table tbody tr.opened-listing:hover td { background: var(--visited-hover); }
 /* Starring is deliberate, so it outranks having merely opened one. */
 .listing-table tbody tr.saved-listing td { background: var(--accent-soft); }
-.listing-table tbody tr.saved-listing:hover td { background: oklch(93% 0.03 155); }
+.listing-table tbody tr.saved-listing:hover td { background: var(--saved-hover); }
 .cell-score strong { display: block; color: var(--accent-hover); font-size: 1.16rem; line-height: 1.05; letter-spacing: -0.025em; }
 .cell-score span { display: block; margin-top: 4px; color: var(--muted); font-size: 0.62rem; font-weight: 650; }
 .cell-score .score-state { display: flex; align-items: center; flex-wrap: wrap; gap: 3px; }
@@ -385,7 +497,7 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .cell-score .confidence-label, .cell-score .verification-label, .cell-score .ineligible-label { display: block; margin-top: 4px; font-size: 0.57rem; line-height: 1.2; font-weight: 680; overflow-wrap: anywhere; }
 .cell-score .confidence-label { color: var(--muted); }
 .cell-score .verification-label { color: var(--amber); }
-.cell-score .ineligible-label { color: var(--danger); }
+.cell-score .ineligible-label { color: var(--red); }
 .cell-quick-open { padding: 10px 7px !important; text-align: center; vertical-align: middle !important; }
 .quick-open { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; padding: 5px 6px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: var(--surface); font-size: 0.64rem; font-weight: 700; line-height: 1; text-decoration: none; white-space: nowrap; }
 .quick-open:hover { border-color: var(--accent-hover); background: var(--accent-hover); color: var(--surface); }
@@ -396,7 +508,7 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .cell-price span { white-space: nowrap; overflow-wrap: normal; }
 .cell-source .source-name { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.3; }
 .cell-source small { display: block; margin-top: 0.28rem; color: var(--muted); font-size: 0.66rem; line-height: 1.2; }
-.cell-source .checked-badge { color: var(--green); font-weight: 700; }
+.cell-source .checked-badge { color: var(--accent); font-weight: 700; }
 .cell-found span { white-space: nowrap; }
 .cell-area span { color: var(--ink); font-weight: 590; }
 .cell-area .location-hint { display: block; margin-top: 3px; color: var(--muted); font-size: 0.68rem; font-weight: 500; line-height: 1.2; }
@@ -420,13 +532,13 @@ select.is-selected { background: var(--surface-muted); border-color: var(--line-
 .cell-fit ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .cell-fit li { position: relative; padding-left: 14px; display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 1; color: var(--ink); font-size: 0.71rem; }
 .cell-fit li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 760; }
-.cell-check > span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; color: oklch(39% 0.065 73); font-size: 0.71rem; }
+.cell-check > span { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 3; color: var(--amber-ink); font-size: 0.71rem; }
 /* Every open question, in full. The score cell names the leading one so a
    narrow screen still says what is unresolved; this column is where the
    sentences live. Two lines each keeps a row with three of them the same
    height as the three-line columns beside it. */
 .cell-check .check-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
-.cell-check .check-list li { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: oklch(39% 0.065 73); font-size: 0.71rem; line-height: 1.25; }
+.cell-check .check-list li { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; color: var(--amber-ink); font-size: 0.71rem; line-height: 1.25; }
 .cell-check > span.unknown, .unknown { color: var(--muted); }
 .compact-row-details { display: none; margin-top: 6px; }
 .compact-row-details > summary { cursor: pointer; color: var(--accent); font-size: 0.68rem; font-weight: 650; }
@@ -511,17 +623,17 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    number it brought back, on one aligned column so the list can be read down
    rather than across. */
 .source-alerts, .source-roster { margin: 0; padding: 0; list-style: none; }
-.source-alerts li { padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--amber-soft); }
+.source-alerts li { padding: 12px 18px 14px; border-bottom: 1px solid var(--line); background: var(--amber-soft); }
 .source-alerts li > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .source-alerts strong { font-size: 0.84rem; }
-.source-alerts p { margin: 5px 0 0; color: var(--amber); font-size: 0.74rem; line-height: 1.4; }
+.source-alerts p { margin: 4px 0 0; max-width: 62ch; color: var(--amber); font-size: 0.73rem; line-height: 1.45; }
 .source-roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .source-roster li {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
-  min-height: 34px;
+  min-height: 38px;
   padding: 0 18px;
   border-bottom: 1px solid var(--line);
 }
@@ -810,7 +922,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .preference-row legend strong { color: var(--ink); font-size: 0.8rem; font-weight: 650; }
 .preference-option { min-width: 44px; min-height: 40px; display: grid; place-items: center; cursor: pointer; }
 .preference-option input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; }
-.review-section { background: oklch(98.6% 0.01 155); }
+.review-section { background: var(--tint); }
 .deal-summary { margin: 0; padding: 16px 18px; border: 1px solid var(--accent-line); border-radius: 12px; background: var(--surface); color: var(--ink); font-size: 0.92rem; font-weight: 570; line-height: 1.6; }
 .deal-consequences { margin-top: 12px; color: var(--muted); font-size: 0.76rem; }
 .deal-consequences summary { cursor: pointer; color: var(--accent-hover); font-weight: 680; }
@@ -918,7 +1030,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .potrero-table th { position: sticky; top: 0; z-index: 2; padding: 10px 11px; border-bottom: 1px solid var(--line-strong); background: var(--surface-muted); color: var(--muted); font-size: 0.67rem; font-weight: 700; text-align: left; text-transform: uppercase; letter-spacing: 0.035em; }
 .potrero-table td { padding: 13px 11px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .potrero-table tbody tr:last-child td { border-bottom: 0; }
-.potrero-table tbody tr:hover td { background: oklch(98% 0.008 100); }
+.potrero-table tbody tr:hover td { background: var(--row-hover); }
 .potrero-table td > strong, .potrero-table td > span { display: block; }
 .potrero-table td > span { margin-top: 4px; color: var(--muted); font-size: 0.68rem; line-height: 1.35; }
 .potrero-table td > strong { font-size: 0.78rem; line-height: 1.35; }
@@ -1301,8 +1413,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   flex: 0 0 auto;
   border-radius: 50%;
   object-fit: cover;
-  background: var(--surface-muted);
-  box-shadow: inset 0 0 0 1px oklch(0% 0 0 / 0.08);
+  background: var(--logo-tile);
+  box-shadow: inset 0 0 0 1px var(--logo-edge);
 }
 .already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 /* Saving a deal reranks every stored home before the page can answer. There is
@@ -1466,7 +1578,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .saved-facts > span + span::before { content: "·"; margin-right: 10px; color: var(--line-strong); }
 .saved-score { margin: 0; color: var(--muted); font-size: 0.78rem; }
 .saved-score strong { color: var(--accent-hover); font-size: 0.95rem; font-weight: 700; }
-.saved-caution { color: var(--caution); font-weight: 620; }
+.saved-caution { color: var(--amber); font-weight: 620; }
 .saved-title { margin: 8px 0 0; font-size: 1.0625rem; font-weight: 660; line-height: 1.35; }
 .saved-title a { color: var(--ink); text-decoration: none; }
 .saved-title a:hover { color: var(--accent-hover); text-decoration: underline; }
@@ -1537,8 +1649,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .liveness-behind { display: block; margin-top: 3px; color: var(--muted); }
 .liveness-line { margin: 12px 0 0; color: var(--muted); font-size: 0.76rem; }
 .liveness-warning { margin: 12px 0 0; padding: 11px 14px; display: flex; flex-wrap: wrap; gap: 6px;
-  align-items: baseline; border: 1px solid var(--caution-line, oklch(84% 0.07 73)); border-radius: 10px;
-  background: var(--caution-soft, oklch(96% 0.035 82)); color: var(--ink); font-size: 0.82rem; }
+  align-items: baseline; border: 1px solid var(--amber-line); border-radius: 10px;
+  background: var(--amber-soft); color: var(--ink); font-size: 0.82rem; }
 .liveness-warning strong { font-weight: 660; }
 
 /* One shared building-size answer, sitting under the paths it applies to.

@@ -424,7 +424,10 @@ def test_nothing_a_source_wrote_can_become_markup(tmp_path: pathlib.Path) -> Non
     # Every script has to be one this app shipped, served from this app. A
     # names list rather than a count, so adding one of ours does not quietly
     # widen what the page will run.
-    allowed = {"listing-actions.js", "donate-panel.js"}
+    # The theme pair comes from base.html, so it is on every page. Neither
+    # reads listing content: one stamps the stored theme before the paint,
+    # the other toggles it.
+    allowed = {"listing-actions.js", "donate-panel.js", "theme-init.js", "theme-toggle.js"}
     for tag in soup.find_all("script"):
         src = tag.get("src")
         assert src, "no inline script belongs on this page"

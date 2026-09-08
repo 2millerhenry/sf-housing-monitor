@@ -1302,3 +1302,32 @@ def test_a_long_source_name_shortens_rather_than_taking_a_second_line() -> None:
 
     assert "white-space: nowrap" in rule, rule
     assert "text-overflow: ellipsis" in rule, rule
+
+
+def test_a_broken_source_says_what_went_wrong_not_only_what_to_do(
+    tmp_path: Path,
+) -> None:
+    """The panel named the state and the retry time and never the cause, so
+    the one question it reliably provoked was the one it did not answer."""
+    settings = app_settings(tmp_path)
+    source = StaleDashboardSource()
+    application = create_app(settings=settings, sources=[source], enable_scheduler=False)
+    repository = application.state.repository
+    run_id = repository.begin_scan("manual")
+    for _ in range(3):
+        run = repository.begin_source_run(
+            run_id, source.platform, source.search_url, source_key="StaleDashboardSource"
+        )
+        repository.finish_source_run(
+            run, "error", message="SourceError: Craigslist turned away an unattended request (HTTP 403)."
+        )
+    repository.finish_scan(run_id, "completed_with_errors")
+
+    with TestClient(application) as client:
+        alerts = sources_panel(client.get("/").text)
+
+    # Dropping the platform from the front leaves the next word starting the
+    # sentence, so it is capitalised.
+    assert "Turned away an unattended request (HTTP 403)." in alerts
+    # The row is headed "Craigslist" already.
+    assert "Craigslist turned away" not in alerts
