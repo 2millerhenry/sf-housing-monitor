@@ -730,6 +730,22 @@ class Scanner:
             self._finish_progress(final_status)
             self._release_scan_locks()
 
+    def recover_interrupted_scans(self) -> int:
+        """Settle any check a stopped process left recorded as running.
+
+        A check only ever runs while its owner holds scan.lock, so taking that
+        lock is proof that none is running in any process -- which makes every
+        row still marked running the work of something that died. Doing this at
+        startup is what makes the Ready Check's own advice, that reopening the
+        app clears an interrupted check, actually true.
+        """
+        if not self._acquire_scan_locks():
+            return 0
+        try:
+            return self.repository.abandon_interrupted_scans()
+        finally:
+            self._release_scan_locks()
+
     def _acquire_scan_locks(self) -> bool:
         if not self._scan_lock.acquire(blocking=False):
             return False

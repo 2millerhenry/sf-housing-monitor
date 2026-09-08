@@ -303,3 +303,142 @@ def test_a_database_that_breaks_after_startup_is_reported_by_the_ready_check(
 
     assert checks["database"].status == "blocked"
     assert "Repair" in checks["database"].action
+
+
+# --------------------------------------------------------------------------
+# 5. the app is stopped while a check is running
+# --------------------------------------------------------------------------
+
+
+def interrupted_scan(repository: Repository) -> int:
+    """The rows a process killed mid-check leaves behind."""
+    run_id = repository.begin_scan("scheduled")
+    repository.begin_source_run(run_id, "Craigslist", "https://sfbay.craigslist.org/search/roo")
+    return run_id
+
+
+def scan_row(repository: Repository, run_id: int) -> dict:
+    with repository.connection() as connection:
+        row = connection.execute("SELECT * FROM scan_runs WHERE id = ?", (run_id,)).fetchone()
+    return dict(row)
+
+
+def test_a_check_cut_off_by_a_quit_is_settled_when_the_app_comes_back(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Quitting mid-check left a row saying a check was running, and nothing
+    ever cleared it. The Ready Check then told people to reopen the app, and
+    reopening the app changed nothing."""
+    repository, scanner = scanner_for(tmp_path, [WorkingSource()])
+    run_id = interrupted_scan(repository)
+
+    assert scanner.recover_interrupted_scans() == 1
+
+    row = scan_row(repository, run_id)
+    assert row["status"] == "interrupted"
+    assert row["finished_at"], "a check that is over has to have an end"
+
+
+def test_the_source_left_mid_fetch_is_settled_too(tmp_path: pathlib.Path) -> None:
+    """The Sources page reads source runs, not scan runs. Settling only the
+    parent leaves that page showing a source still fetching."""
+    repository, scanner = scanner_for(tmp_path, [WorkingSource()])
+    interrupted_scan(repository)
+
+    scanner.recover_interrupted_scans()
+
+    with repository.connection() as connection:
+        rows = [dict(r) for r in connection.execute("SELECT * FROM source_runs")]
+    assert [r["status"] for r in rows] == ["interrupted"]
+    assert all(r["finished_at"] for r in rows)
+
+
+def test_a_check_that_really_finished_is_left_exactly_as_it_was(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Recovery rewrites history. It may only rewrite the part that is false."""
+    repository, scanner = scanner_for(tmp_path, [WorkingSource()])
+    scanner.run_scan("scheduled")
+    before = scan_row(repository, 1)
+
+    assert scanner.recover_interrupted_scans() == 0
+    assert scan_row(repository, 1) == before
+
+
+def test_a_check_that_is_genuinely_running_is_never_declared_dead(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Recovery is only allowed to speak while it holds the lock a live check
+    would be holding. Without that rule a scheduled check running at startup
+    would be marked interrupted underneath itself."""
+    repository, scanner = scanner_for(tmp_path, [WorkingSource()])
+    run_id = interrupted_scan(repository)
+
+    settled: list[int] = []
+    other = Scanner(repository, scanner.preference_loader, [WorkingSource()])
+    assert other._acquire_scan_locks(), "a lock nobody holds has to be available"
+    try:
+        settled.append(scanner.recover_interrupted_scans())
+    finally:
+        other._release_scan_locks()
+
+    assert settled == [0]
+    assert scan_row(repository, run_id)["status"] == "running"
+
+
+def test_the_ready_check_stops_asking_for_repair_once_the_app_restarts(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The point of all of this. The Ready Check said an interrupted check
+    needed Repair; reopening the app is the recovery, so after it the check
+    has to stop asking."""
+    from datetime import UTC, datetime, timedelta
+
+    from sf_housing.diagnostics import _scan_check
+
+    repository, scanner = scanner_for(tmp_path, [WorkingSource()])
+    run_id = interrupted_scan(repository)
+    with repository.connection() as connection:
+        connection.execute(
+            "UPDATE scan_runs SET started_at = ? WHERE id = ?",
+            ((datetime.now(UTC) - timedelta(hours=2)).isoformat(), run_id),
+        )
+        connection.commit()
+
+    now = datetime.now(UTC)
+    before = _scan_check(repository, scanner, now)
+    assert before.status == "attention", "the stuck row is what the check is for"
+    assert "Repair" in before.action
+
+    scanner.recover_interrupted_scans()
+
+    assert _scan_check(repository, scanner, now).status != "attention"
+
+
+def test_reopening_the_app_is_what_actually_settles_the_record(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The path a person really takes. Recovery nothing calls is not recovery,
+    and the Ready Check tells them reopening the app is the fix."""
+    from sf_housing.app import create_app
+    from sf_housing.settings import Settings
+
+    database = tmp_path / "housing.sqlite3"
+    repository = Repository(database)
+    repository.initialize()
+    run_id = interrupted_scan(repository)
+
+    preferences_path = tmp_path / "preferences.yaml"
+    preferences_path.write_text(TEST_PREFERENCES, encoding="utf-8")
+    create_app(
+        settings=Settings(
+            data_dir=tmp_path,
+            preferences_path=preferences_path,
+            database_path=database,
+            log_path=tmp_path / "t.log",
+        ),
+        sources=[],
+        enable_scheduler=False,
+    )
+
+    assert scan_row(repository, run_id)["status"] == "interrupted"

@@ -946,3 +946,327 @@ def test_an_ideal_above_the_maximum_is_refused(tmp_path: Path) -> None:
         response = client.post("/preferences/deal", data=form, follow_redirects=True)
 
     assert "cannot exceed its maximum" in response.text
+
+
+# --------------------------------------------------------------------------
+# something to read while the deal saves
+# --------------------------------------------------------------------------
+
+
+def deal_form_script() -> str:
+    return (Path(__file__).resolve().parents[1] / "sf_housing/static/deal-form.js").read_text(
+        encoding="utf-8"
+    )
+
+
+def saving_notes() -> list[str]:
+    """The message table as written, one entry per element.
+
+    An entry sits at the array's own indent; anything deeper is a
+    continuation of it, because the first sentence is a two-branch ternary
+    spread over three lines.
+    """
+    script = deal_form_script()
+    start = script.index("const savingNotes = (homes) => [")
+    block = script[start : script.index("];", start)]
+    indent = " " * 4
+    entries: list[str] = []
+    for line in block.splitlines()[1:]:
+        if not line.strip() or line.strip().startswith("//"):
+            continue
+        if line.startswith(indent) and not line.startswith(indent + " "):
+            entries.append(line.strip())
+        elif entries:
+            entries[-1] += " " + line.strip()
+    return entries
+
+
+def stylesheet() -> str:
+    return (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
+        encoding="utf-8"
+    )
+
+
+def block_body(style: str, opener: str) -> str:
+    """The text inside the braces opened by `opener`, brace-matched.
+
+    Slicing between two landmarks was how the reduced-motion test passed while
+    the animation had been moved out of the media query it was meant to sit in.
+    """
+    start = style.index(opener) + len(opener)
+    depth = 1
+    for offset in range(start, len(style)):
+        if style[offset] == "{":
+            depth += 1
+        elif style[offset] == "}":
+            depth -= 1
+            if depth == 0:
+                return style[start:offset]
+    raise AssertionError(f"{opener!r} is never closed")
+
+
+MOTION_QUERY = "@media (prefers-reduced-motion: no-preference) {"
+
+
+def motion_gated(style: str) -> list[str]:
+    """Every no-preference block in the sheet, not just the first one.
+
+    The stylesheet gates several unrelated animations this way, so a test that
+    reads only the first block is reading the donate panel's.
+    """
+    bodies: list[str] = []
+    at = 0
+    while (found := style.find(MOTION_QUERY, at)) != -1:
+        body = block_body(style[found:], MOTION_QUERY)
+        bodies.append(body)
+        at = found + len(MOTION_QUERY) + len(body)
+    return bodies
+
+
+def deal_page(tmp_path: Path, prices: tuple[int, ...] = ()) -> str:
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    for index, price in enumerate(prices):
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"saving{index}",
+                title=f"Private room {index} in Bernal Heights",
+                original_url=f"https://sfbay.craigslist.org/roo/d/saving/{index}.html",
+                price=price,
+                neighborhood="Bernal Heights",
+                listing_type="Room/share",
+            ),
+            ScoreResult(70, ["fits"], "check", {}),
+        )
+    with TestClient(application) as client:
+        wait_until_idle(application)
+        return client.get("/preferences").text
+
+
+def test_the_deal_page_carries_a_panel_for_the_wait_that_follows_saving(tmp_path: Path) -> None:
+    """Saving reranks every stored home before the page can answer. Without
+    this the only sign anything is happening is a spinning browser tab."""
+    assert "data-deal-saving" in deal_page(tmp_path)
+
+
+def test_the_panel_stays_out_of_the_way_until_the_deal_is_submitted(tmp_path: Path) -> None:
+    """It explains a wait. Before there is a wait it is one more thing to
+    read on a page that already asks a lot of questions."""
+    import re
+
+    page = deal_page(tmp_path)
+    tag = re.search(r"<section[^>]*\bdata-deal-saving\b[^>]*>", page)
+
+    assert tag, "the panel is not on the page at all"
+    assert re.search(r"(?<!-)\bhidden\b", tag.group(0)), tag.group(0)
+
+
+def test_the_wait_is_measured_in_the_homes_actually_stored(tmp_path: Path) -> None:
+    """"Reranking 5,235 homes" is a wait somebody can sit through. A number
+    baked in when the page was written is a number that goes stale, so the
+    count has to come from the database on every render."""
+    page = deal_page(tmp_path, prices=(2100, 2200, 2300))
+
+    assert 'data-listing-count="3"' in page
+
+
+def test_the_changing_line_is_hidden_from_screen_readers(tmp_path: Path) -> None:
+    """It sits inside an aria-live region. Announced, it would interrupt with
+    a new sentence every eight seconds, over the heading that says what is
+    actually happening."""
+    page = deal_page(tmp_path)
+    note = page[page.index("data-deal-saving-note") - 60 : page.index("data-deal-saving-note") + 90]
+
+    assert 'aria-hidden="true"' in note, note
+
+
+def test_there_are_enough_messages_to_cover_the_rerank() -> None:
+    """At eight seconds each, five sentences cover forty seconds before the
+    reader starts seeing repeats."""
+    assert len(saving_notes()) >= 5
+
+
+def test_the_first_message_counts_the_homes_the_server_reported() -> None:
+    """The rest of the sentences are true whatever the pool holds. The first
+    one carries the number, and it has to be the live one."""
+    notes = saving_notes()
+
+    assert "homes.toLocaleString()" in notes[0]
+
+
+def test_an_empty_pool_is_never_described_as_zero_homes() -> None:
+    """A first-run deal has nothing stored yet. "Rescoring 0 homes" reads as
+    a bug in the sentence that is supposed to be the reassurance."""
+    first = saving_notes()[0]
+
+    assert "Rescoring the homes already collected." in first
+    assert first.startswith("homes ?"), "an empty pool has to take the other branch"
+
+
+def test_the_line_changes_on_a_timer_the_reader_can_follow() -> None:
+    """There is no progress to poll -- the save is one ordinary form post --
+    so the sentences advance on their own eight-second beat."""
+    script = deal_form_script()
+    panel = script[script.index("const startSavingPanel") :]
+
+    assert "window.setInterval(rotate, 8000)" in panel
+
+
+def test_the_panel_is_only_revealed_once_the_deal_is_going_to_be_saved() -> None:
+    """A form that fails validation never posts. Showing "saving your deal"
+    over a form the browser just refused would be a lie about what happened."""
+    script = deal_form_script()
+    handler = script[script.index('form.addEventListener("submit"') :]
+
+    assert handler.count("startSavingPanel(") == 1, "only one place may reveal the panel"
+    assert handler.index("startSavingPanel(") > handler.rindex("event.preventDefault()")
+
+
+def test_the_heading_says_which_of_the_two_waits_this_is() -> None:
+    """A first deal starts a check of every source afterwards; a later one
+    only reranks. They take different amounts of time, so they get different
+    sentences."""
+    panel = deal_form_script()
+    panel = panel[panel.index("const startSavingPanel") : panel.index('form.addEventListener("submit"')]
+
+    assert "firstActivation" in panel
+    assert "starting the first check" in panel
+    assert "reranking your homes" in panel
+
+
+def test_the_line_holds_its_row_so_the_panel_does_not_jump() -> None:
+    """The sentences are different lengths. Without a reserved row a shorter
+    one shortens the panel and the submit button moves under the cursor."""
+    import re
+
+    rule = block_body(stylesheet(), ".deal-saving-note {")
+    reserved = re.search(r"min-height:\s*([\d.]+)(\w+)", rule)
+
+    assert reserved, rule
+    assert float(reserved.group(1)) > 0, "a row of zero height reserves nothing"
+
+
+def test_the_sweeping_bar_is_held_still_for_a_reader_who_asked_for_no_motion() -> None:
+    """The changing sentence already says the save is alive. An endlessly
+    sweeping bar for someone who asked for stillness says it again, badly."""
+    style = stylesheet()
+    gated = motion_gated(style)
+    ungated = style
+    for body in gated:
+        ungated = ungated.replace(body, "")
+
+    assert any("deal-saving-sweep" in body for body in gated), "the sweep is not gated at all"
+    assert "deal-saving-sweep" not in block_body(
+        ungated, ".deal-saving-track > span {"
+    ), "the bar sweeps for a reader who asked it not to"
+
+
+def test_the_bar_never_claims_to_know_how_far_along_the_save_is() -> None:
+    """It is a synchronous post with no progress to report. A bar that fills
+    to a number would be inventing one."""
+    page_style = (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
+        encoding="utf-8"
+    )
+    sweep = page_style[
+        page_style.index("@keyframes deal-saving-sweep") : page_style.index(
+            "}", page_style.index("to {", page_style.index("@keyframes deal-saving-sweep"))
+        )
+    ]
+
+    assert "translateX" in sweep and "width" not in sweep
+
+
+def test_the_clear_button_posts_the_very_form_the_panel_lives_in(tmp_path: Path) -> None:
+    """The reason the guard below has to exist. If Start over ever moves out
+    of this form, the guard is dead code and should go with it."""
+    page = deal_page(tmp_path)
+
+    assert 'formaction="/preferences/deal/reset"' in page
+    assert "data-deal-reset" in page
+
+
+def test_clearing_the_deal_is_never_dressed_up_as_saving_it() -> None:
+    """Start over shares the deal form, so without a guard it fell straight
+    through the save branch: wiping a deal announced that it was being saved
+    and reranked, and a deal missing a home type could not be cleared at all
+    because the save gate refused the submit."""
+    script = deal_form_script()
+    handler = script[script.index('form.addEventListener("submit"') :]
+    guard = handler.index("data-deal-reset")
+
+    assert guard < handler.index("event.preventDefault()"), "the guard runs before the gate"
+    assert guard < handler.index("startSavingPanel("), "the guard runs before the panel"
+
+
+def test_the_number_the_panel_quotes_is_the_number_that_gets_rescored(
+    tmp_path: Path,
+) -> None:
+    """The sentence promises a rescore of exactly this many homes. The count
+    and the rescore read the table through different methods, so nothing but
+    this stops one of them from quietly starting to mean something else."""
+    from sf_housing.scanner import Scanner
+
+    settings = settings_for(tmp_path)
+    settings.preferences_path.parent.mkdir(parents=True, exist_ok=True)
+    settings.preferences_path.write_text(profile_with_room_budget(5000), encoding="utf-8")
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    repository = application.state.repository
+    for index in range(4):
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Craigslist",
+                source_id=f"tie{index}",
+                title=f"Private room {index} in Bernal Heights",
+                original_url=f"https://sfbay.craigslist.org/roo/d/tie/{index}.html",
+                price=2000 + index,
+                neighborhood="Bernal Heights",
+                listing_type="Room/share",
+            ),
+            ScoreResult(70, ["fits"], "check", {}),
+        )
+
+    preferences = load_preferences(settings.preferences_path)
+    scanner = Scanner(repository, lambda: preferences, [])
+
+    assert repository.count_listings() == 4
+    assert scanner.rescore_all(preferences) == repository.count_listings()
+
+
+def test_a_second_submit_never_starts_a_second_clock() -> None:
+    """Pressing Return while the first save is in flight ran rotate twice on
+    one sentence, which reads as a stutter rather than a rotation."""
+    script = deal_form_script()
+    panel = script[script.index("const startSavingPanel") :]
+
+    assert "savingTimer = window.setInterval" in panel, "the clock has to be held to be stopped"
+    assert "savingTimer) return" in panel[: panel.index("savingPanel.hidden = false")]
+
+
+def test_coming_back_with_the_back_button_leaves_a_form_you_can_use() -> None:
+    """The browser restores this page exactly as it was abandoned: panel
+    sweeping, submit button dead. Without this the only way out is a reload."""
+    script = deal_form_script()
+
+    assert 'window.addEventListener("pageshow"' in script
+    restore = script[script.index('window.addEventListener("pageshow"') :]
+    assert "event.persisted" in restore, "only a cached restore needs undoing"
+    assert "stopSavingPanel()" in restore[: restore.index("});")]
+
+    stop = script[script.index("const stopSavingPanel") : script.index('window.addEventListener("pageshow"')]
+    assert "clearInterval" in stop
+    assert "submitButton.disabled = false" in stop
+
+
+def test_the_sentences_name_the_words_the_screen_actually_uses() -> None:
+    """The tiers are labelled Dream, Strong and Secondary on this very page.
+    "okay" is the key underneath them, and naming it told the reader about a
+    word they have never been shown."""
+    notes = " ".join(saving_notes())
+
+    assert "Secondary" in notes and "Dream" in notes
+    assert "marked okay" not in notes
+    assert "Near matches" in notes, "the shortlist calls that view Near matches"

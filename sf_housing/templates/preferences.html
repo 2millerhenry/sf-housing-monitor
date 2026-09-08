@@ -292,6 +292,21 @@
       </details>
       {% endif %}
       <button class="primary" type="submit" data-deal-submit data-first-activation="{{ 'true' if welcome else 'false' }}"><span data-deal-submit-label>{% if welcome %}Save deal and find matches{% else %}Save deal and rerank{% endif %}</span></button>
+      {#- Saving reranks every stored home before this page can answer, which on
+          a full pool is a real wait with a spinning tab and nothing else. The
+          panel below is revealed on submit. There is no percentage to show --
+          the save is one ordinary form post and the browser navigates when it
+          returns -- so the bar is indeterminate and the sentences carry the
+          explaining. The count comes from the server, because "reranking 5,235
+          homes" is a wait somebody can sit through and "please wait" is not. -#}
+      <section class="deal-saving" data-deal-saving hidden aria-live="polite">
+        <div class="deal-saving-heading">
+          <strong data-deal-saving-title>Saving your deal</strong>
+        </div>
+        <div class="deal-saving-track" role="progressbar" aria-label="Saving your deal"><span></span></div>
+        <p class="deal-saving-note" data-deal-saving-note aria-hidden="true"
+           data-listing-count="{{ stored_listing_count or 0 }}">Saving your answers.</p>
+      </section>
     </div>
   </div>
 </form>

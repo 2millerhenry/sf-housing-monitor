@@ -202,7 +202,80 @@
   const submitButton = form.querySelector("[data-deal-submit]");
   const submitLabel = form.querySelector("[data-deal-submit-label]");
   const submitStatus = form.querySelector("[data-submit-status]");
+  const savingPanel = form.querySelector("[data-deal-saving]");
+  const savingTitle = form.querySelector("[data-deal-saving-title]");
+  const savingNote = form.querySelector("[data-deal-saving-note]");
+
+  // What saving a deal actually does, for the wait it actually takes. Every one
+  // of these is true of the work in progress rather than filler: the post is
+  // synchronous, so there is no percentage to show and the sentences are the
+  // only thing that can explain why the page has not answered yet.
+  const savingNotes = (homes) => [
+    homes
+      ? `Rescoring ${homes.toLocaleString()} homes you have already collected.`
+      : "Rescoring the homes already collected.",
+    "A score is your budget, your areas, the size and the timing, weighed together.",
+    "Homes that no longer fit move to Near matches. Nothing is deleted.",
+    "Areas you put in Dream count for more than the ones in Secondary.",
+    "Anything a listing left unsaid becomes a Check on the home, not a reason to drop it.",
+    "Saved homes and anything you have passed on keep their place.",
+    "This runs once, here. The twice-daily checks do not wait for it.",
+  ];
+
+  let savingTimer = null;
+  const restingLabel = submitLabel ? submitLabel.textContent : "";
+  const restingStatus = submitStatus ? submitStatus.textContent : "";
+
+  // Coming back with the Back button restores this page from the browser's
+  // cache exactly as it was abandoned: panel sweeping, button dead, over a
+  // form that is not being saved any more. Put it back to rest instead.
+  const stopSavingPanel = () => {
+    window.clearInterval(savingTimer);
+    savingTimer = null;
+    if (savingPanel) savingPanel.hidden = true;
+    if (submitButton) {
+      submitButton.disabled = false;
+      delete submitButton.dataset.submitting;
+      submitButton.removeAttribute("aria-busy");
+    }
+    if (submitLabel) submitLabel.textContent = restingLabel;
+    if (submitStatus) submitStatus.textContent = restingStatus;
+  };
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) stopSavingPanel();
+  });
+
+  const startSavingPanel = (firstActivation) => {
+    // A second submit must not start a second clock over the same sentence.
+    if (!savingPanel || savingTimer) return;
+    savingPanel.hidden = false;
+    if (savingTitle) {
+      savingTitle.textContent = firstActivation
+        ? "Saving your deal and starting the first check"
+        : "Saving your deal and reranking your homes";
+    }
+    if (!savingNote) return;
+    const homes = Number(savingNote.dataset.listingCount) || 0;
+    const lines = savingNotes(homes);
+    let shown = -1;
+    const rotate = () => {
+      shown = (shown + 1) % lines.length;
+      savingNote.textContent = lines[shown];
+      savingNote.classList.remove("is-fresh");
+      void savingNote.offsetWidth;
+      savingNote.classList.add("is-fresh");
+    };
+    rotate();
+    // Eight seconds, the same beat as the scan panel, so the two waits in this
+    // app read as one thing rather than two.
+    savingTimer = window.setInterval(rotate, 8000);
+  };
   form.addEventListener("submit", (event) => {
+    // Clearing the deal posts this very form from its own button. It is not a
+    // save, so none of what follows applies to it: the panel would announce a
+    // rerank that is not happening, and the "choose a home type" gate below
+    // used to make a half-filled deal impossible to clear at all.
+    if (event.submitter && event.submitter.matches("[data-deal-reset]")) return;
     const first = form.querySelector("[data-path-toggle]");
     if (!form.querySelector("[data-path-toggle]:checked")) {
       event.preventDefault();
@@ -223,6 +296,7 @@
       if (submitStatus) submitStatus.textContent = firstActivation
         ? "Your search is being saved. The shortlist will show live check progress next."
         : "Your deal is being saved and every stored home is being reranked.";
+      startSavingPanel(firstActivation);
     }
   });
 })();

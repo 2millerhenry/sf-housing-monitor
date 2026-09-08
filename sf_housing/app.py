@@ -513,6 +513,11 @@ def create_app(
         timeout_seconds=active_settings.request_timeout_seconds,
         max_scan_seconds=active_settings.scan_max_seconds,
     )
+    # A check that was in flight when the app was last stopped is still
+    # recorded as running. Settling it here, before anything can start a new
+    # one, is what makes reopening the app the recovery the Ready Check
+    # already tells people it is.
+    scanner.recover_interrupted_scans()
     if initial_preferences.profile_active:
         scanner.rescore_all(initial_preferences)
     scheduler = build_scheduler(scanner)
@@ -984,6 +989,11 @@ def create_app(
             "message": message,
             "error": error,
             "welcome": welcome or not preferences.profile_active,
+            # Saving a deal reranks every stored home before the page can
+            # answer, and on a full pool that is a wait with nothing on screen.
+            # The count is what makes the wait explicable rather than merely
+            # long, so it is read here rather than guessed at in the browser.
+            "stored_listing_count": repository.count_listings(),
         }
 
     @application.get("/preferences", response_class=HTMLResponse)

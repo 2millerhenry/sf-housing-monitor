@@ -983,6 +983,31 @@ class Repository:
             connection.commit()
         return str(row["original_url"])
 
+    def abandon_interrupted_scans(self) -> int:
+        """Close out checks a stopped process left recorded as running.
+
+        Nothing else ever clears these rows, so the record kept insisting a
+        check was in flight long after the process running it was gone -- and
+        the Ready Check told people that reopening the app would settle it,
+        which was advice the app did not honour. Callers are responsible for
+        proving no check is actually running before calling this.
+        """
+        stopped = utc_now()
+        with self.connection() as connection:
+            scans = connection.execute(
+                "UPDATE scan_runs SET status = 'interrupted', finished_at = ?, "
+                "message = COALESCE(message, ?) WHERE status = 'running'",
+                (stopped, "The app stopped before this check finished."),
+            )
+            abandoned = int(scans.rowcount or 0)
+            connection.execute(
+                "UPDATE source_runs SET status = 'interrupted', finished_at = ?, "
+                "message = COALESCE(message, ?) WHERE status = 'running'",
+                (stopped, "The app stopped before this source finished."),
+            )
+            connection.commit()
+        return abandoned
+
     def begin_scan(self, trigger: str) -> int:
         with self.connection() as connection:
             cursor = connection.execute(
@@ -1223,6 +1248,11 @@ class Repository:
             for row in rows
             if (status := self.connector_state(str(row["connector_key"]))) is not None
         }
+
+    def count_listings(self) -> int:
+        """How many homes are stored, for pages that have to explain a wait."""
+        with self.connection() as connection:
+            return int(connection.execute("SELECT COUNT(*) FROM listings").fetchone()[0])
 
     def recent_scans(self, limit: int = 8) -> list[dict[str, Any]]:
         with self.connection() as connection:

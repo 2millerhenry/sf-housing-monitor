@@ -1277,6 +1277,48 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   box-shadow: inset 0 0 0 1px oklch(0% 0 0 / 0.08);
 }
 .already-list, .connect-sources { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+/* Saving a deal reranks every stored home before the page can answer. There is
+   no percentage to show -- it is one ordinary form post, and the browser
+   navigates when it returns -- so the bar sweeps rather than fills, and the
+   sentence underneath does the explaining. */
+.deal-saving {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--shadow-low);
+}
+.deal-saving-heading strong { font-size: 0.82rem; letter-spacing: -0.005em; }
+.deal-saving-track { height: 4px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
+.deal-saving-track > span {
+  display: block;
+  width: 40%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.deal-saving-note {
+  margin: 0;
+  min-height: 1.15rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.15rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* The sweep says "still working" without claiming to know how far along it
+     is. Held still for a reader who asked for no motion, where the changing
+     sentence carries that on its own. */
+  .deal-saving-track > span { animation: deal-saving-sweep 1400ms ease-in-out infinite; }
+  .deal-saving-note.is-fresh { animation: scan-note-in 340ms cubic-bezier(0.16, 1, 0.3, 1); }
+}
+@keyframes deal-saving-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+
 /* The two sentences under the chips. The first is reassurance and carries the
    number that proves it; the second is the only invitation on the page that a
    reader who is happy already needs to see. */

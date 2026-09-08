@@ -439,6 +439,21 @@ def _scan_check(repository: Repository, scanner: Scanner, now: datetime) -> Diag
             owner="Repair",
             metadata={"scan_id": latest.get("id"), "started_at": latest.get("started_at")},
         )
+    if latest.get("status") == "interrupted":
+        # Quitting the app during a check is an ordinary thing to do, not a
+        # fault to be repaired. Recovery settles the record on the way back up,
+        # so by the time anyone reads this the only true statement left is that
+        # the last check did not get to finish, and the next one is unaffected.
+        return _check(
+            "scanner",
+            "Scanning",
+            "pass",
+            "Last check was interrupted",
+            "The app was stopped before the last check finished. Nothing collected was lost.",
+            "Nothing to do. The next check runs on schedule, or use Check for new homes now.",
+            owner="App",
+            metadata={"status": "interrupted", "scan_id": latest.get("id")},
+        )
     failures = int(latest.get("sources_failed") or 0)
     completed = latest.get("status") in {"completed", "completed_with_errors"}
     return _check(
