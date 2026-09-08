@@ -68,6 +68,13 @@ RECHECK_FLOOR_PER_SOURCE = 3
 # several searches and their detail pages and wants about a minute -- so this
 # only ever catches a source that has stopped behaving.
 SOURCE_HARD_CEILING_SECONDS = 75.0
+# The same stall one level down. The ceiling above was written to cover a
+# source's whole turn -- "several searches and their detail pages" -- but it
+# only ever wrapped the search, so a single detail page that trickled bytes
+# still held the scan: Craigslist spent 593 seconds on one check and all
+# twenty-three sources behind it were skipped with nothing collected. One
+# detail page is a single request, so anything approaching this is a stall.
+DETAIL_HARD_CEILING_SECONDS = 30.0
 
 RECHECK_HARD_CEILING = 250
 
@@ -372,29 +379,74 @@ class Scanner:
         # healthy source is cut off by a ceiling meant for a broken one.
         remaining = deadline - time.monotonic()
         ceiling = min(SOURCE_HARD_CEILING_SECONDS, max(self.timeout_seconds, remaining))
+        return self._within_ceiling(
+            f"search-{source.platform}",
+            ceiling,
+            run,
+            timed_out=(
+                f"{source.platform} stopped answering partway through and was left after "
+                f"{int(ceiling)} seconds, so the rest of this scan could still run. "
+                "The next check tries it again."
+            ),
+        )
+
+    def _within_ceiling(
+        self,
+        label: str,
+        ceiling: float,
+        run: Callable[[], Any],
+        *,
+        timed_out: str,
+    ) -> Any:
+        """Run one call the scan is allowed to walk away from.
+
+        The thread is a daemon and shares the client, which httpx supports, so
+        an abandoned read finishes into a queue nobody is listening to and the
+        interpreter can still exit.
+        """
         outcome: queue.Queue[tuple[str, Any]] = queue.Queue(maxsize=1)
 
         def worker() -> None:
             try:
-                outcome.put(("listings", run()))
+                outcome.put(("value", run()))
             except BaseException as error:  # reported on the scan's thread
                 outcome.put(("error", error))
 
-        thread = threading.Thread(
-            target=worker, name=f"search-{source.platform}", daemon=True
-        )
-        thread.start()
+        threading.Thread(target=worker, name=label, daemon=True).start()
         try:
             kind, payload = outcome.get(timeout=ceiling)
         except queue.Empty:
-            raise SourceError(
-                f"{source.platform} stopped answering partway through and was left after "
-                f"{int(ceiling)} seconds, so the rest of this scan could still run. "
-                "The next check tries it again."
-            ) from None
+            raise SourceError(timed_out) from None
         if kind == "error":
             raise payload
         return payload
+
+    def _enrich_within_ceiling(
+        self,
+        source: ListingSource,
+        client: httpx.Client,
+        candidate: ListingCandidate,
+        *,
+        limit: float,
+    ) -> ListingCandidate:
+        """Fetch one detail page the scan is allowed to walk away from.
+
+        Every caller already checks the clock before asking, but the ask itself
+        was unbounded, so one page that never finished spent the whole budget
+        anyway. Bounded by whichever comes first: what a single page can
+        reasonably want, or what this phase has left -- so no run of detail
+        pages can add up to an overrun either.
+        """
+        ceiling = max(1.0, min(DETAIL_HARD_CEILING_SECONDS, limit - time.monotonic()))
+        return self._within_ceiling(
+            f"detail-{source.platform}",
+            ceiling,
+            lambda: source.enrich(client, candidate),
+            timed_out=(
+                f"{source.platform} stopped answering for {candidate.original_url} and was "
+                f"left after {int(ceiling)} seconds so the scan could go on."
+            ),
+        )
 
     def _recheck_absent(
         self,
@@ -452,7 +504,9 @@ class Scanner:
             if time.monotonic() + self.timeout_seconds > limit:
                 break
             try:
-                refreshed = source.enrich(client, candidate)
+                refreshed = self._enrich_within_ceiling(
+                    source, client, candidate, limit=limit
+                )
             except Exception as exc:
                 # Unreachable is not gone. Leave the home exactly as it was, and
                 # leave its confirmation date alone so it is tried again rather
@@ -951,7 +1005,9 @@ class Scanner:
                                 break
                             item = prepared[index]
                             try:
-                                item["listing"] = source.enrich(client, item["listing"])
+                                item["listing"] = self._enrich_within_ceiling(
+                                    source, client, item["listing"], limit=deadline
+                                )
                                 item["enriched"] = True
                             except Exception as exc:  # one expired/broken detail must not lose the search result
                                 detail_failures += 1

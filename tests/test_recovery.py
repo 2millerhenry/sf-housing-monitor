@@ -11,6 +11,8 @@ import imaplib
 import pathlib
 import sqlite3
 import sys
+import threading
+import time
 
 import httpx
 import pytest
@@ -30,9 +32,9 @@ from test_imap_alerts import FakeIMAP  # noqa: E402
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
-def room(source_id: str) -> ListingCandidate:
+def room(source_id: str, platform: str = "Craigslist") -> ListingCandidate:
     return ListingCandidate(
-        platform="Craigslist",
+        platform=platform,
         source_id=source_id,
         title="Sunny private room in NOPA",
         original_url=f"https://sfbay.craigslist.org/x/{source_id}.html",
@@ -442,3 +444,227 @@ def test_reopening_the_app_is_what_actually_settles_the_record(
     )
 
     assert scan_row(repository, run_id)["status"] == "interrupted"
+
+
+# --------------------------------------------------------------------------
+# 6. a source whose detail pages stop answering
+# --------------------------------------------------------------------------
+
+
+class StallingDetailSource:
+    """Searches fine, then never finishes a detail page.
+
+    The real shape of the failure: an HTTP read timeout bounds each chunk of a
+    response rather than the whole of it, so a server that trickles bytes holds
+    the connection open for as long as it likes.
+    """
+
+    mode = "automatic"
+    search_url = "https://example.test/stall"
+    manual_reason = None
+    detail_budget = 3
+
+    def __init__(self, platform: str = "Craigslist") -> None:
+        self.platform = platform
+        self.released = threading.Event()
+        self.enrich_calls = 0
+
+    def search(self, client, preferences):
+        return [room("s1"), room("s2"), room("s3")]
+
+    def enrich(self, client, listing):
+        self.enrich_calls += 1
+        self.released.wait(12)  # far past any ceiling a test sets
+        return listing
+
+
+class LateSource:
+    """Runs after the stalling one, and is what starvation actually costs."""
+
+    mode = "automatic"
+    search_url = "https://example.test/late"
+    manual_reason = None
+    detail_budget = 0
+
+    def __init__(self, platform: str = "Zillow") -> None:
+        self.platform = platform
+
+    def search(self, client, preferences):
+        return [room("late1", self.platform), room("late2", self.platform)]
+
+    def enrich(self, client, listing):
+        return listing
+
+
+def test_a_detail_page_that_never_answers_does_not_hold_the_scan(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    """The ceiling was written to cover a source's whole turn, but only ever
+    wrapped the search. One Craigslist check spent 593 seconds inside detail
+    pages and every source behind it was skipped with nothing collected."""
+    from sf_housing import scanner as scanner_module
+
+    monkeypatch.setattr(scanner_module, "DETAIL_HARD_CEILING_SECONDS", 0.4)
+    stalling = StallingDetailSource()
+    repository, scanner = scanner_for(tmp_path, [stalling, LateSource()])
+
+    try:
+        started = time.monotonic()
+        outcome = scanner.run_scan("scheduled")
+        elapsed = time.monotonic() - started
+    finally:
+        stalling.released.set()
+
+    assert stalling.enrich_calls, "the detail fetch has to have been attempted"
+    assert elapsed < 9, f"a stalled detail page held the scan for {elapsed:.1f}s"
+    assert outcome.status in {"completed", "completed_with_errors"}
+
+
+def test_the_sources_behind_a_stalled_one_still_run(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    """This is what the overrun actually cost: not one slow source, but every
+    source queued behind it collecting nothing."""
+    from sf_housing import scanner as scanner_module
+
+    monkeypatch.setattr(scanner_module, "DETAIL_HARD_CEILING_SECONDS", 0.4)
+    stalling = StallingDetailSource()
+    repository, scanner = scanner_for(tmp_path, [stalling, LateSource()])
+
+    try:
+        scanner.run_scan("scheduled")
+    finally:
+        stalling.released.set()
+
+    with repository.connection() as connection:
+        platforms = {
+            row["platform"] for row in connection.execute("SELECT platform FROM listings")
+        }
+    assert "Zillow" in platforms, "the source behind the stalled one was skipped"
+
+
+def test_a_stalled_detail_page_never_loses_the_search_result(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    """A detail page is an enrichment of a home already found. Giving up on the
+    detail must cost the detail, never the home."""
+    from sf_housing import scanner as scanner_module
+
+    monkeypatch.setattr(scanner_module, "DETAIL_HARD_CEILING_SECONDS", 0.4)
+    stalling = StallingDetailSource()
+    repository, scanner = scanner_for(tmp_path, [stalling, LateSource()])
+
+    try:
+        scanner.run_scan("scheduled")
+    finally:
+        stalling.released.set()
+
+    with repository.connection() as connection:
+        kept = [
+            row["source_id"]
+            for row in connection.execute(
+                "SELECT source_id FROM listings WHERE platform = 'Craigslist'"
+            )
+        ]
+    assert sorted(kept) == ["s1", "s2", "s3"], "the searched homes have to survive"
+
+
+def test_the_detail_ceiling_never_outlasts_what_the_phase_has_left(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Each call is bounded on its own, but a run of them must not add up to an
+    overrun either, so the ceiling also stops at the phase's own limit."""
+    from sf_housing.scanner import DETAIL_HARD_CEILING_SECONDS
+
+    repository, scanner = scanner_for(tmp_path, [WorkingSource()])
+    asked: list[float] = []
+
+    class Recorder:
+        platform = "Craigslist"
+
+        def enrich(self, client, listing):
+            raise AssertionError("never reached")
+
+    scanner._within_ceiling = lambda label, ceiling, run, *, timed_out: asked.append(ceiling)
+
+    near = DETAIL_HARD_CEILING_SECONDS / 3
+    scanner._enrich_within_ceiling(
+        Recorder(), None, room("x"), limit=time.monotonic() + near
+    )
+    scanner._enrich_within_ceiling(
+        Recorder(), None, room("x"), limit=time.monotonic() + DETAIL_HARD_CEILING_SECONDS * 5
+    )
+
+    assert asked[0] < DETAIL_HARD_CEILING_SECONDS, "a near limit has to shorten the ceiling"
+    assert asked[0] <= near + 1e-6, f"ceiling {asked[0]} outran the phase limit {near}"
+    assert asked[1] == DETAIL_HARD_CEILING_SECONDS, "a distant limit leaves a whole page's worth"
+
+
+class StallingRecheckSource:
+    """Finds nothing new, and stalls on the rechecks of what it used to list.
+
+    detail_budget is zero, so the only place this source can call ``enrich`` is
+    the recheck of a home missing from its search. That is what makes the test
+    below aim at the recheck path and nothing else.
+    """
+
+    mode = "automatic"
+    search_url = "https://example.test/recheck"
+    manual_reason = None
+    detail_budget = 0
+
+    def __init__(self, platform: str = "Craigslist") -> None:
+        self.platform = platform
+        self.released = threading.Event()
+        self.enrich_calls = 0
+
+    def search(self, client, preferences):
+        return [room("still-here", self.platform)]
+
+    def enrich(self, client, listing):
+        self.enrich_calls += 1
+        self.released.wait(12)
+        return listing
+
+
+def test_a_stalled_recheck_does_not_hold_the_scan_either(
+    tmp_path: pathlib.Path, monkeypatch
+) -> None:
+    """The recheck walks homes a source has stopped listing, one detail page
+    each. It reads the clock before every one, but the read itself was
+    unbounded, so a page that never answered spent the whole scan there."""
+    from sf_housing import scanner as scanner_module
+
+    monkeypatch.setattr(scanner_module, "DETAIL_HARD_CEILING_SECONDS", 0.4)
+    stalling = StallingRecheckSource()
+    repository, scanner = scanner_for(tmp_path, [stalling])
+    # A shortlisted home the search no longer returns is exactly what a recheck
+    # goes and looks at.
+    for index in range(3):
+        repository.upsert_listing(
+            room(f"gone{index}"), ScoreResult(90, ["fits"], "check", {})
+        )
+
+    try:
+        started = time.monotonic()
+        scanner.run_scan("scheduled")
+        elapsed = time.monotonic() - started
+    finally:
+        stalling.released.set()
+
+    assert stalling.enrich_calls, "the recheck has to have been attempted"
+    assert elapsed < 9, f"a stalled recheck held the scan for {elapsed:.1f}s"
+
+
+def test_one_detail_page_is_never_worth_more_than_a_whole_source(tmp_path: pathlib.Path) -> None:
+    """The ceilings are only meaningful relative to each other and to the scan.
+    A single page allowed as long as a source's entire turn, or as long as the
+    scan itself, is not a ceiling."""
+    from sf_housing.scanner import (
+        DETAIL_HARD_CEILING_SECONDS,
+        SOURCE_HARD_CEILING_SECONDS,
+    )
+    from sf_housing.settings import Settings
+
+    assert 0 < DETAIL_HARD_CEILING_SECONDS < SOURCE_HARD_CEILING_SECONDS
+    assert DETAIL_HARD_CEILING_SECONDS < Settings.from_environment().scan_max_seconds / 4
