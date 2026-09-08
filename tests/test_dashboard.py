@@ -12,7 +12,6 @@ from sf_housing.app import (
     _compact_move_in_date,
     _compact_pacific_date,
     _is_recently_posted,
-    _prepared_zillow_searches,
     _was_checked_today,
     _typical_scan_seconds,
     create_app,
@@ -660,13 +659,13 @@ def test_alert_setup_page_explains_local_connection(tmp_path: Path) -> None:
     # The promise, not the sentence: whatever the wording, the page has to say
     # the Facebook login is never involved.
     assert "Facebook login is never used or stored" in response.text
-    # The prepared searches themselves, not the words wrapped around them: a
-    # link built from this deal's own areas, and none built from areas it does
-    # not want.
-    assert "zillow.com/nopa-san-francisco-ca/rentals/" in response.text
-    assert "Mission" in response.text
-    assert "Potrero Hill" not in response.text
-    assert "3-bed</a>" in response.text, "the split searches are still offered"
+    # The prepared Zillow searches this used to check are gone, and so is the
+    # guide that displayed them: Zillow's own search page answers an ordinary
+    # request, so it runs unattended and nobody is asked to save a search on
+    # it. What remains is the promise that it is now one of the sources that
+    # simply work.
+    assert "zillow.com" not in response.text
+    assert "Zillow" in already_works_headline(response.text) or ">Zillow<" in response.text
     # Facebook has its own block further down and is deliberately not offered
     # here as a second, email-shaped way to reach the same listings.
     assert "(3BR)" not in response.text
@@ -689,7 +688,11 @@ def test_alerts_explain_why_a_new_user_returns_to_the_deal(tmp_path: Path) -> No
     assert response.headers["location"].startswith("/preferences?welcome=1&message=Finish+your+deal+first")
 
 
-def test_alerts_uses_user_saved_zillow_urls(tmp_path: Path) -> None:
+def test_the_alerts_page_no_longer_prepares_zillow_searches(tmp_path: Path) -> None:
+    """This used to check that a saved Zillow search URL from the profile was
+    rendered into Zillow's setup guide. Both are gone: Zillow's own search page
+    answers an ordinary request, so it runs unattended and there is no guide to
+    put a link in. The builders behind those links went with it."""
     settings = app_settings(tmp_path)
     settings.preferences_path.write_text(
         TEST_PREFERENCES
@@ -703,29 +706,10 @@ zillow_searches:
     application = create_app(settings=settings, sources=[], enable_scheduler=False)
 
     with TestClient(application) as client:
-        response = client.get("/alerts")
+        page = client.get("/alerts").text
 
-    assert "Exact Noe Valley room search" in response.text
-    assert "saved=yes" in response.text
-
-
-def test_prepared_zillow_room_searches_follow_the_current_room_budget(tmp_path: Path) -> None:
-    settings = app_settings(tmp_path)
-    settings.preferences_path.write_text(
-        TEST_PREFERENCES
-        + """
-zillow_searches:
-  - name: Budget-aware room search
-    url: https://www.zillow.com/noe-valley-san-francisco-ca/rentals/?searchQueryState=%7B%22filterState%22%3A%7B%22mp%22%3A%7B%22min%22%3A800%2C%22max%22%3A2400%7D%7D%7D
-""",
-        encoding="utf-8",
-    )
-    preferences = load_preferences(settings.preferences_path)
-
-    prepared = _prepared_zillow_searches(preferences)
-
-    assert len(prepared) == 1
-    assert "%22max%22%3A2000" in prepared[0]["url"]
+    assert "Exact Noe Valley room search" not in page
+    assert "zillow.com" not in page
 
 
 def test_apify_token_can_be_connected_from_alerts(tmp_path: Path) -> None:

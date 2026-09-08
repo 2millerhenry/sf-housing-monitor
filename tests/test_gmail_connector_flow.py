@@ -300,18 +300,26 @@ def test_every_provider_gets_a_link_to_the_page_it_is_set_up_on(
     for platform in ("HotPads", "Apartments.com", "Roomies"):
         assert platform in ALERT_SETUP_SEARCHES, f"{platform} lost its setup link"
         assert ALERT_SETUP_SEARCHES[platform] in page, f"{platform}'s link is not on the page"
-    assert "zillow.com" in page and "facebook.com" in page
+    # Zillow is not in this list any more: its own search page answers an
+    # ordinary request, so it runs unattended and asking somebody to save a
+    # search on it would buy nothing.
+    assert "zillow.com" not in page
+    assert "facebook.com" in page
 
 
 def test_the_steps_name_the_buttons_each_site_actually_shows() -> None:
     """Checked in a browser: HotPads says "Save search", Apartments.com says
-    "Save Search", Zillow offers Instant, Roomies calls them Listing Alerts."""
+    "Save Search", Roomies calls them Listing Alerts.
+
+    Zillow's "Instant" left with its guide, which left because Zillow stopped
+    being a setup source."""
     import pathlib
 
     page = pathlib.Path("sf_housing/templates/alerts.html").read_text(encoding="utf-8")
 
-    for phrase in ("Save search", "Save Search", "Instant", "Listing Alerts", "All Filters"):
+    for phrase in ("Save search", "Save Search", "Listing Alerts", "All Filters"):
         assert phrase in page, f"the steps no longer name {phrase!r}"
+    assert "Instant" not in page, "Zillow's step survived the guide it belonged to"
 
 
 def test_the_roomies_link_is_the_one_that_actually_resolves() -> None:

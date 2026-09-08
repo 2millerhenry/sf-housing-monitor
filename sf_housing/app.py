@@ -161,123 +161,6 @@ def _zillow_url_with_room_price_cap(url: str, minimum: int, maximum: int) -> str
     return url
 
 
-def _prepared_zillow_searches(preferences: Preferences | None = None) -> list[dict[str, str]]:
-    """Use the user's saved Zillow URLs when available, with safe defaults."""
-    if preferences and "private_room" not in preferences.deal_profile.enabled_paths:
-        return []
-    configured = (preferences.data.get("zillow_searches") if preferences else None) or []
-    budget = preferences.section("budget") if preferences else {}
-    room_minimum = setting_int(budget.get("min_monthly"), 800)
-    room_maximum = setting_int(budget.get("max_monthly"), 2700)
-    searches: list[dict[str, str]] = []
-    if isinstance(configured, list):
-        for item in configured:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name", "")).strip()
-            url = str(item.get("url", "")).strip()
-            parsed = urlparse(url)
-            if (
-                name
-                and parsed.scheme == "https"
-                and parsed.netloc in {"zillow.com", "www.zillow.com"}
-                and parsed.path.endswith("/rentals/")
-            ):
-                searches.append(
-                    {
-                        "name": name,
-                        "url": _zillow_url_with_room_price_cap(url, room_minimum, room_maximum),
-                    }
-                )
-    if searches:
-        return searches
-
-    state = quote(
-        json.dumps(
-            {
-                "filterState": {
-                    "price": {"min": room_minimum, "max": room_maximum},
-                    "fr": {"value": True},
-                    "fsba": {"value": False},
-                }
-            },
-            separators=(",", ":"),
-        )
-    )
-    return [
-        {
-            "name": name,
-            "url": f"https://www.zillow.com/{slug}/rentals/?searchQueryState={state}",
-        }
-        for name, slug in (_profile_search_areas(preferences) if preferences else [("San Francisco", "san-francisco-ca")])
-    ]
-
-
-def _prepared_zillow_unit_searches(preferences: Preferences) -> list[dict[str, str]]:
-    """Prepared whole-unit searches that can become Zillow Instant alerts."""
-    if not set(preferences.deal_profile.enabled_paths).intersection({"studio", "one_bedroom"}):
-        return []
-    max_monthly = setting_int(preferences.section("whole_unit").get("max_monthly"), 3000)
-    state = quote(
-        json.dumps(
-            {
-                "filterState": {
-                    "price": {"min": 0, "max": max_monthly},
-                    "beds": {"min": 0, "max": 1},
-                    "fr": {"value": True},
-                    "fsba": {"value": False},
-                }
-            },
-            separators=(",", ":"),
-        )
-    )
-    return [
-        {
-            "name": name,
-            "url": f"https://www.zillow.com/{slug}/rentals/?searchQueryState={state}",
-        }
-        for name, slug in _profile_search_areas(preferences)
-    ]
-
-
-def _prepared_zillow_split_searches(preferences: Preferences) -> list[dict[str, str]]:
-    """Prepared exact-bedroom searches so each split keeps its own hard cap."""
-    searches: list[dict[str, str]] = []
-    enabled = set(preferences.deal_profile.enabled_paths)
-    for bedroom_count, section_name, default_occupants, default_cap in (
-        (2, "two_bedroom", 2, 2700),
-        (3, "three_bedroom", 3, 2500),
-    ):
-        if section_name not in enabled:
-            continue
-        settings = preferences.section(section_name)
-        max_monthly = int(settings.get("occupants", default_occupants)) * int(
-            settings.get("max_per_person", default_cap)
-        )
-        state = quote(
-            json.dumps(
-                {
-                    "filterState": {
-                        "price": {"min": 0, "max": max_monthly},
-                        "beds": {"min": bedroom_count, "max": bedroom_count},
-                        "fr": {"value": True},
-                        "fsba": {"value": False},
-                    }
-                },
-                separators=(",", ":"),
-            )
-        )
-        searches.extend(
-            {
-                "name": name,
-                "bedrooms": str(bedroom_count),
-                "url": f"https://www.zillow.com/{slug}/rentals/?searchQueryState={state}",
-            }
-            for name, slug in _profile_search_areas(preferences)
-        )
-    return searches
-
-
 def _prepared_facebook_searches(preferences: Preferences) -> list[dict[str, str]]:
     """Use Marketplace's actual keyword-search route for its free native alerts."""
     if "private_room" not in preferences.deal_profile.enabled_paths:
@@ -1536,9 +1419,6 @@ def create_app(
                 "apify_state": connector_states.get("apify"),
                 "furnished_finder_state": connector_states.get("furnished_finder"),
                 "bridge_version": FURNISHED_FINDER_BRIDGE_VERSION,
-                "zillow_searches": _prepared_zillow_searches(preferences),
-                "zillow_unit_searches": _prepared_zillow_unit_searches(preferences),
-                "zillow_split_searches": _prepared_zillow_split_searches(preferences),
                 "facebook_searches": _prepared_facebook_searches(preferences),
                 "facebook_unit_searches": _prepared_facebook_unit_searches(preferences),
                 "alert_setup_searches": ALERT_SETUP_SEARCHES,

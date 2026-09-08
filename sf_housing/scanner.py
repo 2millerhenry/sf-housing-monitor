@@ -204,10 +204,13 @@ class Scanner:
             "SpareRoom": 25,
             # A student board: one small page per scan, no detail reads.
             "Uloop": 28,
-            "Zillow": 30,
             "HotPads": 35,
             "Apartments.com": 40,
             "Zumper": 45,
+            # Six search pages of about 700KB, no detail reads, and the most
+            # reliable of the large portals -- six of six fetches answered
+            # while it was being measured, including to an honest User-Agent.
+            "Zillow": 44,
             # Two search pages and no detail reads, and the source most
             # likely to be turned away, so it is asked early while the
             # scan still has time to record the refusal.

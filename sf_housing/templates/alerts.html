@@ -1,14 +1,20 @@
-{#- One mark per source. Deliberately this app's own lettering rather than
-    the companies' logos: the page has to work offline and tell no third party
-    it was opened, so nothing may be hotlinked, and shipping other people's
-    trademarks inside an MIT repository is a liability the project does not
-    need.
+{#- One mark per source. These were this app's own lettering for a long time,
+    on the reasoning that the page must work offline and tell no third party it
+    was opened -- which ruled out hotlinking -- and that shipping other
+    companies' trademarks inside an MIT repository was a liability the project
+    did not need.
 
-    Hue alone ran out. Eighteen names is all a circle holds at the twenty
-    degrees it takes to tell two of them apart, and the seventeenth was already
-    in. So the wheel is fixed at eighteen positions and lightness carries the
-    rest: thirty-six slots, each a colour a source keeps for good, and nothing
-    is ever re-spaced to make room again. -#}
+    The first half of that still holds and is still enforced: every logo is
+    fetched once and served from this app's own static directory, and a test
+    fails if an absolute URL to anyone else appears in a chip.
+
+    The second half was reconsidered. Naming a source and showing its mark is
+    how a reader recognises where a home came from, and using a mark to
+    identify the thing it belongs to is the ordinary way an aggregator works.
+    It remains a judgement call rather than a settled one, and it is recorded
+    here so whoever revisits it knows it was made on purpose. A source with no
+    usable icon keeps its lettering, which is why the marks below still exist.
+-#}
 {% set source_marks = {
   'Roomies':                  ('R', '10', '54'),
   'Craigslist':               ('CL', '30', '54'),
@@ -309,24 +315,14 @@
         <p class="setup-lede">Each site is separate, and none of them will email you until you ask. The searches below already carry the budgets and areas from Your deal, so you only have to save them.</p>
 
         <div class="setup-guides">
-          <details class="setup-guide" open>
-            <summary>{{ source_chip('Zillow') }}<span>about 2 minutes</span></summary>
-            <ol>
-              <li>Open a prepared search:
-                <span class="prepared-links">
-                {% for search in zillow_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} rooms</a>{% endfor %}
-                {% for search in zillow_unit_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} studio &amp; 1-bed</a>{% endfor %}
-                {% for search in zillow_split_searches %}<a href="{{ search.url }}" target="_blank" rel="noopener noreferrer">{{ search.name }} {{ search.bedrooms }}-bed</a>{% endfor %}
-                </span>
-              </li>
-              <li>Sign in to Zillow if it asks. A saved search needs an account.</li>
-              <li>Press <strong>Save search</strong>, near the top of the results.</li>
-              <li>When it asks how often to email you, choose <strong>Instant</strong>. Daily works too, but you will hear about homes a day later.</li>
-              <li>Repeat for each link above that matters to you. Zillow emails one alert per saved search.</li>
-            </ol>
-          </details>
+          {#- Zillow's guide used to sit here, opened by default. It is gone
+              because Zillow is no longer a setup source: its own search page
+              answers an ordinary request and it now runs unattended like
+              Craigslist. Walking somebody through connecting it would ask for
+              two minutes to add what they already have. The first guide below
+              carries the `open` this one had. -#}
 
-          <details class="setup-guide">
+          <details class="setup-guide" open>
             <summary>{{ source_chip('HotPads') }}<span>about 2 minutes</span></summary>
             <ol>
               <li>Open <a href="{{ alert_setup_searches['HotPads'] }}" target="_blank" rel="noopener noreferrer">HotPads&rsquo; San Francisco rentals</a>.</li>

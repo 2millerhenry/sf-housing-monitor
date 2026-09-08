@@ -2471,12 +2471,16 @@ class ApartmentGuideSource:
         )
 
 
-# 32767 is the largest signed 16-bit integer, and Trulia publishes it as a unit
-# number where a home has none: one address in the 120 read here arrived as
-# "1825 Mission St #32767", on a building card, which cannot have a unit number
+# 32767 is the largest signed 16-bit integer, and Zillow publishes it as a unit
+# number where a home has none -- on Trulia too, which it owns. "1825 Mission St
+# #32767" arrived from both, on a building card, which cannot have a unit number
 # in the first place. Every other suffix seen was an ordinary flat number, so
 # this strips the sentinel by value rather than guessing which numbers are real.
-_TRULIA_NO_UNIT = re.compile(r"\s*#\s*32767\b")
+_NO_UNIT_SENTINEL = re.compile(r"\s*#\s*32767\b")
+
+
+def _without_sentinel_unit(address: str) -> str:
+    return _NO_UNIT_SENTINEL.sub("", address).strip()
 
 
 class TruliaSource:
@@ -2619,7 +2623,7 @@ class TruliaSource:
             # somebody else's host would otherwise be stored and opened as-is.
             return None
 
-        street = _TRULIA_NO_UNIT.sub("", _clean_text(location.get("streetAddress"), 160)).strip()
+        street = _without_sentinel_unit(_clean_text(location.get("streetAddress"), 160))
         name = street or _clean_text(location.get("fullLocation"), 180)
         if not name:
             return None
@@ -2929,6 +2933,242 @@ class MovotoSource:
             metadata=metadata,
             # One home let whole, not a room inside somebody else's.
             housing_kind=WHOLE_UNIT,
+        )
+
+
+class ZillowSource:
+    """Read the San Francisco rentals Zillow publishes on its own search page.
+
+    Zillow was a setup source here for as long as this app has existed: connect
+    an inbox, save a search on Zillow, wait for it to email you. It had brought
+    in nothing. The page itself turns out to answer an ordinary request --
+    including one that identifies itself honestly, which is rarer here than the
+    browser string most of these need -- and to carry its results in the page
+    rather than behind an API call.
+
+    They sit under ``searchPageState.cat1.searchResults.listResults``, 41 to a
+    page against a stated 2,568, in two shapes that have to be read differently:
+
+    * a building, with ``units`` holding one entry per bedroom count it lets
+      and a rent written as text ("$3,886+"), and
+    * a single home, with ``unformattedPrice``, ``beds``, ``baths`` and
+      ``area`` as numbers.
+
+    Read as one shape, four homes in every page of 41 lose their bedroom count
+    and 37 lose their rent.
+
+    Zillow owns Trulia, and the two share a quirk this relies on knowing:
+    32767 -- the largest signed 16-bit integer -- appears as a unit number
+    where a home has none.
+    """
+
+    platform = "Zillow"
+    mode = "automatic"
+    search_url = "https://www.zillow.com/san-francisco-ca/rentals/"
+    manual_reason = None
+    # Everything worth scoring is on the search page.
+    detail_budget = 0
+    empty_result_message = "Zillow published no San Francisco rentals on its search page."
+    # Forty-one homes a page. Six pages is about 250 homes, which is the
+    # per-source cap's worth; the nightly sweep goes deeper.
+    max_pages = 6
+    # 2,568 rentals is 63 pages. Read to the bottom once a day, at an hour
+    # where being turned away costs a run nobody is watching.
+    deep_max_pages = 65
+
+    FOR_RENT = "FOR_RENT"
+
+    def _page_url(self, page: int) -> str:
+        return self.search_url if page == 1 else f"{self.search_url}{page}_p/"
+
+    @staticmethod
+    def _results(document: str) -> list[dict]:
+        """The rentals on a Zillow search page, or nothing."""
+        match = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', document, re.S)
+        if not match:
+            return []
+        try:
+            parsed = json.loads(match.group(1))
+        except (ValueError, json.JSONDecodeError):
+            return []
+        found = _nested_mapping(
+            parsed, "props", "pageProps", "searchPageState", "cat1", "searchResults"
+        ).get("listResults")
+        return [row for row in found or [] if isinstance(row, dict)]
+
+    def search_for_trigger(
+        self, client: httpx.Client, preferences: Preferences, trigger: str
+    ) -> list[ListingCandidate]:
+        return self._search(client, preferences, _pages_for_trigger(self, trigger))
+
+    def search(self, client: httpx.Client, preferences: Preferences) -> list[ListingCandidate]:
+        return self._search(client, preferences, self.max_pages)
+
+    def _search(
+        self, client: httpx.Client, preferences: Preferences, pages: int
+    ) -> list[ListingCandidate]:
+        wanted = _wanted_bedroom_counts(preferences)
+        maximum = setting_int(preferences.section("sources").get("max_results_per_source"), 250)
+        listings: list[ListingCandidate] = []
+        seen: set[str] = set()
+        read_a_card = False
+        document = ""
+
+        for page in range(1, pages + 1):
+            document = _require_page(
+                client.get(self._page_url(page), headers=_BROWSER_HEADERS), self.platform
+            )
+            results = self._results(document)
+            if not results:
+                break
+            fresh = 0
+            for home in results:
+                identifier = _clean_text(home.get("id") or home.get("zpid"), 60)
+                if not identifier or identifier in seen:
+                    continue
+                seen.add(identifier)
+                fresh += 1
+                read_a_card = True
+                candidate = self._candidate(home, identifier, wanted)
+                if candidate is not None:
+                    listings.append(candidate)
+                    if len(listings) >= maximum:
+                        return listings
+            if not fresh:
+                break
+
+        if not read_a_card:
+            raise _read_nothing(self.platform, document, "rentals on its search page")
+        return listings
+
+    @staticmethod
+    def _building_units(home: dict) -> list[tuple[int, int | None, bool]]:
+        """A building's sizes, as (bedrooms, rent, is a room) -- text parsed.
+
+        Zillow writes these as strings: ``{"price": "$3,886+", "beds": "1"}``.
+        A studio arrives as a bedroom count of "0" or as "Studio", so both are
+        read rather than one of them silently becoming nothing.
+        """
+        sizes: list[tuple[int, int | None, bool]] = []
+        for unit in home.get("units") or []:
+            if not isinstance(unit, dict):
+                continue
+            raw = _clean_text(unit.get("beds"), 24)
+            if not raw:
+                continue
+            bedrooms = 0 if _normal_text(raw).startswith("studio") else None
+            if bedrooms is None:
+                digits = re.search(r"\d+", raw)
+                if not digits:
+                    continue
+                bedrooms = int(digits.group(0))
+            sizes.append(
+                (bedrooms, _parse_price(_clean_text(unit.get("price"), 40), require_currency=True),
+                 unit.get("roomForRent") is True)
+            )
+        return sizes
+
+    def _candidate(
+        self, home: dict, identifier: str, wanted: set[int]
+    ) -> ListingCandidate | None:
+        # The page is a rentals search, but the record shape is the same one
+        # Zillow uses for a sale. Checked rather than assumed from the URL.
+        if _clean_text(home.get("statusType"), 40).upper() != self.FOR_RENT:
+            return None
+        if not _is_san_francisco_locality(home.get("addressCity")):
+            return None
+
+        path = str(home.get("detailUrl") or "").strip()
+        if not path:
+            return None
+        # Zillow gives some of these as a path and some as a full address.
+        url = urljoin("https://www.zillow.com/", path)
+        if not url.startswith("https://www.zillow.com/"):
+            return None
+        # One building can appear twice on a page: once as itself, once as a
+        # specific unit inside it, both pointing at the same detail page. Vara
+        # arrived as a studio building at $3,852 and as 1863 Mission St #306 at
+        # $3,300. `canonical_url` is unique, so stored as-is the second silently
+        # overwrites the first and one of the two homes is simply lost. The id
+        # is what tells them apart, so it goes in the link -- kept by
+        # `canonicalize_url`, which only drops campaign tags.
+        url = f"{url}{'&' if '?' in url else '?'}zid={quote(identifier)}"
+
+        street = _without_sentinel_unit(_clean_text(home.get("addressStreet"), 160))
+        name = _clean_text(home.get("buildingName"), 180) or street
+        if not name:
+            return None
+
+        metadata: dict[str, object] = {}
+        if street:
+            metadata["address"] = street
+        detail = [f"{name} listed on Zillow."]
+        if street and street != name:
+            detail.append(f"Address: {street}.")
+
+        sizes = self._building_units(home)
+        is_room = bool(sizes) and all(size[2] for size in sizes)
+        if sizes:
+            metadata["building_listing"] = True
+            beds, rent = _representative_bedroom(
+                [{"beds": bedrooms, "prices": {"low": price}} for bedrooms, price, _ in sizes], wanted
+            )
+            if beds is not None:
+                metadata["bedrooms"] = beds
+                if rent:
+                    detail.append(f"Its {_bedroom_noun(beds)} homes start at ${rent:,} a month.")
+                else:
+                    detail.append(f"It lets {_bedroom_noun(beds)} homes, at a rent it does not publish.")
+            others = _other_bedroom_sizes(
+                [{"beds": bedrooms, "prices": {"low": price}} for bedrooms, price, _ in sizes], beds
+            )
+            if others:
+                detail.append("This building also lets " + ", ".join(others[:6]) + ".")
+            price = rent
+            free = home.get("availabilityCount")
+            if isinstance(free, (int, float)) and not isinstance(free, bool) and free > 0:
+                # Deliberately not "N units", which the building-size reader
+                # would take for the size of the whole building.
+                detail.append(_homes_free_note(int(free)))
+                metadata["homes_available"] = int(free)
+        else:
+            # A single home: the numbers are numbers here, not text.
+            raw = home.get("unformattedPrice")
+            price = int(raw) if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0 else None
+            beds = home.get("beds")
+            if isinstance(beds, (int, float)) and not isinstance(beds, bool):
+                metadata["bedrooms"] = int(beds)
+                detail.append(f"Listed as {_bedroom_phrase(int(beds))}.")
+            baths = home.get("baths")
+            if isinstance(baths, (int, float)) and not isinstance(baths, bool) and baths > 0:
+                plural = "" if baths == 1 else "s"
+                detail.append(f"{int(baths) if float(baths).is_integer() else baths} bathroom{plural}.")
+            area = home.get("area")
+            if isinstance(area, (int, float)) and not isinstance(area, bool) and area > 0:
+                metadata["floor_area"] = f"{int(area):,} sq ft"
+                detail.append(f"Floor area {int(area):,} sq ft.")
+            if price is not None:
+                detail.append(f"Asking ${price:,} a month.")
+
+        coordinates = home.get("latLong") if isinstance(home.get("latLong"), dict) else {}
+        return ListingCandidate(
+            platform=self.platform,
+            source_id=identifier,
+            title=name,
+            original_url=url,
+            price=price,
+            neighborhood=(
+                sf_area_from_address(street)
+                or sf_target_coordinate_neighborhood(
+                    coordinates.get("latitude"), coordinates.get("longitude")
+                )
+                or sf_area_from_zip(home.get("addressZipcode"))
+            ),
+            listing_type="Apartment building" if sizes else "Home",
+            summary=_clean_text(" ".join(detail), 1200),
+            metadata=metadata,
+            # Zillow marks a room let inside a home on the unit itself.
+            housing_kind=ROOM if is_room else WHOLE_UNIT,
         )
 
 
@@ -5075,6 +5315,7 @@ def default_sources(
     apartment_guide = ApartmentGuideSource()
     movoto = MovotoSource()
     trulia = TruliaSource()
+    zillow = ZillowSource()
     free_sources: list[ListingSource] = [craigslist, listings_project, abacus]
     manual_sources: list[ListingSource] = [
         ManualSource("HotPads", "https://hotpads.com/san-francisco-ca/apartments-for-rent", blocked_reason),
@@ -5101,7 +5342,6 @@ def default_sources(
                 FurnishedFinderSource.search_url,
                 "Connect Apify before checking Furnished Finder's blocked public search.",
             ),
-            ZillowAlertSource(mailbox),
             HotPadsAlertSource(mailbox),
             ApartmentsComAlertSource(mailbox),
             spareroom,
@@ -5118,6 +5358,7 @@ def default_sources(
             apartment_guide,
             movoto,
             trulia,
+            zillow,
             RoomiesAlertSource(mailbox),
         ]
     return [
@@ -5137,7 +5378,6 @@ def default_sources(
             FurnishedFinderSource.search_url,
             "Connect Apify before checking Furnished Finder's blocked public search.",
         ),
-        ManualSource("Zillow", "https://www.zillow.com/myzillow/savedsearches/", "Zillow alert email setup is not connected yet."),
         *manual_sources[:1],
         spareroom,
         sf_portal,
@@ -5153,5 +5393,6 @@ def default_sources(
         apartment_guide,
         movoto,
         trulia,
+        zillow,
         *manual_sources[1:],
     ]
