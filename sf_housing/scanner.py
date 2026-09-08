@@ -825,6 +825,40 @@ class Scanner:
             return DEEP_SOURCE_CEILING_SECONDS
         return SOURCE_HARD_CEILING_SECONDS
 
+    def _seconds_until_readable(self, source: ListingSource, trigger: str) -> float:
+        """How long this source still wants left alone. Zero means read it.
+
+        Every scan re-read every source in full, and a person pressing Check
+        for new homes got a full read each time. Zillow blocks by address for
+        six hours or more, and it does so on rate: about ten requests a minute
+        sustained earned one here. Twenty-four pages a press, pressed while
+        waiting, is the shape of that -- so a source may declare a floor, and
+        pressing again inside it costs nothing rather than another read.
+
+        The nightly sweep is exempt. It runs once a day, which is its own rate
+        limit, and it is the only run that reads deeply enough to be worth
+        protecting from a manual check that happened to land minutes earlier.
+        """
+        if trigger == DEEP_SWEEP_TRIGGER:
+            return 0.0
+        floor = float(getattr(source, "min_seconds_between_reads", 0) or 0)
+        if floor <= 0:
+            return 0.0
+        # The last time it was asked, not the last time it answered: during a
+        # block the failures are what has to be spaced out.
+        stamp = self.repository.last_source_attempt(
+            source_key=self._source_key(source), platform=source.platform
+        )
+        if not stamp:
+            return 0.0
+        try:
+            asked = datetime.fromisoformat(stamp)
+        except ValueError:
+            return 0.0
+        if asked.tzinfo is None:
+            asked = asked.replace(tzinfo=UTC)
+        return max(0.0, floor - (datetime.now(UTC) - asked).total_seconds())
+
     def _budget_for(self, trigger: str) -> float:
         """How long this scan may take.
 
@@ -910,6 +944,26 @@ class Scanner:
                             source_run_id,
                             source.mode,
                             message=source.manual_reason,
+                            source_key=self._source_key(source),
+                        )
+                        self._finish_source_progress(source_index, weights.get(source.platform, 0.0))
+                        continue
+                    # Some sources ask not to be read again so soon, and this
+                    # applies to a check somebody pressed as much as to a
+                    # scheduled one: pressing again while waiting is precisely
+                    # how an address gets blocked. Nothing is lost by declining
+                    # -- the homes from minutes ago are already in the pool.
+                    wait = self._seconds_until_readable(source, trigger)
+                    if wait > 0:
+                        self.repository.finish_source_run(
+                            source_run_id,
+                            "skipped",
+                            message=(
+                                f"Checked less than {int(wait // 60) + 1} minute(s) ago. "
+                                "Reading it again this soon is what gets a source to refuse us, "
+                                "and its homes are already collected."
+                            ),
+                            provider=self._provider(source),
                             source_key=self._source_key(source),
                         )
                         self._finish_source_progress(source_index, weights.get(source.platform, 0.0))

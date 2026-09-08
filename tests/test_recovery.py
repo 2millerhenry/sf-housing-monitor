@@ -668,3 +668,140 @@ def test_one_detail_page_is_never_worth_more_than_a_whole_source(tmp_path: pathl
 
     assert 0 < DETAIL_HARD_CEILING_SECONDS < SOURCE_HARD_CEILING_SECONDS
     assert DETAIL_HARD_CEILING_SECONDS < Settings.from_environment().scan_max_seconds / 4
+
+
+# --------------------------------------------------------------------------
+# 7. a source that asks not to be read again so soon
+# --------------------------------------------------------------------------
+
+
+class CountingSource:
+    """Records how many times a scan actually read it."""
+
+    platform = "Zillow"
+    mode = "automatic"
+    search_url = "https://example.test/zillow"
+    manual_reason = None
+    detail_budget = 0
+    min_seconds_between_reads = 900
+
+    def __init__(self) -> None:
+        self.reads = 0
+
+    def search(self, client, preferences):
+        self.reads += 1
+        return [room("z1", "Zillow"), room("z2", "Zillow")]
+
+    def enrich(self, client, listing):
+        return listing
+
+
+def test_pressing_check_again_does_not_read_the_source_again(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Twenty-four pages a press, pressed while waiting, is how an address
+    earns a block that outlasts the afternoon. Nothing is lost by declining:
+    the homes from a minute ago are already in the pool."""
+    source = CountingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+
+    for _ in range(5):
+        scanner.run_scan("manual")
+
+    assert source.reads == 1, f"read {source.reads} times in five presses"
+
+
+def test_the_homes_from_the_first_read_are_still_there(tmp_path: pathlib.Path) -> None:
+    """Declining to re-read must not look like a source that found nothing."""
+    source = CountingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+    scanner.run_scan("manual")
+    scanner.run_scan("manual")
+
+    with repository.connection() as connection:
+        kept = [r["source_id"] for r in connection.execute("SELECT source_id FROM listings")]
+    assert sorted(kept) == ["z1", "z2"]
+
+
+def test_the_skip_says_why_rather_than_looking_like_a_failure(
+    tmp_path: pathlib.Path,
+) -> None:
+    source = CountingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+    scanner.run_scan("manual")
+    scanner.run_scan("manual")
+
+    with repository.connection() as connection:
+        runs = [dict(r) for r in connection.execute("SELECT * FROM source_runs ORDER BY id")]
+    assert runs[-1]["status"] == "skipped", runs[-1]["status"]
+    assert "already collected" in (runs[-1]["message"] or "")
+
+
+def test_the_nightly_sweep_is_never_held_back_by_the_floor(
+    tmp_path: pathlib.Path,
+) -> None:
+    """It runs once a day, which is its own rate limit, and it is the only run
+    that reads deeply enough to be worth protecting from a manual check that
+    happened to land minutes earlier."""
+    from sf_housing.scanner import DEEP_SWEEP_TRIGGER
+
+    source = CountingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+    scanner.run_scan("manual")
+    scanner.run_scan(DEEP_SWEEP_TRIGGER)
+
+    assert source.reads == 2, "the sweep was held back by a check minutes earlier"
+
+
+def test_a_source_without_a_floor_is_read_every_time(tmp_path: pathlib.Path) -> None:
+    """The floor is opt-in. Most of these are cheap to read and nobody has
+    ever objected to being asked."""
+    source = CountingSource()
+    source.min_seconds_between_reads = 0
+    repository, scanner = scanner_for(tmp_path, [source])
+
+    scanner.run_scan("manual")
+    scanner.run_scan("manual")
+
+    assert source.reads == 2
+
+
+def test_the_floor_holds_however_many_times_somebody_presses(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Every declined check records a skipped run, and those pile up fast when
+    somebody keeps pressing. Reading a fixed window of recent runs let them
+    push the last real attempt out of sight, so the floor lapsed after a
+    handful of presses -- exactly when it was working hardest."""
+    source = CountingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+
+    for _ in range(25):
+        scanner.run_scan("manual")
+
+    assert source.reads == 1, f"the floor lapsed after some presses: {source.reads} reads"
+
+
+class RefusingSource(CountingSource):
+    """A source that is currently turning us away, as Zillow was."""
+
+    def search(self, client, preferences):
+        self.reads += 1
+        raise SourceError("Zillow turned away an unattended request (HTTP 403).")
+
+
+def test_a_source_that_is_refusing_us_is_asked_no_more_often_than_one_that_is_not(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The floor has to be measured from the last time it was asked, not the
+    last time it answered. Measured from the last success, a source that is
+    refusing every request has no recent success -- so the floor never applies
+    and every press hammers the block that is already in place. That is the
+    case the floor exists for."""
+    source = RefusingSource()
+    repository, scanner = scanner_for(tmp_path, [source])
+
+    for _ in range(6):
+        scanner.run_scan("manual")
+
+    assert source.reads == 1, f"a refusing source was asked {source.reads} times"

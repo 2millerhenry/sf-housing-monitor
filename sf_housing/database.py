@@ -1328,6 +1328,24 @@ class Repository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def last_source_attempt(self, *, source_key: str, platform: str) -> str | None:
+        """When this source was last actually asked, skips excluded.
+
+        Deliberately its own query rather than a slice of the history: a source
+        with a floor records a skipped run every time a check declines to read
+        it, and those pile up fast when somebody keeps pressing. Reading a
+        fixed window of recent runs let them push the last real attempt out of
+        sight, and the floor lapsed exactly when it was working hardest.
+        """
+        with self.connection() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(finished_at, started_at) AS asked FROM source_runs "
+                "WHERE (source_key = ? OR platform = ?) AND status IN ('success', 'error') "
+                "ORDER BY id DESC LIMIT 1",
+                (source_key, platform),
+            ).fetchone()
+        return str(row["asked"]) if row and row["asked"] else None
+
     def source_run_history(
         self,
         *,

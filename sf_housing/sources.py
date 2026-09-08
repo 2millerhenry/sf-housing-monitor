@@ -4,6 +4,7 @@ import hashlib
 import json
 import logging
 import re
+import time
 from pathlib import Path
 from datetime import UTC, datetime
 from dataclasses import replace
@@ -2980,6 +2981,27 @@ class ZillowSource:
     # request and finds the extra homes on any day Zillow lifts the cap.
     deep_max_pages = 30
 
+    # A second between pages, because Zillow blocks by address and it lasts.
+    # Roughly three hundred requests over half an hour -- ten a minute, spread
+    # over an afternoon of measuring -- earned a 403 that outlived six hours,
+    # on both a browser string and an honest one. Unpaced, eight bands is
+    # fifty-two requests inside a minute: a burst rate five times the average
+    # that drew the block, saved so far only by being short. This halves it and
+    # costs nothing that matters -- an interactive read stays near thirty-five
+    # seconds against a seventy-five second ceiling, and the sweep near two
+    # minutes against five.
+    PAGE_PAUSE_SECONDS = 1.0
+
+    # And a floor between whole reads. The pause above spaces the pages of one
+    # read; this spaces the reads. Every scan re-read every source in full, so
+    # somebody pressing Check for new homes while waiting spent twenty-four
+    # requests a press -- the surest way for one of these to earn a block that
+    # outlasts the afternoon. Fifteen minutes caps that at four reads an hour,
+    # which is under two requests a minute even if somebody never stops
+    # pressing. San Francisco rentals do not turn over inside fifteen minutes,
+    # so nothing is missed; the nightly sweep is exempt and still reads deeply.
+    min_seconds_between_reads = 900
+
     FOR_RENT = "FOR_RENT"
 
     # Rent bands, measured against live Zillow rather than guessed. The cap is
@@ -3084,6 +3106,9 @@ class ZillowSource:
         seen: set[str] = set()
         read_a_card = False
         document = ""
+        # Counted across every band: the pause is about the rate Zillow sees
+        # from this address, which does not reset because a new band started.
+        requested = 0
 
         # ``seen`` spans every band on purpose: a building whose rents straddle
         # a boundary is returned on both sides of it, and the pool wants it once.
@@ -3095,6 +3120,9 @@ class ZillowSource:
             band_seen: set[str] = set()
             for page in range(1, pages + 1):
                 url = self._page_url(page) if band is None else self._band_url(band, page)
+                if requested:
+                    time.sleep(self.PAGE_PAUSE_SECONDS)
+                requested += 1
                 response = client.get(url, headers=_BROWSER_HEADERS)
                 # Past its last page Zillow answers 400 rather than serving an
                 # empty one. Once cards have been read that is the end of this

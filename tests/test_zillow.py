@@ -691,3 +691,67 @@ def test_being_turned_away_is_not_read_as_the_end_of_the_results(preferences) ->
         source.search_for_trigger(client, preferences, DEEP_SWEEP_TRIGGER)
 
     assert "403" in str(refused.value)
+
+
+def test_pages_are_spaced_so_a_sweep_is_not_a_burst(preferences, monkeypatch) -> None:
+    """Zillow blocks by address and it lasts: about three hundred requests over
+    half an hour drew a 403 that outlived six hours, on a browser string and an
+    honest one alike. Unpaced, eight bands is fifty-two requests inside a
+    minute -- a burst rate several times the average that drew it."""
+    import sf_housing.sources as sources
+
+    waited: list[float] = []
+    monkeypatch.setattr(sources.time, "sleep", lambda seconds: waited.append(seconds))
+    client = BandClient()
+
+    ZillowSource().search_for_trigger(client, preferences, DEEP_SWEEP_TRIGGER)
+
+    assert waited, "the pages go out as fast as the network allows"
+    assert len(waited) == len(client.requested) - 1, "every page after the first waits"
+    assert all(pause == ZillowSource.PAGE_PAUSE_SECONDS for pause in waited)
+
+
+def test_the_pause_carries_across_bands(preferences, monkeypatch) -> None:
+    """The rate Zillow sees is from this address. It does not reset because a
+    new band started, so neither does the count."""
+    import sf_housing.sources as sources
+
+    waited: list[float] = []
+    monkeypatch.setattr(sources.time, "sleep", lambda seconds: waited.append(seconds))
+    client = BandClient()
+
+    ZillowSource().search_for_trigger(client, preferences, DEEP_SWEEP_TRIGGER)
+
+    # One un-paused request in total, not one per band.
+    assert len(client.requested) - len(waited) == 1
+
+
+def test_the_pacing_still_fits_inside_both_ceilings() -> None:
+    """A pause that outlasts the ceiling abandons the source, which loses more
+    than a block would."""
+    from sf_housing.scanner import (
+        DEEP_SOURCE_CEILING_SECONDS,
+        SOURCE_HARD_CEILING_SECONDS,
+    )
+
+    source = ZillowSource()
+    interactive = source.max_pages * source.PAGE_PAUSE_SECONDS
+    sweep = 52 * source.PAGE_PAUSE_SECONDS
+
+    assert source.PAGE_PAUSE_SECONDS > 0, "the requests go out as one burst"
+    assert interactive < SOURCE_HARD_CEILING_SECONDS / 2, "no room left to actually read"
+    assert sweep < DEEP_SOURCE_CEILING_SECONDS / 2
+
+
+def test_zillow_asks_not_to_be_read_again_within_the_quarter_hour() -> None:
+    """Zillow blocks by address for hours, on rate. Twenty-four pages a press,
+    pressed while waiting, is how a person earns that. A floor caps it at four
+    reads an hour however often the button is pressed."""
+    source = ZillowSource()
+    floor_minutes = source.min_seconds_between_reads / 60
+    reads_per_hour = 60 / floor_minutes
+    worst_case_per_minute = reads_per_hour * source.max_pages / 60
+
+    assert floor_minutes >= 10, "a press still costs a full read"
+    # Roughly ten a minute sustained is what drew the block being defended against.
+    assert worst_case_per_minute < 3, worst_case_per_minute
