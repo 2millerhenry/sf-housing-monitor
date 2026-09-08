@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
+from zoneinfo import ZoneInfo
 
 from .connectors import ConnectorStatus
 
@@ -57,8 +58,32 @@ def _parse_time(value: object) -> datetime | None:
     return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed.astimezone(UTC)
 
 
+# Everything else this product says a time in -- the two daily checks, the list
+# of recent checks beside this one -- is Pacific. Source health alone answered
+# in UTC, so the panel put "9:13 AM UTC" next to a column headed "Pacific time"
+# and left the reader to do the arithmetic. Defined here because this is the
+# leaf; scheduling re-exports it.
+PACIFIC = ZoneInfo("America/Los_Angeles")
+
+
 def _format_time(value: datetime | None) -> str:
-    return value.astimezone(UTC).strftime("%b %-d at %-I:%M %p UTC") if value else "an unknown time"
+    return value.astimezone(PACIFIC).strftime("%b %-d at %-I:%M %p") if value else "an unknown time"
+
+
+# Sentence case throughout, and never a bare colour: each of these is the whole
+# of what a healthy row says, so it has to say it in words.
+SHORT_LABELS = {
+    "working": "Current",
+    "working_zero": "No matches",
+    "waiting_first_alert": "Waiting for the first alert",
+    "checking": "Checking",
+    "attention": "Needs attention",
+    "stale": "Stale",
+    "backoff": "Paused",
+    "manual": "Needs setup",
+    "optional": "Optional",
+    "not_run": "Not run yet",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +101,19 @@ class SourceFreshness:
     last_success_at: str | None
     failure_streak: int = 0
     next_retry_at: str | None = None
+    listings_seen: int = 0
+
+    @property
+    def short_label(self) -> str:
+        """The state on its own, for a list that already shows the name.
+
+        The System status panel prints the platform beside this, so the long
+        label read "Craigslist is current" one column away from "Craigslist" --
+        and the repetition was long enough to wrap the badges into each other.
+        The long labels stay as they are: the Ready Check lists checks flat,
+        where each one has to name its own subject.
+        """
+        return SHORT_LABELS.get(self.status, self.status.replace("_", " ").capitalize())
 
     @property
     def needs_attention(self) -> bool:
@@ -244,6 +282,7 @@ def evaluate_source_freshness(
                 "Nothing to do. The next scheduled check will look again.",
                 latest,
                 last_success_at,
+                listings_seen=seen,
             )
         return SourceFreshness(
             key,
@@ -255,6 +294,7 @@ def evaluate_source_freshness(
             "Nothing to do.",
             latest,
             last_success_at,
+            listings_seen=seen,
         )
 
     return SourceFreshness(

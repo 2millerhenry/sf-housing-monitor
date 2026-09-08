@@ -158,8 +158,13 @@ def test_dashboard_calls_out_a_stale_source_without_hiding_other_results(tmp_pat
     assert response.status_code == 200
     assert "Still visible room" in response.text
     assert "1 source needs attention" in response.text
-    assert "Craigslist is stale" in response.text
-    assert "Use Check for new homes now" in response.text
+    # A broken source is called out where the eye goes first, with the sentence
+    # saying what to do about it -- not filed among the ones that are fine.
+    alerts = response.text[response.text.index('class="source-alerts"') :]
+    alerts = alerts[: alerts.index("</ul>")]
+    assert "Craigslist" in alerts
+    assert "Stale" in alerts
+    assert "Use Check for new homes now" in alerts
 
 
 def test_dashboard_keeps_each_listing_link_in_the_left_side_of_the_table(tmp_path: Path) -> None:
@@ -1193,3 +1198,107 @@ def test_the_source_chips_tighten_rather_than_taking_a_third_line() -> None:
     narrow = style[style.index("@media (max-width: 1300px)") :]
     assert ".already-list .source-chip" in narrow[:400]
     assert "font-size: 0.72rem" in narrow[:400]
+
+
+# --------------------------------------------------------------------------
+# the source panel says the state once
+# --------------------------------------------------------------------------
+
+
+class HealthyDashboardSource:
+    platform = "Movoto"
+    mode = "automatic"
+    search_url = "https://example.test/movoto"
+    manual_reason = None
+
+
+def panel_with_sources(tmp_path: Path, *, seen: int = 1957, stale: bool = False) -> str:
+    """One source, checked once, rendered into the System status panel."""
+    settings = app_settings(tmp_path)
+    source = StaleDashboardSource() if stale else HealthyDashboardSource()
+    application = create_app(settings=settings, sources=[source], enable_scheduler=False)
+    repository = application.state.repository
+    run_id = repository.begin_scan("manual")
+    source_run = repository.begin_source_run(
+        run_id, source.platform, source.search_url, source_key=type(source).__name__
+    )
+    repository.finish_source_run(source_run, "success", seen=seen)
+    repository.finish_scan(run_id, "completed")
+    if stale:
+        old = (datetime.now(UTC) - FRESHNESS_WINDOW - timedelta(minutes=1)).isoformat()
+        with repository.connection() as connection:
+            connection.execute(
+                "UPDATE source_runs SET finished_at = ? WHERE id = ?", (old, source_run)
+            )
+            connection.commit()
+    with TestClient(application) as client:
+        return client.get("/").text
+
+
+def sources_panel(page: str) -> str:
+    start = page.index('aria-labelledby="sources-title"')
+    return page[start : page.index("</section>", start)]
+
+
+def test_a_working_source_never_restates_its_own_name(tmp_path: Path) -> None:
+    """The name is already the first thing in the row. "Movoto is current" one
+    column away from "Movoto" is the same word twice, and it was long enough to
+    wrap the badges into each other."""
+    panel = sources_panel(panel_with_sources(tmp_path))
+
+    assert "Movoto" in panel
+    assert "Movoto is current" not in panel
+
+
+def test_a_working_source_is_one_row_of_name_and_number(tmp_path: Path) -> None:
+    """What is worth knowing about a source that worked is what it brought
+    back, not a sentence saying it worked."""
+    panel = sources_panel(panel_with_sources(tmp_path, seen=1957))
+
+    assert "1,957" in panel, "the count carries the row"
+    assert "This is a valid result, not a failure." not in panel
+    assert "The latest source check completed at" not in panel
+
+
+def test_a_source_with_nothing_to_show_says_so_in_words(tmp_path: Path) -> None:
+    """The Honest State Rule: colour is never the only evidence."""
+    panel = sources_panel(panel_with_sources(tmp_path, seen=0))
+
+    assert "No matches" in panel
+
+
+def test_only_a_source_needing_a_person_gets_the_recovery_sentence(
+    tmp_path: Path,
+) -> None:
+    """Every row carrying its recovery text is twenty-two sentences telling
+    somebody to do nothing."""
+    healthy = sources_panel(panel_with_sources(tmp_path))
+
+    assert "source-alerts" not in healthy, "nothing is wrong, so nothing is raised"
+    assert "Nothing to do" not in healthy
+
+
+def test_a_source_time_is_stated_in_the_zone_the_rest_of_the_page_uses() -> None:
+    """The checks beside this are headed "Pacific time" and the two daily runs
+    are Pacific. Source health answering in UTC left the reader converting.
+
+    Asserted on the formatter, because only a paused source quotes a time in
+    the panel and a stale one never reaches this sentence at all.
+    """
+    from sf_housing.freshness import _format_time
+
+    # The same instant the panel used to render as "Sep 8 at 3:13 AM UTC".
+    assert _format_time(datetime(2026, 9, 8, 3, 13, tzinfo=UTC)) == "Sep 7 at 8:13 PM"
+
+
+def test_a_long_source_name_shortens_rather_than_taking_a_second_line() -> None:
+    """A roster is only scannable while every row is the same height, and
+    "Abacus (small buildings)" is wider than half of a narrow panel."""
+    style = (Path(__file__).resolve().parents[1] / "sf_housing/static/style.css").read_text(
+        encoding="utf-8"
+    )
+    start = style.index(".source-roster a {")
+    rule = style[start : style.index("}", start)]
+
+    assert "white-space: nowrap" in rule, rule
+    assert "text-overflow: ellipsis" in rule, rule

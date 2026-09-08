@@ -375,21 +375,41 @@
   <div class="system-grid">
     <section aria-labelledby="sources-title">
       <div class="system-heading"><h2 id="sources-title">Sources</h2><span><a href="/alerts">Manage sources</a> · <a href="/support">Run ready check</a></span></div>
-      <div class="status-list">
-        {% for source in source_statuses %}
-        <div class="status-item">
+      {#- Twenty sources each restating their own name, the same timestamp and
+          the same "this is a valid result" sentence is not twenty facts, it is
+          one fact printed twenty times. What is actually worth reading is which
+          sources broke, and what the rest brought back. So a source that needs
+          a person gets room and the sentence saying what to do, and everything
+          working collapses to a name against a number. -#}
+      {% set broken = source_statuses | selectattr('status', 'in', ['attention', 'stale', 'backoff']) | list %}
+      {% set healthy = source_statuses | rejectattr('status', 'in', ['attention', 'stale', 'backoff']) | list %}
+      {% if broken %}
+      <ul class="source-alerts">
+        {% for source in broken %}
+        <li>
           <div>
             <strong>{{ source.platform }}</strong>
-            <span class="status {{ source.status }}">
-              {{ source.freshness_label }}
-            </span>
+            <span class="status {{ source.status }}">{{ source.short_label }}</span>
           </div>
-          <p>{{ source.freshness_explanation }}</p>
-          {% if source.status in ['attention', 'stale', 'backoff'] %}<small class="source-recovery">{{ source.recovery_action }}</small>{% endif %}
-          <a href="{{ source.search_url }}" target="_blank" rel="noopener noreferrer">Open source ↗</a>
-        </div>
+          <p>{{ source.recovery_action }}</p>
+        </li>
         {% endfor %}
-      </div>
+      </ul>
+      {% endif %}
+      {% if healthy %}
+      <ul class="source-roster">
+        {% for source in healthy | sort(attribute='freshness_seen', reverse=true) %}
+        <li>
+          <a href="{{ source.search_url }}" target="_blank" rel="noopener noreferrer">{{ source.platform }}</a>
+          {% if source.freshness_seen %}
+          <span class="source-count">{{ "{:,}".format(source.freshness_seen) }}</span>
+          {% else %}
+          <span class="source-state">{{ source.short_label }}</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      {% endif %}
     </section>
     <section aria-labelledby="scans-title">
       <div class="system-heading"><h2 id="scans-title">Recent checks</h2><span>Pacific time</span></div>

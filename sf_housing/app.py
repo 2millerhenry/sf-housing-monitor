@@ -750,6 +750,8 @@ def create_app(
                     "status": health.status,
                     "freshness_label": health.label,
                     "freshness_explanation": health.explanation,
+                    "short_label": health.short_label,
+                    "freshness_seen": health.listings_seen,
                     "recovery_action": health.action,
                     "failure_streak": health.failure_streak,
                     "last_success_at": health.last_success_at,

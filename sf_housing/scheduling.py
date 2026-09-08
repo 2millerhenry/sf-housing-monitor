@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
-from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -15,7 +14,7 @@ from .scanner import DEEP_SWEEP_TRIGGER, Scanner
 
 LOGGER = logging.getLogger(__name__)
 
-PACIFIC = ZoneInfo("America/Los_Angeles")
+from .freshness import PACIFIC  # one definition, re-exported for existing callers
 SCHEDULE_HOURS = (10, 18)
 
 # How often to ask whether a due slot went unserved. The cron job below is the

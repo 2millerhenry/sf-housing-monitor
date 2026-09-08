@@ -506,21 +506,47 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .system-heading { min-height: 52px; padding: 0 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); }
 .system-heading h2 { margin: 0; font-size: 0.9rem; }
 .system-heading a, .system-heading span { color: var(--muted); font-size: 0.75rem; }
-.status-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.status-item { padding: 14px 18px; border-bottom: 1px solid var(--line); }
-.status-item:nth-child(odd) { border-right: 1px solid var(--line); }
-.status-item:nth-last-child(-n+2) { border-bottom: 0; }
-.status-item > div { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.status-item strong { font-size: 0.84rem; }
-.status-item p { min-height: 34px; margin: 8px 0; color: var(--muted); line-height: 1.4; font-size: 0.75rem; }
-.status-item a { font-size: 0.75rem; font-weight: 620; }
+/* The source panel is a roster, not twenty paragraphs. A source that needs a
+   person gets room and a sentence; everything working is a name against the
+   number it brought back, on one aligned column so the list can be read down
+   rather than across. */
+.source-alerts, .source-roster { margin: 0; padding: 0; list-style: none; }
+.source-alerts li { padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--amber-soft); }
+.source-alerts li > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.source-alerts strong { font-size: 0.84rem; }
+.source-alerts p { margin: 5px 0 0; color: var(--amber); font-size: 0.74rem; line-height: 1.4; }
+.source-roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.source-roster li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+.source-roster li:nth-child(odd) { border-right: 1px solid var(--line); }
+.source-roster li:nth-last-child(-n+2) { border-bottom: 0; }
+.source-roster a {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 560;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-roster a:hover { color: var(--accent); text-decoration: underline; }
+/* Counts line up as a column, so the productive sources read at a glance. */
+.source-count { flex: none; color: var(--ink); font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+.source-state { flex: none; color: var(--muted); font-size: 0.72rem; white-space: nowrap; }
 .status { display: inline-flex; align-items: center; border-radius: 999px; background: var(--surface-muted); color: var(--muted); padding: 3px 7px; font-size: 0.62rem; font-weight: 730; white-space: nowrap; }
 .status.success, .status.completed { background: var(--accent-soft); color: var(--accent-hover); }
 .status.working, .status.working_zero, .status.checking { background: var(--accent-soft); color: var(--accent-hover); }
 .status.error, .status.failed, .status.completed_with_errors { background: var(--red-soft); color: var(--red); }
 .status.attention, .status.stale, .status.backoff { background: var(--amber-soft); color: var(--amber); }
 .status.manual, .status.setup, .status.skipped, .status.not_run, .status.optional { background: var(--amber-soft); color: var(--amber); }
-.source-recovery { display: block; margin: -2px 0 9px; color: var(--amber); font-size: 0.72rem; line-height: 1.4; }
 .scan-list > div { display: grid; grid-template-columns: auto 1fr; gap: 6px 9px; align-items: center; padding: 13px 18px; border-bottom: 1px solid var(--line); }
 .scan-list > div:last-child { border-bottom: 0; }
 .scan-list strong { text-align: right; font-size: 0.75rem; }
@@ -1176,7 +1202,9 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .listing-table .cell-score { width: 56px; }
   .listing-table .cell-actions { width: 116px; }
   .row-action { font-size: 0.62rem; padding-inline: 4px; }
-  .status-list { grid-template-columns: 1fr; }
+  .source-roster { grid-template-columns: 1fr; }
+  .source-roster li:nth-child(odd) { border-right: 0; }
+  .source-roster li:last-child { border-bottom: 0; }
   .status-item:nth-child(odd) { border-right: 0; }
   .status-item:nth-last-child(2) { border-bottom: 1px solid var(--line); }
   .budget-grid, .three-fields, .two-fields { grid-template-columns: 1fr; }
