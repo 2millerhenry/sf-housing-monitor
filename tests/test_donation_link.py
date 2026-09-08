@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pathlib
+
 from pathlib import Path
 
 import pytest
@@ -221,3 +223,28 @@ def test_the_close_button_is_a_circle_not_an_oval() -> None:
     for declaration in ("width: 32px", "height: 32px", "min-width: 32px", "min-height: 32px", "padding: 0"):
         assert declaration in rule, f"{declaration} is missing, so the shared button rule wins"
     assert "border-radius: 50%" in rule
+
+
+def test_the_footer_says_the_promise_in_full() -> None:
+    """"Free to use" invites the question. Answering it in the same breath is
+    the difference between a claim and a promise."""
+    base = (
+        pathlib.Path(__file__).resolve().parents[1] / "sf_housing/templates/base.html"
+    ).read_text(encoding="utf-8")
+
+    assert "Free to use, forever." in base
+
+
+def test_the_footer_is_meant_to_be_noticed() -> None:
+    """It is the one place the app asks for anything, and set to match the
+    page it read as something already scrolled past: a shade darker than the
+    page, and a size up from the rest of the small print."""
+    style = (
+        pathlib.Path(__file__).resolve().parents[1] / "sf_housing/static/style.css"
+    ).read_text(encoding="utf-8")
+    footer = style[style.index(".site-footer {") : style.index(".site-footer {") + 200]
+    paragraph = style[style.index(".footer-inner p {") : style.index("}", style.index(".footer-inner p {"))]
+    size = float(paragraph.split("font-size:")[1].split("rem")[0].strip())
+
+    assert "var(--band-strong)" in footer, footer
+    assert size >= 0.9, f"the footer type is still small print at {size}rem"
