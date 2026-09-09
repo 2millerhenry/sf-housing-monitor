@@ -945,11 +945,24 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 /* The form opens with the one number a home type actually needs. A minimum and
    an ideal are refinements, so they stay out of the way until someone asks for
    them -- and come back on their own for anyone who has already set one. */
-.path-ledger-head, .path-row { display: grid; grid-template-columns: minmax(185px, 1.5fr) repeat(3, minmax(100px, 0.72fr)); gap: 8px 14px; align-items: center; }
+/* The column track is a variable so the narrow layout has one thing to change
+   rather than two. It used to be written out twice -- once plainly and once
+   again under .show-ranges -- and the reflow further down this file overrode
+   only the plain one. A media query adds no specificity of its own, so for
+   anybody who had asked for a price range the five-column desktop grid stayed
+   on a phone: the ledger measured 591px inside a 430px window, the form clips
+   to its own rounded corners, and nine fields -- every required maximum among
+   them -- sat past the edge with no way to scroll to them. */
+.path-ledger { --ledger-columns: minmax(185px, 1.5fr) repeat(3, minmax(100px, 0.72fr)); }
+.path-ledger.show-ranges { --ledger-columns: minmax(165px, 1.3fr) repeat(4, minmax(84px, 0.56fr)); }
+.path-ledger-head, .path-row { display: grid; grid-template-columns: var(--ledger-columns); gap: 8px 14px; align-items: center; }
 .path-ledger .is-optional { display: none; }
 .path-ledger.show-ranges .is-optional { display: block; }
-.path-ledger.show-ranges .path-ledger-head,
-.path-ledger.show-ranges .path-row { grid-template-columns: minmax(165px, 1.3fr) repeat(4, minmax(84px, 0.56fr)); }
+/* Revealing the column must not take the cell's own layout with it: block
+   there costs the 4px gap between a label and its field, which nothing shows
+   on a wide screen -- the labels are hidden -- and which put this field four
+   pixels above the one beside it as soon as the narrow layout displayed them. */
+.path-ledger.show-ranges .money-cell.is-optional { display: grid; }
 .path-ledger-head { padding: 9px 16px; border-bottom: 1px solid var(--line); background: var(--surface-muted); color: var(--muted); font-size: 0.69rem; font-weight: 620; }
 .path-ledger-head span:not(:first-child) { text-align: left; }
 .path-row { padding: 12px 16px; transition: background-color 180ms var(--ease-state); }
@@ -1372,10 +1385,18 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .area-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .area-tier:nth-child(2n+1) { border-left: 0; }
   .area-tier:nth-child(n+3) { border-top: 1px solid var(--line); }
+  /* One column: the home type on its own line, then its money below it with
+     the labels the hidden header row was carrying. Written against both
+     ledgers, and the fields against both again, because .show-ranges outranks
+     a bare class and this block has no specificity of its own to answer with. */
   .path-ledger-head { display: none; }
   .cell-label { display: block; }
-  .path-row { grid-template-columns: 1fr; }
-  .path-row-fields { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .path-ledger, .path-ledger.show-ranges { --ledger-columns: 1fr; }
+  /* "Just you" fills the Sharing with column on a wide screen. Stacked there
+     is no column to fill, and the home type above it already says so. */
+  .cell-empty { display: none; }
+  .path-ledger .path-row-fields,
+  .path-ledger.show-ranges .path-row-fields { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-row.three-up, .field-row.two-up { grid-template-columns: 1fr; }
   .path-choice:last-child:nth-child(odd) { grid-column: auto; }
   .preference-head { display: none; }

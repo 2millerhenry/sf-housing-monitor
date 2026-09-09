@@ -1277,3 +1277,155 @@ def test_the_sentence_fades_out_before_the_next_one_fades_in() -> None:
 
     assert 'opacity = "0"' in panel, "nothing ever fades out"
     assert "setTimeout(show" in panel, "the swap does not wait for the fade"
+
+
+# --------------------------------------------------------------------------
+# the budget table on a narrow window
+# --------------------------------------------------------------------------
+
+
+def css_rules(style: str):
+    """Every (selector, declarations, enclosing at-rule) in the stylesheet.
+
+    Enough of a parser for the questions below: one level of at-rule nesting,
+    which is all this file uses.
+    """
+    import re
+
+    style = re.sub(r"/\*.*?\*/", "", style, flags=re.S)
+
+    def walk(text: str, condition: str):
+        at = 0
+        while True:
+            opened = text.find("{", at)
+            if opened == -1:
+                return
+            prelude = text[at:opened].split("}")[-1].strip()
+            depth, close = 1, opened + 1
+            while depth:
+                if text[close] == "{":
+                    depth += 1
+                elif text[close] == "}":
+                    depth -= 1
+                close += 1
+            body = text[opened + 1 : close - 1]
+            if prelude.startswith("@"):
+                yield from walk(body, prelude)
+            else:
+                yield prelude, body, condition
+            at = close
+
+    return list(walk(style, ""))
+
+
+def specificity(selector: str) -> tuple[int, int, int]:
+    """(ids, classes, elements) for one selector.
+
+    Counting, not a parser -- the selectors it is asked about are plain
+    class and element chains, and the test below refuses anything else.
+    """
+    import re
+
+    assert ":" not in selector and "[" not in selector, f"too clever for this: {selector}"
+    return (
+        selector.count("#"),
+        selector.count("."),
+        len(re.findall(r"(?:^|[\s>+~])([a-z][a-z0-9-]*)", selector)),
+    )
+
+
+def test_the_column_track_is_chosen_in_exactly_one_place() -> None:
+    """Every rule that gives a budget row its columns has to read the variable,
+    because that is what leaves the narrow layout one thing to override instead
+    of a list that can grow behind its back. The list had grown: the desktop
+    track was written plainly and again under .show-ranges, and the reflow
+    answered only the plain one."""
+    for selector, body, _ in css_rules(stylesheet()):
+        if "path-row-fields" in selector:
+            continue  # the fields have their own two-up track on a narrow window
+        if "path-row" not in selector and "path-ledger-head" not in selector:
+            continue
+        for declaration in body.split(";"):
+            name, _, value = declaration.partition(":")
+            if name.strip() == "grid-template-columns":
+                assert value.strip() == "var(--ledger-columns)", f"{selector} {{{declaration} }}"
+
+
+def test_the_narrow_layout_can_reach_that_place() -> None:
+    """A media query carries no specificity of its own, so the reflow only
+    happens if it is at least as strong as what it is undoing. It was not.
+    Anybody who had asked for a price range kept the five-column desktop grid
+    on a phone: the table measured 591px inside a 430px window, the form clips
+    to its own rounded corners, and nine fields -- every required maximum among
+    them -- sat past the edge of the screen with nothing able to scroll to
+    them."""
+    wide, narrow = [], []
+    for selector, body, condition in css_rules(stylesheet()):
+        if "--ledger-columns:" not in body:
+            continue
+        for one in (part.strip() for part in selector.split(",")):
+            (narrow if "max-width" in condition else wide).append((one, condition))
+
+    assert wide, "nothing sets the column track any more"
+    assert narrow, "the narrow window no longer changes it"
+    strongest_narrow = max(specificity(one) for one, _ in narrow)
+    strongest_wide = max(specificity(one) for one, _ in wide)
+
+    # A tie is enough: the narrow block is further down the file.
+    assert strongest_narrow >= strongest_wide, (
+        f"the strongest narrow rule {strongest_narrow} cannot beat the strongest "
+        f"wide rule {strongest_wide}; wide={wide} narrow={narrow}"
+    )
+
+
+def narrow_rules():
+    """The rules that only apply once the window is too narrow for the table."""
+    return [
+        (selector, body)
+        for selector, body, condition in css_rules(stylesheet())
+        if "max-width: 760px" in condition
+    ]
+
+
+def declares(body: str, name: str) -> str:
+    for declaration in body.split(";"):
+        key, _, value = declaration.partition(":")
+        if key.strip() == name:
+            return value.strip()
+    return ""
+
+
+def test_the_stacked_row_reads_as_a_labelled_form_not_a_headless_table() -> None:
+    """With the column headings gone, every field has to say what it is, the
+    fields have to fit two to a line, and the placeholder that fills the
+    Sharing with column on a wide screen has no column left to fill."""
+    rules = narrow_rules()
+    assert rules, "the narrow layout is gone"
+
+    def display_of(selector: str) -> str:
+        return next(
+            (declares(body, "display") for sel, body in rules if sel.strip() == selector), ""
+        )
+
+    assert display_of(".path-ledger-head") == "none", "the headings stay and the labels do not"
+    assert display_of(".cell-label") == "block", "then nothing says which number is which"
+    assert display_of(".cell-empty") == "none", '"Just you" has no column to fill here'
+
+    # Named against the fields themselves: three other things in this block lay
+    # out two-up as well, so looking for the bare track proved nothing.
+    fields = [body for selector, body in rules if "path-row-fields" in selector]
+    assert fields, "the fields keep the desktop track"
+    for body in fields:
+        assert declares(body, "grid-template-columns") == "repeat(2, minmax(0, 1fr))", body
+
+
+def test_revealing_the_optional_column_keeps_the_cell_a_grid() -> None:
+    """The reveal sets display on a class the cell shares with a heading, and
+    block there costs the 4px gap between a label and its field. Nothing shows
+    it on a wide screen, where the labels are hidden -- it appeared the moment
+    the narrow layout displayed them, four pixels out from the field beside
+    it."""
+    style = stylesheet()
+
+    assert ".money-cell { min-width: 0; display: grid;" in style
+    assert ".path-ledger.show-ranges .money-cell.is-optional { display: grid; }" in style
