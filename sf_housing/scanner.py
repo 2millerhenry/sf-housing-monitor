@@ -186,6 +186,15 @@ class Scanner:
         else:
             percent = 0
         snapshot["percent"] = max(0, min(100, percent))
+        # The weights are seconds each source really took on its own recent
+        # runs, so what is left of them is already the answer to "how much
+        # longer" -- no second guess to keep in step with the first. Only
+        # offered while a scan is running and only once the weights are known;
+        # a number invented for the first ever scan would be worse than none.
+        remaining: int | None = None
+        if snapshot["running"] and weight_total > 0:
+            remaining = max(0, round(weight_total - weight_done - running))
+        snapshot["seconds_remaining"] = remaining
         return snapshot
 
     def _eligible_sources(self, trigger: str) -> list[ListingSource]:

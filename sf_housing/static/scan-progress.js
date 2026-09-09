@@ -17,6 +17,19 @@
   // watches the whole rotation should come away knowing how their homes are
   // collected. Written as functions so the ones with numbers in them are the
   // live numbers, not the ones from when the page loaded.
+  // How much longer, from the seconds each source really took on its own
+  // recent runs. Rounded hard on purpose: a scan is not predictable to the
+  // second, and "about a minute left" that turns out to be seventy seconds
+  // reads as honest where "63s left" counting unevenly reads as broken.
+  const remainingLabel = (progress) => {
+    const left = progress.seconds_remaining;
+    if (left === null || left === undefined) return "";
+    if (left <= 10) return " · finishing up";
+    if (left < 60) return " · about half a minute left";
+    const minutes = Math.round(left / 60);
+    return ` · about ${minutes} minute${minutes === 1 ? "" : "s"} left`;
+  };
+
   const NOTES = [
     (p) => `Reading ${p.current_source || "each source"} for homes it has not shown before.`,
     (p) => `${p.listings_seen || 0} listings read so far across ${p.sources_total || 0} sources.`,
@@ -57,7 +70,7 @@
     percentLabel.textContent = `${percent}%`;
     track.setAttribute("aria-valuenow", String(percent));
     bar.style.setProperty("--scan-progress", String(percent / 100));
-    detail.textContent = `${elapsed}s elapsed · ${completed} of ${sourceCount} sources · ${checked} listings checked`;
+    detail.textContent = `${elapsed}s elapsed${remainingLabel(progress)} · ${completed} of ${sourceCount} sources · ${checked} listings checked`;
     estimate.textContent = progress.typical_seconds
       ? `Usually about ${progress.typical_seconds}s`
       : `Up to ${progress.maximum_seconds || 120}s`;

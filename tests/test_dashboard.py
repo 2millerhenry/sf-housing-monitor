@@ -1525,3 +1525,93 @@ def test_the_export_carries_the_score_floor_the_shortlist_is_defined_by(
 
     body = inspect.getsource(select_listings)
     assert "minimum_score=preferences.minimum_score" in body
+
+
+def test_the_bar_says_how_much_longer_from_what_the_sources_really_take() -> None:
+    """The weights already are the seconds each source took on its own recent
+    runs, so what is left of them is the answer. A second estimate kept
+    alongside the first is a second thing to drift."""
+    import inspect
+
+    from sf_housing.scanner import Scanner
+
+    body = inspect.getsource(Scanner.progress.fget)
+
+    assert "seconds_remaining" in body
+    assert "weight_total - weight_done - running" in body
+
+
+def test_no_estimate_is_offered_before_there_is_anything_to_base_one_on(
+    tmp_path: Path,
+) -> None:
+    """A number invented for the very first scan, when no source has ever been
+    timed, is worse than saying nothing."""
+    from sf_housing.database import Repository
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scanner import Scanner
+    from tests.conftest import TEST_PREFERENCES
+
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    scanner = Scanner(repository, lambda: parse_preferences(TEST_PREFERENCES), [])
+
+    assert scanner.progress["seconds_remaining"] is None
+
+
+def test_a_finished_scan_stops_predicting(tmp_path: Path) -> None:
+    """"About a minute left" beside a finished scan is the bar lying."""
+    from sf_housing.database import Repository
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scanner import Scanner
+    from tests.conftest import TEST_PREFERENCES
+
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    scanner = Scanner(repository, lambda: parse_preferences(TEST_PREFERENCES), [])
+    scanner.run_scan("manual")
+
+    assert scanner.progress["running"] is False
+    assert scanner.progress["seconds_remaining"] is None
+
+
+def test_the_estimate_is_rounded_rather_than_counted_to_the_second() -> None:
+    """A scan is not predictable to the second. "63s left" counting unevenly
+    reads as broken where "about a minute left" reads as honest."""
+    script = scan_progress_script()
+
+    assert "seconds_remaining" in script
+    assert "finishing up" in script
+    assert "Math.round(left / 60)" in script
+    # And it says nothing when the scanner offers no number. Asserted as the
+    # whole condition: a guard rewritten to if (false) still contains a
+    # return "" and would otherwise pass this.
+    assert 'if (left === null || left === undefined) return "";' in script
+
+
+def test_a_running_scan_says_how_many_seconds_are_left(tmp_path: Path) -> None:
+    """The estimate has to be a number while a scan is running, not merely
+    absent at the right moments. Read from the weights directly, because a
+    real scan of real sources cannot be held at a known fraction."""
+    from sf_housing.database import Repository
+    from sf_housing.preferences import parse_preferences
+    from sf_housing.scanner import Scanner
+    from tests.conftest import TEST_PREFERENCES
+
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    scanner = Scanner(repository, lambda: parse_preferences(TEST_PREFERENCES), [])
+    with scanner._progress_lock:
+        scanner._progress_state.update(
+            {
+                "running": True,
+                "status": "running",
+                "weight_total": 100.0,
+                "weight_done": 40.0,
+                "weight_current": 0.0,
+                "current_started_monotonic": None,
+            }
+        )
+
+    # Sixty of the hundred seconds these sources usually take are still ahead.
+    assert scanner.progress["seconds_remaining"] == 60
+    assert scanner.progress["percent"] == 40
