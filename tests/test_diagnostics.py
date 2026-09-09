@@ -564,3 +564,139 @@ def test_every_class_the_support_page_uses_is_actually_styled() -> None:
     missing = sorted(name for name in names if f".{name}" not in css)
 
     assert not missing, f"styled nowhere: {missing}"
+
+
+# --------------------------------------------------------------------------
+# showing somebody their own data
+# --------------------------------------------------------------------------
+
+
+def support_app(tmp_path):
+    from sf_housing.app import create_app
+
+    settings = app_settings(tmp_path) if "app_settings" in globals() else None
+    if settings is None:
+        from sf_housing.settings import Settings
+
+        data = tmp_path / "data"
+        settings = Settings(
+            data_dir=data,
+            preferences_path=data / "config" / "preferences.yaml",
+            database_path=data / "housing.sqlite3",
+            log_path=data / "housing.log",
+        )
+    return create_app(settings=settings, sources=[], enable_scheduler=False), settings
+
+
+def test_the_button_opens_the_data_folder_not_the_program_directory(tmp_path, monkeypatch):
+    """The folder above this one also holds runtimes, cache and python -- some
+    hundreds of megabytes of machinery that is not the user's. Opening that
+    would show somebody a program directory and call it their data."""
+    from fastapi.testclient import TestClient
+
+    import sf_housing.app as app_module
+
+    opened: list = []
+    monkeypatch.setattr(app_module, "_reveal_folder", lambda folder: opened.append(folder) or True)
+    application, settings = support_app(tmp_path)
+
+    with TestClient(application) as client:
+        response = client.post("/support/show-data-folder", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert opened == [settings.data_dir], opened
+    assert opened[0] != settings.data_dir.parent
+
+
+def test_a_computer_with_no_file_browser_is_still_told_where_the_data_is(
+    tmp_path, monkeypatch
+):
+    """The path is worth more than the apology. Somebody whose file browser
+    will not open can still copy this and get there another way."""
+    from urllib.parse import unquote
+
+    from fastapi.testclient import TestClient
+
+    import sf_housing.app as app_module
+
+    monkeypatch.setattr(app_module, "_reveal_folder", lambda folder: False)
+    application, settings = support_app(tmp_path)
+
+    with TestClient(application) as client:
+        response = client.post("/support/show-data-folder", follow_redirects=False)
+
+    assert response.status_code == 303
+    location = unquote(response.headers["location"])
+    assert "error=" in location
+    assert str(settings.data_dir) in location, location
+
+
+def test_a_first_run_with_no_data_folder_yet_says_so_rather_than_failing(
+    tmp_path, monkeypatch
+):
+    """Before the first check there is nothing to open, and a 500 there reads
+    as the app being broken rather than as it being new."""
+    from urllib.parse import unquote
+
+    from fastapi.testclient import TestClient
+
+    import sf_housing.app as app_module
+
+    application, settings = support_app(tmp_path)
+    monkeypatch.setattr(app_module, "_reveal_folder", lambda folder: True)
+    import shutil
+
+    shutil.rmtree(settings.data_dir, ignore_errors=True)
+
+    with TestClient(application) as client:
+        response = client.post("/support/show-data-folder", follow_redirects=False)
+
+    assert response.status_code == 303
+    assert "no data folder yet" in unquote(response.headers["location"])
+
+
+def test_opening_a_window_on_somebody_elses_machine_needs_the_local_dashboard(tmp_path):
+    """It starts a subprocess. Any page on the internet being able to make
+    that happen is not something to leave lying around."""
+    from fastapi.testclient import TestClient
+
+    application, _ = support_app(tmp_path)
+
+    with TestClient(application) as client:
+        refused = client.post(
+            "/support/show-data-folder",
+            headers={"host": "127.0.0.1:8000", "origin": "https://evil.example"},
+            follow_redirects=False,
+        )
+
+    assert refused.status_code == 403, refused.status_code
+
+
+def test_the_page_says_where_the_data_is_and_how_to_read_it(tmp_path):
+    """A file nobody can interpret is not open data."""
+    from fastapi.testclient import TestClient
+
+    application, settings = support_app(tmp_path)
+    with TestClient(application) as client:
+        page = client.get("/support").text
+
+    assert str(settings.data_dir) in page, "the path is not shown"
+    assert "listings" in page and "scan_runs" in page and "source_runs" in page
+    assert "-wal" in page, "copying a live database without its -wal file loses recent homes"
+    assert "_json" in page, "the internal columns are not marked as unsupported"
+
+
+def test_this_stays_a_button_and_never_becomes_a_way_off_the_machine() -> None:
+    """The footer promises this app runs entirely on this computer, and this
+    section is where that is proved. An upload, a share link or a send-to-
+    support would quietly make it false."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    start_marker = 'class="support-data"'
+    body = (root / "sf_housing/templates/support.html").read_text(encoding="utf-8")
+    section = body[body.index(start_marker) : body.index("</section>", body.index(start_marker))]
+
+    assert "/support/show-data-folder" in section
+    for leak in ("http://", "https://", "upload", "mailto:"):
+        assert leak not in section.casefold(), f"the data section offers {leak}"

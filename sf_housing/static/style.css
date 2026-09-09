@@ -1155,6 +1155,28 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 /* Getting help is a sequence, not a row of buttons: try again, then send what
    the page already knows. Numbering it says which to do first. */
+/* The one place the app's own promise -- that it runs entirely on this
+   computer -- is either proved or quietly broken. Shaped like the help block
+   below it so it reads as part of the page rather than as a developer tool
+   somebody left switched on. */
+.support-data { margin-top: 26px; padding: 20px 22px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.support-data h2 { margin: 0 0 6px; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em; }
+.support-data > p { max-width: 72ch; margin: 0 0 12px; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.support-data form { margin: 0; }
+.support-data button { min-height: 38px; padding: 0 15px; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.82rem; font-weight: 620; cursor: pointer; }
+.support-data button:hover { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-hover); }
+/* The path is here so somebody whose file browser will not open still has
+   something to copy, which is the whole point of the failure message too. */
+.support-data-path { margin: 11px 0 0; color: var(--faint); font-size: 0.76rem; word-break: break-all; }
+.support-data-schema { margin-top: 14px; }
+.support-data-schema summary { color: var(--accent); font-size: 0.82rem; font-weight: 620; cursor: pointer; }
+.support-data-schema > div { max-width: 72ch; margin-top: 10px; color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
+.support-data-schema ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; }
+.support-data-schema strong { color: var(--ink); font-weight: 640; }
+/* Wide enough to hold the query without wrapping it into nonsense, and its own
+   scroll rather than the page's if a reader's window is narrower than that. */
+.support-data-query { margin: 0 0 12px; padding: 11px 13px; overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); font-size: 0.76rem; line-height: 1.5; }
+
 .support-help { margin-top: 26px; padding: 20px 22px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .support-help h2 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em; }
 .help-steps { margin: 0; padding-left: 20px; display: grid; gap: 18px; }

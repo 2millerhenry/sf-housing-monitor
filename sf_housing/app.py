@@ -1645,7 +1645,7 @@ def create_app(
         )
 
     @application.get("/support", response_class=HTMLResponse)
-    def support_page(request: Request, probe: int = 0, message: str = ""):
+    def support_page(request: Request, probe: int = 0, message: str = "", error: str = ""):
         report = support_report(request, include_connectivity=bool(probe))
         return templates.TemplateResponse(
             request=request,
@@ -1654,9 +1654,50 @@ def create_app(
                 "report": report,
                 "report_json": report_json(report),
                 "message": message,
+                "error": error,
+                # Named so the page can say where the data is even when no file
+                # window can be opened -- a path somebody can copy beats a
+                # button that silently did nothing.
+                "data_folder": active_settings.data_dir,
+                "database_name": active_settings.database_path.name,
                 "connectivity_checked": bool(probe),
                 "support_email": SUPPORT_EMAIL,
             },
+        )
+
+    @application.post("/support/show-data-folder")
+    def show_data_folder():
+        """Open the folder holding the database, in the platform file browser.
+
+        Deliberately the data folder rather than the app root above it: the
+        root also holds runtimes/, cache/ and python/, some hundreds of
+        megabytes of machinery that is not the user's and would make this look
+        like a program directory rather than their own homes and notes.
+
+        A POST because it starts a subprocess, so it goes through the same
+        same-origin guard as everything else that acts rather than reads.
+        """
+        folder = active_settings.data_dir
+        if not folder.is_dir():
+            return RedirectResponse(
+                "/support?error="
+                + quote(
+                    "There is no data folder yet. It is made during the first check, "
+                    f"and it will be at: {folder}"
+                ),
+                status_code=303,
+            )
+        if not _reveal_folder(folder):
+            # The path is worth more than the apology: somebody with no file
+            # browser can still copy this and open it however they like.
+            return RedirectResponse(
+                "/support?error="
+                + quote(f"This computer could not open a file window. Your data is at: {folder}"),
+                status_code=303,
+            )
+        return RedirectResponse(
+            "/support?message=Your+data+folder+is+open+in+your+file+browser",
+            status_code=303,
         )
 
     @application.get("/support/report.json")

@@ -21,6 +21,7 @@
 </section>
 
 {% if message %}<div class="notice" role="status">{{ message }}</div>{% endif %}
+{% if error %}<div class="notice error" role="alert" tabindex="-1">{{ error }}</div>{% endif %}
 <div class="notice support-copy-result" role="status" data-copy-result hidden></div>
 
 {% if report.action_checks %}
@@ -76,6 +77,59 @@
   <a class="button" href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external">Say thanks</a>
 </aside>
 {% endif %}
+
+{#- The footer promises this app runs entirely on this computer. This is where
+    that promise is either proved or quietly broken, so it is a button that
+    opens a folder and nothing else: no upload, no share link, no send-to-
+    support. The value is in pointing at a file that already exists and saying
+    enough about it to use, not in building a database browser somebody else
+    has already built better. -#}
+<section class="support-data" aria-labelledby="data-title">
+  <h2 id="data-title">Your data</h2>
+  <p>
+    Everything this app knows is one file on this computer:
+    <code>{{ database_name }}</code>, in the folder below. It has never been
+    anywhere else. Uninstalling leaves it exactly where it is unless you type
+    DELETE when asked.
+  </p>
+  <form method="post" action="/support/show-data-folder">
+    <button type="submit">Show my data</button>
+  </form>
+  <p class="support-data-path"><code>{{ data_folder }}</code></p>
+  <details class="support-data-schema">
+    <summary>Reading it yourself</summary>
+    <div>
+      <p>
+        It is an ordinary SQLite database, so any SQLite browser opens it, as
+        does <code>pandas.read_sql</code> or the <code>sqlite3</code> command.
+        Three tables carry everything worth reading:
+      </p>
+      <ul>
+        <li><strong>listings</strong> &mdash; one row per home, with its <code>score</code>, <code>price</code>, <code>neighborhood</code>, <code>original_url</code>, and whatever you marked or wrote in <code>status</code> and <code>note</code>.</li>
+        <li><strong>scan_runs</strong> &mdash; one row per check, with what started it and how it ended.</li>
+        <li><strong>source_runs</strong> &mdash; one row per source within a check, with how many homes it saw.</li>
+      </ul>
+      <p>Somewhere to start:</p>
+      <pre class="support-data-query"><code>SELECT price, neighborhood, title, original_url
+FROM listings
+WHERE status = 'saved'
+ORDER BY price;</code></pre>
+      <p>
+        Two things worth knowing. If you copy the database while the app is
+        running, take the <code>-wal</code> and <code>-shm</code> files beside
+        it as well, or your copy will open fine and be missing the most recent
+        homes. And the columns ending <code>_json</code> are this app talking
+        to itself &mdash; their shape changes between versions, so nothing
+        should be built on them.
+      </p>
+      <p>
+        For a shortlist rather than everything, the
+        <a href="/">Shortlist</a> has a Download as CSV button that exports
+        whatever you are looking at.
+      </p>
+    </div>
+  </details>
+</section>
 
 <section class="support-help" aria-labelledby="help-title">
   <h2 id="help-title">Still not right?</h2>
