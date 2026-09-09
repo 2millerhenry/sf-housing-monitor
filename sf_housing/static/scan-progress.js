@@ -7,7 +7,6 @@
   const track = root.querySelector("[role='progressbar']");
   const bar = root.querySelector("[data-scan-bar]");
   const detail = root.querySelector("[data-scan-detail]");
-  const estimate = root.querySelector("[data-scan-estimate]");
   const note = root.querySelector("[data-scan-note]");
   let finished = false;
   let shownNote = -1;
@@ -25,15 +24,18 @@
   };
 
   const NOTES = [
-    (p) => `Reading ${p.current_source || "each source"} for homes it has not shown before.`,
-    (p) => `${p.listings_seen || 0} listings read so far across ${p.sources_total || 0} sources.`,
+    // The counters -- elapsed, sources, listings seen -- live in the line
+    // above and are not repeated here. This one is the exception because how
+    // many are new is the thing that line does not say.
+    (p) => `${p.listings_added || 0} of them are new since your last check.`,
     () => "Ranking every home against your deal: budget, area, size and timing.",
+    () => "A home that just misses your deal is kept in Near matches, not dropped.",
+    () => "Anything a listing leaves unsaid becomes a check on the home, not a reason to drop it.",
     () => "Homes you have already been shown are updated rather than listed twice.",
     () => "Matching addresses, so one building on three sites stays one home.",
     () => "Sources are read one at a time, so none of them starts turning us away.",
     () => "Homes appear as each source finishes. Nothing waits for the last one.",
     () => "Re-checking whether the homes on your shortlist are still going.",
-    (p) => `${p.sources_completed || 0} sources done, the rest still to read.`,
   ];
 
   // Eight seconds a message, taken from the scan's own clock rather than a
@@ -65,9 +67,6 @@
     track.setAttribute("aria-valuenow", String(percent));
     bar.style.setProperty("--scan-progress", String(percent / 100));
     detail.textContent = `${elapsed}s elapsed${remainingLabel(progress)} · ${completed} of ${sourceCount} sources · ${checked} listings checked`;
-    estimate.textContent = progress.typical_seconds
-      ? `Usually about ${progress.typical_seconds}s`
-      : `Up to ${progress.maximum_seconds || 120}s`;
     rotateNote(progress);
 
     if (!progress.running && !finished) {

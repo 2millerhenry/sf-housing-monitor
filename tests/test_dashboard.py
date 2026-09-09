@@ -1153,7 +1153,11 @@ def test_each_message_says_something_the_scan_is_really_doing() -> None:
     notes = rotating_notes()
     live = [note for note in notes if "${p." in note]
 
-    assert len(live) >= 3, "no message reports anything about the actual scan"
+    # One, not three. Three of these used to restate the counters in the line
+    # directly above them -- the current source, the sources done, the
+    # listings seen -- which is the same fact twice on one small panel. The
+    # numbers belong there once; what is left here says what they cannot.
+    assert len(live) >= 1, "no message reports anything about the actual scan"
     for note in notes:
         assert "TODO" not in note and "..." not in note
 
@@ -1581,11 +1585,16 @@ def test_the_estimate_is_rounded_rather_than_counted_to_the_second() -> None:
 
     from sf_housing.scanner import _remaining_label
 
-    assert _remaining_label(None) == ""
-    assert _remaining_label(5) == "finishing up"
-    assert _remaining_label(30) == "about half a minute left"
-    assert _remaining_label(61) == "about 1 minute left"
-    assert _remaining_label(125) == "about 2 minutes left"
+    assert _remaining_label(None, running=False) == ""
+    assert _remaining_label(125, running=False) == "", "a finished scan predicts nothing"
+    assert _remaining_label(5, running=True) == "finishing up"
+    assert _remaining_label(30, running=True) == "about half a minute left"
+    assert _remaining_label(61, running=True) == "about 1 minute left"
+    assert _remaining_label(125, running=True) == "about 2 minutes left"
+    # A first scan has no history to estimate from, and used to get its own
+    # separate line for that -- which then sat beside the real estimate on
+    # every scan after it.
+    assert _remaining_label(None, running=True) == "a couple of minutes, probably"
     # Worded once, in Python. The first paint is server-rendered and every
     # update after it is not, so a second copy of this phrasing in the script
     # would disagree for the half second before the first poll -- and then
@@ -1641,3 +1650,29 @@ def test_a_running_scan_says_how_many_seconds_are_left(tmp_path: Path) -> None:
     # Sixty of the hundred seconds these sources usually take are still ahead.
     assert scanner.progress["seconds_remaining"] == 60
     assert scanner.progress["percent"] == 40
+
+
+def test_the_panel_says_how_much_longer_in_exactly_one_place(tmp_path: Path) -> None:
+    """It carried two: a live estimate from what the sources really take, and
+    beside it a static "usually about 152s" that was there first. One of them
+    was always stale, and on a small panel that reads as the app not knowing."""
+    application = create_app(settings=app_settings(tmp_path), sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        client.post("/scan", follow_redirects=False)
+        page = client.get("/").text
+
+    assert "data-scan-estimate" not in page, "the second estimate is back"
+    assert "Usually about" not in page
+    assert page.count("data-scan-detail") == 1
+
+
+def test_no_rotating_message_repeats_a_number_shown_beside_it() -> None:
+    """The panel is small. A sentence saying "4 sources done" under a line
+    already reading "4 of 23 sources" is the same fact twice, and the reader
+    has to check whether it is really the same."""
+    notes = rotating_notes()
+    joined = " ".join(notes)
+
+    assert "sources_completed" not in joined, "a message restates the source counter"
+    assert "sources_total" not in joined
+    assert "current_source" not in joined, "the heading already names it"

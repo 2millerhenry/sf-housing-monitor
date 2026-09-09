@@ -103,16 +103,22 @@ CONFIRMATION_STALE_AFTER = timedelta(hours=24)
 INITIAL_DISCOVERY_WINDOW = timedelta(days=7)
 
 
-def _remaining_label(seconds: int | None) -> str:
+def _remaining_label(seconds: int | None, *, running: bool) -> str:
     """How much longer, in words somebody can act on.
 
     Rounded hard on purpose. A scan is not predictable to the second, and
     "about a minute left" that turns out to be seventy seconds reads as honest
-    where "63s left" counting unevenly reads as broken. Empty when there is
-    nothing to say, so the sentence around it simply closes up.
+    where "63s left" counting unevenly reads as broken.
+
+    The one slot the panel has for this. A first scan has no history to
+    estimate from and used to get its own separate line saying "may take up to
+    two minutes", which then sat beside the real estimate on every scan after
+    -- the same thing said twice, one of them stale.
     """
-    if seconds is None:
+    if not running:
         return ""
+    if seconds is None:
+        return "a couple of minutes, probably"
     if seconds <= 10:
         return "finishing up"
     if seconds < 60:
@@ -217,7 +223,7 @@ class Scanner:
         # updates it: the first paint is server-rendered and every one after is
         # not, so two copies of this phrasing would disagree for the half
         # second before the first poll, and then quietly forever.
-        snapshot["remaining_label"] = _remaining_label(remaining)
+        snapshot["remaining_label"] = _remaining_label(remaining, running=bool(snapshot["running"]))
         return snapshot
 
     def _eligible_sources(self, trigger: str) -> list[ListingSource]:

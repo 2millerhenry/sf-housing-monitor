@@ -51,7 +51,6 @@
   </div>
   <div class="scan-progress-meta">
     <span data-scan-detail>{{ scan_progress.elapsed_seconds }}s elapsed{% if scan_progress.remaining_label %} · {{ scan_progress.remaining_label }}{% endif %} · {{ scan_progress.sources_completed }} of {{ scan_progress.sources_total }} sources · {{ scan_progress.listings_seen }} listings checked</span>
-    <span data-scan-estimate>{% if typical_scan_seconds %}Usually about {{ typical_scan_seconds }}s{% else %}May take up to 2 minutes{% endif %}</span>
   </div>
   {#- Something to read during the three minutes this takes. Hidden from
       screen readers on purpose: the heading and the line above already carry
