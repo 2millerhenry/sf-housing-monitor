@@ -1106,6 +1106,79 @@ def test_the_nav_runs_in_the_order_somebody_uses_it(tmp_path: Path) -> None:
     assert page.index("</nav>") < page.index("data-theme-toggle")
 
 
+def test_the_logo_is_drawn_into_the_page_so_it_can_follow_the_theme(tmp_path: Path) -> None:
+    """currentColor does not cross a document boundary. Served as an <img> the
+    artwork keeps its own dark green, which is the one colour the dark theme
+    cannot show it in -- so it is inline, and the accent it inherits is what
+    makes the same drawing work on paper and on charcoal."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    header = page[page.index('<header class="site-header">') : page.index("</header>")]
+    assert '<svg class="brand-lockup"' in header, "the logo is not drawn into the page"
+    assert "<img" not in header, "an image cannot take the colour of the page around it"
+
+    style = stylesheet()
+    assert "fill: currentColor" in block_body(style, ".brand-lockup, .brand-mark { ")
+    assert "color: var(--accent)" in block_body(style, ".brand { ")
+
+
+def test_a_narrow_window_keeps_the_bridge_when_the_wordmark_will_not_fit(
+    tmp_path: Path,
+) -> None:
+    """The lockup is seven to one. Below 760px it would push the tabs off the
+    row, so the bridge stands in -- and the link keeps its name either way,
+    because the name is on the link and never on the artwork."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    header = page[page.index('<header class="site-header">') : page.index("</header>")]
+    assert '<svg class="brand-mark"' in header
+    assert header.count('aria-hidden="true"') >= 2, "neither drawing should be read out"
+    assert 'aria-label="SF Home Finder home"' in header, "the link carries the name"
+
+    # The stylesheet has several 760px blocks; this is the one the swap is in.
+    style = stylesheet()
+    opener = "@media (max-width: 760px) {"
+    narrow = block_body(style[style.rindex(opener, 0, style.index(".brand-lockup { display: none")):], opener)
+    assert ".brand-lockup { display: none; }" in narrow
+    assert ".brand-mark { display: block; }" in narrow
+
+
+def test_the_tab_shows_the_logo_rather_than_a_blank_page_icon(tmp_path: Path) -> None:
+    """A local app lives in a pinned tab for weeks. It had no icon at all."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+        assert client.get("/static/favicon.svg").status_code == 200
+        assert client.get("/static/favicon.png").status_code == 200
+
+    assert 'rel="icon"' in page and "favicon.svg" in page
+    assert 'rel="alternate icon"' in page and "favicon.png" in page, "for a browser too old for SVG"
+
+    import re
+
+    icon = Path("sf_housing/static/favicon.svg").read_text(encoding="utf-8")
+    drawing = re.sub(r"<!--.*?-->", "", icon, flags=re.S)
+    # Painted outside the page, so it has no currentColor to inherit and has to
+    # answer the browser's own setting itself.
+    assert "currentColor" not in drawing, "a tab icon inherits nothing"
+    assert "fill: #" in drawing, "so it has to name its own colour"
+    assert "prefers-color-scheme: dark" in drawing, "dark green on a dark tab bar is invisible"
+    assert "<script" not in icon and "javascript:" not in icon
+
+
 def test_moving_between_pages_is_one_thing_changing(tmp_path: Path) -> None:
     """Following a link used to be a blank frame. The transition is a
     progressive enhancement -- no JavaScript, and a browser without it

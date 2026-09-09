@@ -95,12 +95,26 @@ def test_release_wheel_never_packages_a_profile_or_mutable_data() -> None:
         "*.css",
         "*.html",
         "*.js",
+        # The tab icon, in both the form a current browser wants and the one an
+        # older browser can still read.
+        "*.png",
+        "*.svg",
         "*.zip",
         "data/*.json",
         # Each source's own icon, fetched once and served locally rather than
         # hotlinked. Public brand marks, identical in every install.
         "source-icons/*.png",
     ]
+
+    # Those two globs sit at the top of the static directory, so they are named
+    # file by file for the same reason everything else here is: a glob is only
+    # safe while somebody is watching what lands under it.
+    top = sorted(
+        path.name
+        for path in (ROOT / "sf_housing" / "static").iterdir()
+        if path.is_file() and path.suffix in {".png", ".svg"}
+    )
+    assert top == ["favicon.png", "favicon.svg"], top
 
     # And that directory is named file by file too, for the same reason the
     # data directory is: a glob is only safe while somebody is watching what
@@ -248,6 +262,21 @@ def test_the_source_logos_travel_in_the_wheel() -> None:
     static = config["tool"]["setuptools"]["package-data"]["sf_housing.static"]
 
     assert "source-icons/*.png" in static
+
+
+def test_the_tab_icon_travels_in_the_wheel() -> None:
+    """Same failure as the source logos, one directory up: static package-data
+    listed css, js and zip, so a top-level asset would be missing from an
+    installed copy and present in every run from the repository."""
+    import tomllib
+
+    with open(ROOT / "pyproject.toml", "rb") as handle:
+        config = tomllib.load(handle)
+    static = config["tool"]["setuptools"]["package-data"]["sf_housing.static"]
+
+    assert "*.svg" in static and "*.png" in static, static
+    for asset in ("favicon.svg", "favicon.png"):
+        assert (ROOT / "sf_housing/static" / asset).is_file(), asset
 
 
 def test_every_source_the_page_names_has_the_icon_it_asks_for() -> None:

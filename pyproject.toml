@@ -49,7 +49,9 @@ namespaces = true
 # The source logos are served from here, so they have to travel in the wheel.
 # Listed as an explicit sub-path because source-icons is a directory of assets
 # rather than a package, and packages.find will never see it.
-"sf_housing.static" = ["*.css", "*.js", "*.zip", "source-icons/*.png"]
+# The tab icon is served from here too, and a top-level *.png is not
+# covered by the source-icons sub-path.
+"sf_housing.static" = ["*.css", "*.js", "*.zip", "*.svg", "*.png", "source-icons/*.png"]
 
 [tool.pytest.ini_options]
 addopts = "-q"

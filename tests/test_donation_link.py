@@ -242,7 +242,16 @@ def test_the_footer_is_meant_to_be_noticed() -> None:
     style = (
         pathlib.Path(__file__).resolve().parents[1] / "sf_housing/static/style.css"
     ).read_text(encoding="utf-8")
-    footer = style[style.index(".site-footer {") : style.index(".site-footer {") + 200]
+    # One selector can carry more than one rule -- the footer is also named for
+    # the page transition, further up the file -- so this looks for the rule
+    # that paints it rather than for the first one that mentions it.
+    blocks, at = [], style.find(".site-footer {")
+    while at != -1:
+        blocks.append(style[at : style.index("}", at) + 1])
+        at = style.find(".site-footer {", at + 1)
+    painted = [block for block in blocks if "background" in block]
+    assert len(painted) == 1, f"{len(painted)} rules give the footer a background"
+    footer = painted[0]
     paragraph = style[style.index(".footer-inner p {") : style.index("}", style.index(".footer-inner p {"))]
     size = float(paragraph.split("font-size:")[1].split("rem")[0].strip())
 

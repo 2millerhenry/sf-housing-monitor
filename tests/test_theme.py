@@ -105,11 +105,21 @@ def test_the_theme_is_settled_before_the_page_is_painted() -> None:
 def test_the_shared_layout_carries_no_inline_script() -> None:
     """base.html is on every page, including the listing page, which is built
     to be safe to serve whatever a source wrote. An inline script there is an
-    inline script everywhere, and the theme is not worth that exception."""
+    inline script everywhere, and the theme is not worth that exception.
+
+    What base.html includes is on every page too, so this follows the includes:
+    reading only base.html left the logo template outside a guarantee it is
+    just as much a part of."""
     import re
 
-    for tag in re.findall(r"<script\b[^>]*>", BASE):
-        assert "src=" in tag, f"base.html carries an inline script: {tag}"
+    shared = {"base.html": BASE}
+    for name in re.findall(r'{%-?\s*include\s+"([^"]+)"', BASE):
+        shared[name] = (ROOT / "sf_housing/templates" / name).read_text(encoding="utf-8")
+    assert len(shared) > 1, "the layout stopped including anything; is that right?"
+
+    for name, markup in shared.items():
+        for tag in re.findall(r"<script\b[^>]*>", markup):
+            assert "src=" in tag, f"{name} carries an inline script: {tag}"
 
 
 def test_the_dark_theme_tells_the_browser_its_own_controls_are_dark() -> None:

@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}SF Housing Monitor{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ asset_version() }}">
+  {# The SVG answers the browser's own light or dark setting; the PNG is for a
+     browser too old to take an SVG icon at all, and carries the light colour. #}
+  <link rel="icon" href="{{ url_for('static', path='/favicon.svg') }}?v={{ asset_version() }}" type="image/svg+xml">
+  <link rel="alternate icon" href="{{ url_for('static', path='/favicon.png') }}?v={{ asset_version() }}" sizes="32x32" type="image/png">
   {# Deliberately not deferred: it has to run before the first paint, or a dark
      reader watches the page load light and turn over. A file rather than an
      inline script because no page here carries inline script. #}
@@ -13,10 +17,9 @@
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <a class="brand" href="/" aria-label="SF Housing Monitor home">
-        <span class="brand-mark" aria-hidden="true">SF</span>
-        <span>Home Finder</span>
-      </a>
+      {# The accessible name lives here rather than on the artwork, so it holds
+         whichever of the two drawings the window is wide enough for. #}
+      <a class="brand" href="/" aria-label="SF Home Finder home">{% include "_brand.html" %}</a>
       <nav aria-label="Main navigation">
         <a href="/" {% if request.url.path == '/' and view != 'saved' %}class="active" aria-current="page"{% endif %}>Shortlist</a>
         <a href="/?view=saved&sort=score" {% if request.url.path == '/' and view == 'saved' %}class="active" aria-current="page"{% endif %}>Saved</a>

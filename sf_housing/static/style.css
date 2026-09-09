@@ -197,20 +197,17 @@ button:focus-visible, .button:focus-visible, a:focus-visible, select:focus-visib
   gap: 24px;
 }
 .site-header a { text-decoration: none; }
-.brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); font-weight: 720; letter-spacing: -0.018em; white-space: nowrap; }
-.brand-mark {
-  width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--accent);
-  color: var(--surface);
-  font-size: 0.68rem;
-  font-weight: 760;
-  letter-spacing: 0.02em;
-}
+/* The logo is drawn in the page and inherits this colour, so the one drawing
+   serves both themes: the deep green it was supplied in on paper, and the
+   sage the dark theme uses for the same voice. */
+.brand { display: inline-flex; align-items: center; color: var(--accent); flex: 0 0 auto; }
+/* fill, not color: the traced shapes carry no fill of their own, so this is
+   what makes them the accent above rather than the SVG default of black. */
+.brand-lockup, .brand-mark { display: block; height: 24px; width: auto; fill: currentColor; }
+/* Seven to one needs about 167px. Below that the bridge stands in on its own. */
+.brand-mark { display: none; }
+.brand:hover { color: var(--accent-hover); }
+.brand:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
 .site-header nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 /* Sized to the navigation beside it so the header reads as one row of controls
    rather than a row with a button bolted on the end. */
@@ -1344,7 +1341,8 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 
 @media (max-width: 760px) {
   .header-inner { padding: 0 16px; gap: 14px; overflow-x: auto; }
-  .brand span:last-child { display: none; }
+  .brand-lockup { display: none; }
+  .brand-mark { display: block; }
   .site-header nav { flex: 0 0 auto; }
   .site-header nav a { padding: 8px 9px; }
   main { padding: 30px 16px 56px; }
