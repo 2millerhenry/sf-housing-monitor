@@ -1579,13 +1579,39 @@ def test_the_estimate_is_rounded_rather_than_counted_to_the_second() -> None:
     reads as broken where "about a minute left" reads as honest."""
     script = scan_progress_script()
 
-    assert "seconds_remaining" in script
-    assert "finishing up" in script
-    assert "Math.round(left / 60)" in script
-    # And it says nothing when the scanner offers no number. Asserted as the
-    # whole condition: a guard rewritten to if (false) still contains a
-    # return "" and would otherwise pass this.
-    assert 'if (left === null || left === undefined) return "";' in script
+    from sf_housing.scanner import _remaining_label
+
+    assert _remaining_label(None) == ""
+    assert _remaining_label(5) == "finishing up"
+    assert _remaining_label(30) == "about half a minute left"
+    assert _remaining_label(61) == "about 1 minute left"
+    assert _remaining_label(125) == "about 2 minutes left"
+    # Worded once, in Python. The first paint is server-rendered and every
+    # update after it is not, so a second copy of this phrasing in the script
+    # would disagree for the half second before the first poll -- and then
+    # quietly forever.
+    assert "remaining_label" in script
+    # Scoped to the function that renders it: the word "minute" appears in a
+    # comment elsewhere, and a test that cannot tell those apart fails for
+    # reasons nobody can act on.
+    start = script.index("const remainingLabel")
+    renderer = script[start : script.index("};", start)]
+    assert "minute" not in renderer, "the script is wording the estimate itself"
+    assert "progress.remaining_label" in renderer
+
+
+def test_the_first_paint_says_the_same_thing_as_every_update_after_it() -> None:
+    """The page renders the line once on the server and the script rewrites it
+    twice a second. If only one of them knows about the estimate, the number
+    appears half a second late on every scan."""
+    from pathlib import Path as _Path
+
+    page = (_Path(__file__).resolve().parents[1] / "sf_housing/templates/index.html").read_text(
+        encoding="utf-8"
+    )
+    line = page[page.index("data-scan-detail") : page.index("</span>", page.index("data-scan-detail"))]
+
+    assert "remaining_label" in line, line
 
 
 def test_a_running_scan_says_how_many_seconds_are_left(tmp_path: Path) -> None:

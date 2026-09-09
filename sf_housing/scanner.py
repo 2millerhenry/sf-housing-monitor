@@ -103,6 +103,24 @@ CONFIRMATION_STALE_AFTER = timedelta(hours=24)
 INITIAL_DISCOVERY_WINDOW = timedelta(days=7)
 
 
+def _remaining_label(seconds: int | None) -> str:
+    """How much longer, in words somebody can act on.
+
+    Rounded hard on purpose. A scan is not predictable to the second, and
+    "about a minute left" that turns out to be seventy seconds reads as honest
+    where "63s left" counting unevenly reads as broken. Empty when there is
+    nothing to say, so the sentence around it simply closes up.
+    """
+    if seconds is None:
+        return ""
+    if seconds <= 10:
+        return "finishing up"
+    if seconds < 60:
+        return "about half a minute left"
+    minutes = round(seconds / 60)
+    return f"about {minutes} minute{'' if minutes == 1 else 's'} left"
+
+
 class Scanner:
     def __init__(
         self,
@@ -195,6 +213,11 @@ class Scanner:
         if snapshot["running"] and weight_total > 0:
             remaining = max(0, round(weight_total - weight_done - running))
         snapshot["seconds_remaining"] = remaining
+        # Worded here rather than in the page and again in the script that
+        # updates it: the first paint is server-rendered and every one after is
+        # not, so two copies of this phrasing would disagree for the half
+        # second before the first poll, and then quietly forever.
+        snapshot["remaining_label"] = _remaining_label(remaining)
         return snapshot
 
     def _eligible_sources(self, trigger: str) -> list[ListingSource]:

@@ -17,17 +17,11 @@
   // watches the whole rotation should come away knowing how their homes are
   // collected. Written as functions so the ones with numbers in them are the
   // live numbers, not the ones from when the page loaded.
-  // How much longer, from the seconds each source really took on its own
-  // recent runs. Rounded hard on purpose: a scan is not predictable to the
-  // second, and "about a minute left" that turns out to be seventy seconds
-  // reads as honest where "63s left" counting unevenly reads as broken.
+  // The wording comes from the scanner, so the first paint and every update
+  // after it say the same thing. Only the separator is decided here.
   const remainingLabel = (progress) => {
-    const left = progress.seconds_remaining;
-    if (left === null || left === undefined) return "";
-    if (left <= 10) return " · finishing up";
-    if (left < 60) return " · about half a minute left";
-    const minutes = Math.round(left / 60);
-    return ` · about ${minutes} minute${minutes === 1 ? "" : "s"} left`;
+    const label = progress.remaining_label;
+    return label ? ` · ${label}` : "";
   };
 
   const NOTES = [
