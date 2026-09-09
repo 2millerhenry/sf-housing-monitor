@@ -24,59 +24,77 @@
 {% if error %}<div class="notice error" role="alert" tabindex="-1">{{ error }}</div>{% endif %}
 <div class="notice support-copy-result" role="status" data-copy-result hidden></div>
 
+{#- One list, not a stack of separate alarms. Each of these already spells out
+    its own next step, and most of them are a listing site declining for a few
+    hours rather than anything the reader broke; five bordered cards with a
+    coloured edge each said otherwise before a word of them was read. -#}
 {% if report.action_checks %}
 <section class="fix-list" aria-labelledby="next-actions-title">
   <h2 id="next-actions-title">{{ report.action_checks|length }} thing{% if report.action_checks|length != 1 %}s{% endif %} to fix</h2>
-  {% for check in report.action_checks %}
-  <article class="fix-row {{ check.status }}">
-    <div>
-      <h3>{{ check.label }}</h3>
-      <p>{{ check.explanation }}</p>
-    </div>
-    <p class="fix-do"><span>What to do</span>{{ check.action }}</p>
-  </article>
-  {% endfor %}
+  <div class="fix-rows">
+    {% for check in report.action_checks %}
+    <article class="fix-row {{ check.status }}">
+      <div>
+        <h3>{{ check.label }}</h3>
+        <p>{{ check.explanation }}</p>
+      </div>
+      <p class="fix-do"><span>What to do</span>{{ check.action }}</p>
+    </article>
+    {% endfor %}
+  </div>
 </section>
 {% endif %}
 
+{#- The actions sit above the archive rather than under it. Somebody reading
+    this page wants to try something, and a numbered procedure with a paragraph
+    of small print under each step reads as a support ticket being opened. -#}
+<section class="support-tools" aria-labelledby="help-title">
+  <h2 id="help-title">Still not right?</h2>
+  <p class="support-tools-lead">Run the checks again first: they are worked out fresh every time, so anything that has fixed itself disappears. If it has not, send the report to whoever is helping you.</p>
+  <div class="help-actions">
+    <a class="button" href="/support">Check again</a>
+    <a class="button" href="/support?probe=1">{% if connectivity_checked %}Connections checked{% else %}Test the connections{% endif %}</a>
+    <button type="button" data-copy-report>Copy the report</button>
+    {% if support_email %}<a class="button" href="mailto:{{ support_email }}?subject=SF%20Housing%20Monitor">Email {{ support_email }}</a>{% endif %}
+  </div>
+  <p class="support-tools-note">Testing connections is the only thing on this page that reaches the internet. The report is the {{ report.checks|length }} check results and this app&rsquo;s version &mdash; no passwords, no tokens, no email contents, and none of your notes or saved homes.</p>
+</section>
+
+{#- Two folds in one frame rather than two cards floating apart: this is the
+    part of the page nobody has to read, and it should look like one thing set
+    aside, not two more things to get through. -#}
 <section class="support-quiet" aria-labelledby="checked-title">
   <h2 id="checked-title" class="support-quiet-title">What was checked</h2>
-  <details class="support-fold">
-    <summary>
-      <span><strong>{{ report.passing_checks|length }} working</strong><small>Nothing to do about these</small></span>
-      <span class="disclosure-action">Show</span>
-    </summary>
-    <ul class="check-list">
-      {% for check in report.passing_checks %}
-      <li><strong>{{ check.label }}</strong><span>{{ check.explanation }}</span></li>
-      {% else %}
-      <li><span>Checks appear once setup finishes.</span></li>
-      {% endfor %}
-    </ul>
-  </details>
+  <div class="support-quiet-frame">
+    <details class="support-fold">
+      <summary>
+        <span><strong>{{ report.passing_checks|length }} working</strong><small>Nothing to do about these</small></span>
+        <span class="disclosure-action">Show</span>
+      </summary>
+      <ul class="check-list">
+        {% for check in report.passing_checks %}
+        <li><strong>{{ check.label }}</strong><span>{{ check.explanation }}</span></li>
+        {% else %}
+        <li><span>Checks appear once setup finishes.</span></li>
+        {% endfor %}
+      </ul>
+    </details>
 
-  {% if report.optional_checks %}
-  <details class="support-fold">
-    <summary>
-      <span><strong>{{ report.optional_checks|length }} optional, not set up</strong><small>None of these stop the app working</small></span>
-      <span class="disclosure-action">Show</span>
-    </summary>
-    <ul class="check-list">
-      {% for check in report.optional_checks %}
-      <li><strong>{{ check.label }}</strong><span>{{ check.explanation }}</span></li>
-      {% endfor %}
-    </ul>
-  </details>
-  {% endif %}
+    {% if report.optional_checks %}
+    <details class="support-fold">
+      <summary>
+        <span><strong>{{ report.optional_checks|length }} optional, not set up</strong><small>None of these stop the app working</small></span>
+        <span class="disclosure-action">Show</span>
+      </summary>
+      <ul class="check-list">
+        {% for check in report.optional_checks %}
+        <li><strong>{{ check.label }}</strong><span>{{ check.explanation }}</span></li>
+        {% endfor %}
+      </ul>
+    </details>
+    {% endif %}
+  </div>
 </section>
-
-{% if donate_url and report.overall == 'ready' %}
-<aside class="support-donate" aria-labelledby="support-donate-title">
-  <h2 id="support-donate-title">Keeping this working</h2>
-  <p>Nothing here is hosted or funded. When the listing sites change, someone has to fix the readers.</p>
-  <a class="button" href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external">Say thanks</a>
-</aside>
-{% endif %}
 
 {#- The footer promises this app runs entirely on this computer. This is where
     that promise is either proved or quietly broken, so it is a button that
@@ -87,80 +105,54 @@
 <section class="support-data" aria-labelledby="data-title">
   <h2 id="data-title">Your data</h2>
   <p>
-    Everything this app knows is one file on this computer:
-    <code>{{ database_name }}</code>, in the folder below. It has never been
-    anywhere else. Uninstalling leaves it exactly where it is unless you type
-    DELETE when asked.
+    Everything this app knows is one file on this computer,
+    <code>{{ database_name }}</code>. It has never been anywhere else, and
+    uninstalling leaves it where it is unless you type DELETE when asked.
   </p>
-  <form method="post" action="/support/show-data-folder">
-    <button type="submit">Show my data</button>
-  </form>
-  <p class="support-data-path"><code>{{ data_folder }}</code></p>
+  <div class="support-data-open">
+    <form method="post" action="/support/show-data-folder">
+      <button type="submit">Show my data</button>
+    </form>
+    <code class="support-data-path">{{ data_folder }}</code>
+  </div>
   <details class="support-data-schema">
     <summary>Reading it yourself</summary>
     <div>
       <p>
-        It is an ordinary SQLite database, so any SQLite browser opens it, as
-        does <code>pandas.read_sql</code> or the <code>sqlite3</code> command.
-        Three tables carry everything worth reading:
+        An ordinary SQLite file: any SQLite browser opens it, as do
+        <code>pandas.read_sql</code> and the <code>sqlite3</code> command.
+        Three tables carry everything worth reading.
       </p>
       <ul>
         <li><strong>listings</strong> &mdash; one row per home, with its <code>score</code>, <code>price</code>, <code>neighborhood</code>, <code>original_url</code>, and whatever you marked or wrote in <code>status</code> and <code>note</code>.</li>
         <li><strong>scan_runs</strong> &mdash; one row per check, with what started it and how it ended.</li>
         <li><strong>source_runs</strong> &mdash; one row per source within a check, with how many homes it saw.</li>
       </ul>
-      <p>Somewhere to start:</p>
       <pre class="support-data-query"><code>SELECT price, neighborhood, title, original_url
 FROM listings
 WHERE status = 'saved'
 ORDER BY price;</code></pre>
       <p>
-        Two things worth knowing. If you copy the database while the app is
-        running, take the <code>-wal</code> and <code>-shm</code> files beside
-        it as well, or your copy will open fine and be missing the most recent
-        homes. And the columns ending <code>_json</code> are this app talking
-        to itself &mdash; their shape changes between versions, so nothing
-        should be built on them.
-      </p>
-      <p>
-        For a shortlist rather than everything, the
-        <a href="/">Shortlist</a> has a Download as CSV button that exports
-        whatever you are looking at.
+        If you copy the database while the app is running, take the
+        <code>-wal</code> and <code>-shm</code> files beside it too, or your
+        copy will open fine and be missing the newest homes. Columns ending
+        <code>_json</code> are this app talking to itself: their shape changes
+        between versions, so build nothing on them. For a shortlist rather than
+        everything, the <a href="/">Shortlist</a> has a Download as CSV button.
       </p>
     </div>
   </details>
 </section>
 
-<section class="support-help" aria-labelledby="help-title">
-  <h2 id="help-title">Still not right?</h2>
-  <ol class="help-steps">
-    <li>
-      <strong>Run the checks again.</strong> They are worked out fresh each time, so a problem that has fixed itself disappears.
-      <span class="help-actions">
-        <a class="button" href="/support">Check again</a>
-        <a class="button" href="/support?probe=1">{% if connectivity_checked %}Connections checked{% else %}Test the connections{% endif %}</a>
-      </span>
-      <small>Testing connections is the only thing on this page that reaches the internet. Nothing else here does.</small>
-    </li>
-    {% if support_email %}
-    <li>
-      <strong>Send what this page knows.</strong> Copy the report, then paste it into an email. It is the fastest way for somebody to see what went wrong without asking you twenty questions.
-      <span class="help-actions">
-        <button type="button" data-copy-report>Copy the report</button>
-        <a class="button" href="mailto:{{ support_email }}?subject=SF%20Housing%20Monitor">Email {{ support_email }}</a>
-      </span>
-      <small>The report holds the {{ report.checks|length }} check results and this app&rsquo;s version. It contains no passwords, no tokens, no email contents, and none of your notes or saved homes.</small>
-    </li>
-    {% else %}
-    <li>
-      <strong>Send what this page knows.</strong> Copy the report and include it wherever you are asking for help.
-      <span class="help-actions"><button type="button" data-copy-report>Copy the report</button></span>
-      <small>No passwords, tokens, email contents, notes or saved homes are included.</small>
-    </li>
-    {% endif %}
-  </ol>
-  <p class="support-generated">Checked {{ report.generated_at }} UTC.</p>
-</section>
+{% if donate_url and report.overall == 'ready' %}
+<aside class="support-donate" aria-labelledby="support-donate-title">
+  <h2 id="support-donate-title">Keeping this working</h2>
+  <p>Nothing here is hosted or funded. When the listing sites change, someone has to fix the readers.</p>
+  <a class="button" href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external">Say thanks</a>
+</aside>
+{% endif %}
+
+<p class="support-generated">Checked {{ report.generated_at }} UTC.</p>
 
 <script src="{{ url_for('static', path='/support.js') }}?v={{ asset_version() }}" defer></script>
 {% endblock %}

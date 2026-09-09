@@ -196,6 +196,62 @@ def test_the_question_is_asked_out_loud(tmp_path: Path) -> None:
         assert label in page
 
 
+def enclosing_div(page: str, opener: str) -> str:
+    """The markup of one <div>, from its opening tag to the tag that closes it.
+
+    Slicing to the next landmark on the page instead is how the first version of
+    the test below passed with the question moved back out of the table: the
+    landmark was further down than the closing tag, so outside still read as
+    inside.
+    """
+    start = page.index(opener)
+    at = page.index(">", start) + 1
+    depth = 1
+    while depth:
+        opened = page.find("<div", at)
+        closed = page.find("</div>", at)
+        assert closed != -1, f"{opener!r} is never closed"
+        if opened != -1 and opened < closed:
+            depth, at = depth + 1, opened + 4
+        else:
+            depth, at = depth - 1, closed + 6
+    return page[start:at]
+
+
+def test_the_question_is_the_last_row_of_the_table_it_applies_to(tmp_path: Path) -> None:
+    """It reads "applies to every whole home above", and it used to sit outside
+    the box those homes are in, joined by a hairline that doubled the border
+    under the last row. Inside the ledger, on the same fill as the column
+    headings, it bookends the table it is asking about."""
+    from tests.test_deal_profile import block_body, stylesheet
+
+    page = page_for(tmp_path)
+    ledger = enclosing_div(page, '<div class="path-ledger')
+
+    assert 'class="size-choice"' in ledger, "the question sits outside the table again"
+    assert ledger.rindex('class="path-row"') < ledger.index('class="size-choice"'), "it comes last"
+
+    band = block_body(stylesheet(), ".size-choice { ")
+    head = block_body(stylesheet(), ".path-ledger-head { ")
+    assert "background: var(--surface-muted)" in band, band
+    assert "var(--surface-muted)" in head, "the two ends of the table have to match"
+
+
+def test_a_link_shaped_button_lays_out_like_the_text_around_it() -> None:
+    """Every button here is a 42px inline-flex box centred on its own label, so
+    one sitting inside a sentence pushed the whole line box down and opened a
+    blank line through the middle of the help text. A button that reads as a
+    link has to lay out as one."""
+    from tests.test_deal_profile import block_body, stylesheet
+
+    style = stylesheet()
+    shared = block_body(style, "button, .button {")
+    link = block_body(style, ".link-button { ")
+
+    assert "min-height: 42px" in shared and "display: inline-flex" in shared, shared
+    assert "min-height: 0" in link and "display: inline" in link, link
+
+
 @pytest.mark.parametrize(("units", "expected"), [("25", 'value="25" checked'), ("", 'value="" checked')])
 def test_your_answer_is_the_one_shown_back(tmp_path: Path, units, expected) -> None:
     page = page_for(tmp_path, units)

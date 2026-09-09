@@ -1079,6 +1079,67 @@ def test_the_nav_asks_for_an_action_not_a_noun(tmp_path: Path) -> None:
     assert '>Sources</a>' not in page, "the bare noun is gone from the nav"
 
 
+def main_nav(page: str) -> list[str]:
+    """The header tab labels, in the order the header puts them in."""
+    import re
+
+    start = page.index('<nav aria-label="Main navigation">')
+    nav = page[start : page.index("</nav>", start)]
+    return [text.strip() for text in re.findall(r">([^<>]+)</a>", nav)]
+
+
+def test_the_nav_runs_in_the_order_somebody_uses_it(tmp_path: Path) -> None:
+    """Look at what fits, keep some, adjust the deal that produced those
+    results, and only then go looking for more places to read. Add sources sat
+    ahead of Your deal, which put the rarest tab in front of the one people
+    come back to."""
+    settings = app_settings(tmp_path)
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+
+    with TestClient(application) as client:
+        page = client.get("/").text
+
+    assert main_nav(page) == ["Shortlist", "Saved", "Your deal", "Add sources", "Support"]
+    # The theme control is a button, not a destination, so it comes after all
+    # of them rather than sitting in the run of tabs.
+    assert page.index("</nav>") < page.index("data-theme-toggle")
+
+
+def test_moving_between_pages_is_one_thing_changing(tmp_path: Path) -> None:
+    """Following a link used to be a blank frame. The transition is a
+    progressive enhancement -- no JavaScript, and a browser without it
+    navigates exactly as before -- so what has to hold is the CSS: it is asked
+    for, it is skipped for somebody who wants less motion, and the header and
+    footer are lifted out of the page snapshot so only the body travels."""
+    style = stylesheet()
+
+    motion = block_body(style, "@media (prefers-reduced-motion: no-preference) {\n  @view-transition")
+    assert "navigation: auto" in motion, motion
+    # Cancelling it with an override underneath would still snapshot the page
+    # for somebody who asked for no motion. It has to be the at-rule that is
+    # never declared.
+    declarations = style.count("@view-transition")
+    assert declarations == 1, f"{declarations} view-transition at-rules; only the gated one belongs"
+
+    for name in ("site-header", "site-footer"):
+        assert f".site-{name.split('-')[1]} {{ view-transition-name: {name}; }}" in style
+        # A name used twice aborts the whole transition, silently.
+        assert style.count(f"view-transition-name: {name};") == 1, name
+
+
+def test_every_page_animation_names_a_keyframe_that_exists() -> None:
+    """A view transition whose animation names nothing renders as an instant
+    swap and reports no error anywhere. Only reading both halves catches it."""
+    import re
+
+    style = stylesheet()
+    named = set(re.findall(r"::view-transition-(?:old|new)\([^)]+\) \{ animation: ([a-z-]+)", style))
+    assert named, "the page transition has no animations at all"
+    for name in named:
+        assert f"@keyframes {name} {{" in style, f"{name} is animated but never defined"
+
+
 def test_the_page_it_opens_says_the_same_thing(tmp_path: Path) -> None:
     """A tab called one thing that opens a page called another is how people
     decide they are in the wrong place and leave."""

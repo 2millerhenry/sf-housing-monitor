@@ -238,6 +238,48 @@ button:focus-visible, .button:focus-visible, a:focus-visible, select:focus-visib
 .site-header nav a:hover { color: var(--ink); background: var(--surface-muted); }
 .site-header nav a.active { color: var(--ink); background: var(--surface-muted); font-weight: 680; }
 
+/* ---- Moving between pages ---- */
+/* Every page here is a document the server renders, so following a link used
+   to be a blank frame and a jump to the top. A cross-document view transition
+   makes it one thing changing instead. The header and the footer are the same
+   object on every page, so they are named: naming lifts them out of the root
+   snapshot, they hold their place, and the only thing that travels is the page
+   body between them. The header still cross-fades in place, which is what
+   carries the active tab from one item to the next.
+
+   No JavaScript, and nothing here is load-bearing: a browser without the
+   feature navigates exactly as it did before. The at-rule sits inside the
+   motion query rather than being cancelled by an override underneath it --
+   somebody who asked for less motion should not have the page snapshotted at
+   all, only for the result to be animated to nothing. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+.site-header { view-transition-name: site-header; }
+.site-footer { view-transition-name: site-footer; }
+/* The groups carry the position and size morph, and their browser default is
+   250ms -- longer than anything visible here, which would hold the page in its
+   captured state after the last thing anybody can see has finished. */
+::view-transition-group(root),
+::view-transition-group(site-header), ::view-transition-group(site-footer),
+::view-transition-old(site-header), ::view-transition-new(site-header),
+::view-transition-old(site-footer), ::view-transition-new(site-footer) {
+  animation-duration: 240ms;
+  animation-timing-function: var(--ease-state);
+}
+/* The two images are blended additively, so a real cross-fade only looks clean
+   while the pair of them adds up to about one page. The first attempt fired the
+   old one out in 90ms and started the new one 40ms later, which left a window
+   around 60ms where they summed to a third: the page washed out towards the
+   canvas and the page being left was still legible underneath it. Matched
+   curves and no delay hold the sum between 0.93 and 1.0 the whole way through.
+   Eight pixels of travel is enough to feel like arrival and not enough to look
+   like a slide changing. */
+::view-transition-old(root) { animation: page-leave 200ms var(--ease-state) both; }
+::view-transition-new(root) { animation: page-arrive 240ms var(--ease-state) both; }
+@keyframes page-leave { to { opacity: 0; } }
+@keyframes page-arrive { from { opacity: 0; transform: translateY(8px); } }
+
 main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
 
 /* A quiet standing line rather than a banner: the funding ask should be
@@ -758,7 +800,11 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .area-fields { display: grid; gap: 13px; }
 .area-fields label > span { font-weight: 450; color: var(--faint); }
 .area-fields textarea { width: 100%; resize: vertical; border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px 11px; background: var(--surface); color: var(--ink); line-height: 1.45; }
-.field-help { margin: -3px 0 0; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
+/* Prose keeps a readable measure even where the control above it runs the
+   full width. Three sentences stretched across a 1,100px form wrap into
+   lines nobody tracks back from, which is what made the help under the
+   home types read as fine print to skip. */
+.field-help { max-width: 78ch; margin: -3px 0 0; color: var(--muted); font-size: 0.76rem; line-height: 1.45; }
 .compact-fields { display: grid; gap: 20px; }
 .compact-fields fieldset { margin: 0; padding: 0; border: 0; }
 .compact-fields legend { margin: 0 0 9px; font-size: 0.78rem; font-weight: 690; }
@@ -819,7 +865,13 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .reset-deal-confirm button:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
 
 /* A control that reads as a sentence rather than a button. */
-.link-button { padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 620; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+/* A button that reads as a link has to lay out as one too. The shared
+   button rule makes every button a 42px inline-flex box centred on its own
+   text, and one of those sitting in a sentence pushes the whole line box
+   down: the help under the home types had a blank line through the middle
+   of it for exactly this reason. Back to an inline box on the text's own
+   baseline. */
+.link-button { display: inline; min-height: 0; padding: 0; border: 0; background: none; color: var(--accent); font: inherit; font-weight: 620; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .link-button:hover { color: var(--accent-hover); }
 
 .match-cutoff { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); --cutoff-fill: 46%; }
@@ -1153,21 +1205,21 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .tally.quiet { background: var(--surface-muted); color: var(--muted); }
 .support-quiet-title { margin: 26px 0 0; color: var(--muted); font-size: 0.72rem; font-weight: 650; letter-spacing: 0.015em; }
 
-/* Getting help is a sequence, not a row of buttons: try again, then send what
-   the page already knows. Numbering it says which to do first. */
 /* The one place the app's own promise -- that it runs entirely on this
-   computer -- is either proved or quietly broken. Shaped like the help block
-   below it so it reads as part of the page rather than as a developer tool
-   somebody left switched on. */
-.support-data { margin-top: 26px; padding: 20px 22px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+   computer -- is either proved or quietly broken. Shaped like the block above
+   it so it reads as part of the page rather than as a developer tool somebody
+   left switched on. */
+.support-data { margin-top: 22px; padding: 18px 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); }
 .support-data h2 { margin: 0 0 6px; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em; }
-.support-data > p { max-width: 72ch; margin: 0 0 12px; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+.support-data > p { max-width: 72ch; margin: 0 0 13px; color: var(--muted); font-size: 0.85rem; line-height: 1.55; }
 .support-data form { margin: 0; }
 .support-data button { min-height: 38px; padding: 0 15px; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.82rem; font-weight: 620; cursor: pointer; }
 .support-data button:hover { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-hover); }
-/* The path is here so somebody whose file browser will not open still has
-   something to copy, which is the whole point of the failure message too. */
-.support-data-path { margin: 11px 0 0; color: var(--faint); font-size: 0.76rem; word-break: break-all; }
+/* The path sits beside the button rather than under it: it is the same answer
+   in a form somebody can copy, and it is what the failure message falls back
+   to when no file browser will open. */
+.support-data-open { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.support-data-path { color: var(--faint); font-size: 0.76rem; word-break: break-all; }
 .support-data-schema { margin-top: 14px; }
 .support-data-schema summary { color: var(--accent); font-size: 0.82rem; font-weight: 620; cursor: pointer; }
 .support-data-schema > div { max-width: 72ch; margin-top: 10px; color: var(--muted); font-size: 0.82rem; line-height: 1.6; }
@@ -1177,39 +1229,57 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
    scroll rather than the page's if a reader's window is narrower than that. */
 .support-data-query { margin: 0 0 12px; padding: 11px 13px; overflow-x: auto; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); font-size: 0.76rem; line-height: 1.5; }
 
-.support-help { margin-top: 26px; padding: 20px 22px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.support-help h2 { margin: 0 0 4px; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em; }
-.help-steps { margin: 0; padding-left: 20px; display: grid; gap: 18px; }
-.help-steps li { max-width: 72ch; color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
-.help-steps strong { color: var(--ink); font-weight: 640; }
-.help-steps small { display: block; margin-top: 7px; color: var(--faint); font-size: 0.76rem; line-height: 1.5; }
-.help-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 11px; }
+/* Trying something comes before reading the archive, so this sits directly
+   under the things to fix. It used to be a numbered procedure at the foot of
+   the page with a paragraph of small print under each step, which is a lot of
+   apparatus for "press this again, and if that fails, send this". */
+.support-tools { margin-top: 22px; padding: 18px 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); }
+.support-tools h2 { margin: 0 0 5px; font-size: 1.05rem; font-weight: 650; letter-spacing: -0.012em; }
+.support-tools-lead { max-width: 72ch; margin: 0 0 13px; color: var(--muted); font-size: 0.85rem; line-height: 1.55; }
+.support-tools-note { max-width: 78ch; margin: 13px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--faint); font-size: 0.72rem; line-height: 1.45; }
+.help-actions { display: flex; flex-wrap: wrap; gap: 9px; }
 .help-actions .button, .help-actions button { min-height: 38px; padding: 0 15px; display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--surface); color: var(--ink); font: inherit; font-size: 0.82rem; font-weight: 620; cursor: pointer; text-decoration: none; }
 .help-actions .button:hover, .help-actions button:hover { border-color: var(--accent-line); background: var(--accent-soft); color: var(--accent-hover); }
-.support-generated { margin: 18px 0 0; padding-top: 13px; border-top: 1px solid var(--line); color: var(--faint); font-size: 0.74rem; }
+.support-generated { margin: 22px 0 0; color: var(--faint); font-size: 0.74rem; }
 
-.fix-list { margin-top: 22px; display: grid; gap: 10px; }
-.fix-list > h2 { margin: 0 0 2px; font-size: 1.05rem; letter-spacing: -0.012em; }
+/* Things to fix come first and are the only part of this page allowed to look
+   urgent -- but as one list, not as a stack of separate alarms. Every row
+   spells out its own next step, and most of them are a listing site declining
+   for a few hours; five bordered cards each carrying a coloured edge said
+   otherwise before a word of them had been read. The dot is the whole of the
+   severity now, and it is the only thing on the row that is coloured. */
+.fix-list { margin-top: 22px; }
+.fix-list > h2 { margin: 0 0 9px; font-size: 1.05rem; letter-spacing: -0.012em; }
+.fix-rows { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); overflow: hidden; }
 .fix-row {
-  padding: 15px 17px;
+  position: relative;
+  padding: 14px 18px 14px 34px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.6fr);
+  /* The explanation is capped at a measure rather than given a share of a
+     1,180px page: proportional columns left the action stranded a third of
+     a screen away from the sentence it answers. */
+  grid-template-columns: minmax(0, 58ch) minmax(210px, 1fr);
   align-items: start;
-  gap: 12px 22px;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--amber);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: var(--shadow-low);
+  gap: 10px 22px;
 }
+.fix-row + .fix-row { border-top: 1px solid var(--line); }
+/* Empty content, so a screen reader is never read a bullet: the row already
+   says in words what is wrong and what to do about it. */
+.fix-row::before { content: ""; position: absolute; top: 20px; left: 17px; width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }
+.fix-row.blocked::before { background: var(--red); }
 .fix-row h3 { margin: 0 0 4px; font-size: 0.94rem; letter-spacing: -0.008em; }
 .fix-row > div > p { max-width: 72ch; margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.5; }
-.fix-do { margin: 0; font-size: 0.8rem; line-height: 1.5; }
+.fix-do { max-width: 52ch; margin: 0; font-size: 0.8rem; line-height: 1.5; }
 .fix-do > span { display: block; margin-bottom: 3px; color: var(--muted); font-size: 0.68rem; font-weight: 680; }
 
 /* The passed and optional folds reuse .system-disclosure's card and summary
-   treatment, so only what genuinely differs from it belongs here. */
+   treatment, so only what genuinely differs from it belongs here. They share
+   one frame rather than standing apart as two cards: this is the part of the
+   page nobody has to read, and it should look like one thing set aside. */
 .support-quiet { display: block; }
+.support-quiet-frame { margin-top: 9px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-low); overflow: hidden; }
+.support-quiet-frame > .support-fold { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+.support-quiet-frame > .support-fold + .support-fold { border-top: 1px solid var(--line); }
 .support-fold[open] > summary { border-bottom: 1px solid var(--line); }
 .support-fold[open] > summary .disclosure-action::after { content: "Hide"; }
 .support-fold .check-list { margin: 0; padding: 2px 18px 6px; list-style: none; }
@@ -1217,29 +1287,6 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
 .support-fold .check-list li + li { border-top: 1px solid var(--line); }
 .support-fold .check-list strong { font-size: 0.86rem; letter-spacing: -0.006em; }
 .support-fold .check-list span { max-width: 78ch; color: var(--muted); font-size: 0.78rem; line-height: 1.48; }
-
-.support-tools {
-  margin-top: 18px;
-  padding: 15px 17px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow: var(--shadow-low);
-}
-.support-tools .button, .support-tools button { min-height: 38px; }
-.support-tools > p {
-  flex-basis: 100%;
-  margin: 0;
-  padding-top: 12px;
-  border-top: 1px solid var(--line);
-  color: var(--faint);
-  font-size: 0.72rem;
-  line-height: 1.45;
-}
 
 .support-donate {
   margin-top: 18px;
@@ -1357,7 +1404,10 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   .coverage-ledger { grid-template-columns: 1fr; }
   .coverage-ledger div:nth-child(even) { border-left: 0; }
   .coverage-ledger div + div { border-top: 1px solid var(--line); }
-  .fix-row, .support-tools, .support-donate { padding: 14px; }
+  /* The dot keeps its gutter; everything else gives up its side padding. */
+  .fix-row { padding: 13px 14px 13px 30px; }
+  .fix-row::before { left: 14px; }
+  .support-tools, .support-data, .support-donate { padding: 14px; }
   .support-tools .button, .support-tools button { flex: 1 1 100%; }
   .support-fold .check-list { padding-inline: 14px; }
   .source-order { grid-template-columns: 1fr; gap: 13px; }
@@ -1695,13 +1745,18 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   background: var(--amber-soft); color: var(--ink); font-size: 0.82rem; }
 .liveness-warning strong { font-weight: 660; }
 
-/* One shared building-size answer, sitting under the paths it applies to.
+/* One shared building-size answer, and it is the last row of the table it
+   applies to rather than a loose row underneath it: it used to sit outside the
+   ledger with only a hairline joining them, which doubled the border under the
+   last home type and read as something left behind. Inside, on the same fill
+   as the column headings, it bookends the table -- the question is plainly
+   about everything above it, and the band is what makes it visible.
    Pills rather than a select: four options are worth one click, not two, and
    the choice is a stance ("a small building") more than a number. */
-.size-choice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; padding: 13px 16px; border-top: 1px solid var(--line); }
-.size-choice-ask { display: grid; gap: 2px; min-width: 0; }
-.size-choice-ask strong { color: var(--ink); font-size: 0.8rem; font-weight: 650; }
-.size-choice-ask small { color: var(--muted); font-size: 0.68rem; font-weight: 450; }
+.size-choice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 14px 16px; border-top: 1px solid var(--line); background: var(--surface-muted); }
+.size-choice-ask { display: grid; gap: 3px; min-width: 0; }
+.size-choice-ask strong { color: var(--ink); font-size: 0.86rem; font-weight: 650; letter-spacing: -0.008em; }
+.size-choice-ask small { max-width: 58ch; color: var(--muted); font-size: 0.73rem; font-weight: 450; line-height: 1.4; }
 .size-options { display: flex; flex-wrap: wrap; gap: 6px; }
 .size-option { position: relative; display: block; }
 .size-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
@@ -1709,7 +1764,7 @@ details[open] > summary .disclosure-action::after { content: "Hide details"; fon
   border: 1px solid var(--line); border-radius: 9px; background: var(--surface);
   color: var(--muted); font-size: 0.74rem; font-weight: 560; text-align: center; white-space: nowrap;
   transition: border-color 160ms var(--ease-state), background-color 160ms var(--ease-state), color 160ms var(--ease-state); }
-.size-option:hover > span { border-color: var(--line-strong); background: var(--surface-muted); }
+.size-option:hover > span { border-color: var(--line-strong); }
 .size-option input:checked + span { border-color: var(--accent-line); background: var(--accent-soft); color: var(--ink); font-weight: 640; }
 .size-option input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (max-width: 620px) { .size-choice { flex-direction: column; align-items: flex-start; } }

@@ -548,6 +548,41 @@ def test_only_the_connection_test_reaches_the_internet(tmp_path: Path) -> None:
     assert "/support?probe=1" in page, "and it is opt-in"
 
 
+def test_the_things_to_fix_read_as_one_list_not_a_stack_of_alarms() -> None:
+    """Most of what lands here is a listing site declining for a few hours, and
+    it retries itself. Five separately bordered cards, each with a coloured
+    edge, said something louder than that before a word had been read. One
+    frame, hairline rows, and a dot carrying the only colour on the row."""
+    from tests.test_deal_profile import block_body, stylesheet
+
+    style = stylesheet()
+    row = block_body(style, ".fix-row {")
+    frame = block_body(style, ".fix-rows { ")
+
+    assert "border-left" not in row, row
+    assert "border:" not in row, "the frame belongs to the list, not to every row"
+    assert "border: 1px solid var(--line)" in frame, frame
+    assert ".fix-row + .fix-row { border-top:" in style, "the rows need a hairline between them"
+    # Severity still shows, at the smallest size that can carry it. Round on
+    # purpose: a square of colour against the leading edge of a row is the
+    # side stripe again in miniature, which is the thing this replaced.
+    dot = block_body(style, ".fix-row::before {")
+    assert "background: var(--amber)" in dot and "border-radius: 50%" in dot, dot
+    assert ".fix-row.blocked::before { background: var(--red); }" in style
+
+
+def test_something_to_try_comes_before_the_archive(tmp_path: Path) -> None:
+    """Somebody on this page wants to try something. The actions were at the
+    foot of it, under two folds of history nobody has to read."""
+    settings = settings_for(tmp_path)
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/support").text
+
+    assert page.index("Still not right?") < page.index("What was checked")
+    assert page.index("Check again") < page.index("Copy the report"), "try it again first"
+
+
 def test_every_class_the_support_page_uses_is_actually_styled() -> None:
     """The committed repository shipped a Support page whose own stylesheet had
     none of its rules: fix-list, fix-row, support-fold and support-tools existed
