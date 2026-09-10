@@ -14,6 +14,31 @@ It keeps three searches separate, each with its own budget and rules that you se
 - entire studios and one-bedrooms,
 - entire 2–3 bedroom homes to split, priced per person as well as in total.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shortlist-dark.png">
+  <img alt="The shortlist: studios ranked by how well they match, each row showing the score, rent, neighbourhood, source and what still needs confirming" src="docs/screenshots/shortlist.png">
+</picture>
+
+Every home is scored against the deal you wrote, and the score says why. Nothing is thrown
+away: what falls below your line waits in **Near matches**, and changing the deal later
+rescores everything you have ever collected.
+
+## Eighteen sources, no accounts
+
+![Eighteen sources already work: Zillow, Trulia, Redfin, Craigslist, Movoto, ApartmentGuide, Zumper, Rent.com, Apartment List, AvalonBay, UDR, AppFolio, RentSFNow, Abacus, SF Housing Portal, SpareRoom, Uloop and Listings Project](docs/screenshots/sources.png)
+
+Those run on their own, twice a day, with nothing to sign up for. Three more sites — HotPads,
+Apartments.com and Roomies — only ever send listings by email, so connecting one inbox with a
+read-only app password turns on all three at once. That is optional; the eighteen keep running
+either way.
+
+## One number that tells you what your deal costs
+
+![The shortlist cut-off slider reading "60 and up, 446 homes"](docs/screenshots/match-slider.png)
+
+Tighten the deal and the count follows as you type, so you can see what a smaller budget or one
+fewer neighbourhood actually costs you before you commit to it.
+
 ## Get it running
 
 1. Download **SF-Housing-Monitor-0.4.0-macOS-arm64.zip** from the
