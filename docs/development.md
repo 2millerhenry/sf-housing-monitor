@@ -34,3 +34,16 @@ Inspect or restart the installed background service:
 ```bash
 launchctl print gui/$(id -u)/com.sfhousing.monitor
 ```
+
+
+## If you fork this
+
+The donation link lives in two places, and both take an empty value meaning "show nothing":
+
+- `_DEFAULT_DONATE_URL` in [`sf_housing/__init__.py`](../sf_housing/__init__.py) — the line in
+  the app's own footer and on its Support page.
+- [`.github/FUNDING.yml`](../.github/FUNDING.yml) — the Sponsor button on the repository.
+
+The app root, the login-service label and the Windows task name are deliberately still called
+`SF Housing Monitor`. They are where an existing installation keeps its data and how its
+scheduled checks are registered, so renaming them would orphan both.
