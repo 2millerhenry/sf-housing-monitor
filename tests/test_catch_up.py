@@ -59,14 +59,14 @@ class Source:
         return listing
 
 
-def settle(scanner: Scanner, timeout: float = 15.0) -> None:
-    """Wait for a background scan the way a person watching the page does."""
-    import time
+def settle(scanner: Scanner, timeout: float = 30.0) -> None:
+    """Wait for a background scan to finish.
 
-    deadline = time.monotonic() + timeout
-    while scanner.is_running and time.monotonic() < deadline:
-        time.sleep(0.02)
-    assert not scanner.is_running, "a scan never finished"
+    Blocks on the scanner rather than asking it repeatedly against a deadline:
+    a poll loop that gives up after a fixed number of seconds turns a slow
+    machine into a failed assertion about the scanner.
+    """
+    assert scanner.wait_until_idle(timeout), "a scan never finished"
 
 
 def board(tmp_path: pathlib.Path, source=None):

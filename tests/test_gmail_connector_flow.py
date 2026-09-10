@@ -80,9 +80,7 @@ def test_bounded_gmail_test_enters_normal_ranking_storage_and_provider_state(
 
     with TestClient(application) as client:
         started = client.post("/alerts/gmail/test", follow_redirects=False)
-        deadline = time.monotonic() + 3
-        while application.state.scanner.is_running and time.monotonic() < deadline:
-            time.sleep(0.01)
+        assert application.state.scanner.wait_until_idle(), "the test scan never finished"
         provider = application.state.repository.connector_state("gmail:zillow")
         aggregate = application.state.repository.connector_state("gmail")
         page = client.get("/alerts")

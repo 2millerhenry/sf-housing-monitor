@@ -59,7 +59,23 @@ FULL_SOURCE_TRIGGERS = AUTOMATIC_TRIGGERS | {"connector_test"}
 # Every source still gets a fair share of what is left, so one slow source
 # cannot spend the whole allowance and starve the rest, and each is guaranteed a
 # small floor so it always makes progress even when the share is thin.
-RECHECK_FLOOR_PER_SOURCE = 3
+# What a source is owed each scan regardless of the share it works out to.
+#
+# Three was too few to matter. A real install had 90 shortlisted Craigslist
+# homes waiting to be re-confirmed and drained them at roughly that rate, so
+# the median home on the shortlist had last been looked at 52 hours earlier
+# and the oldest 127 -- long enough for one to be flagged, pulled, and still
+# sitting there looking live when somebody clicked it.
+RECHECK_FLOOR_PER_SOURCE = 20
+
+# ...but the floor is a slice of time, not a licence to spend the whole scan.
+# A count on its own is only a bound for a source that answers quickly: a slow
+# one doing twenty reads at a tenth of a second apiece would eat a short scan
+# outright and the sources behind it would never run. So the floor holds until
+# either its count or this share of what is left is used, whichever comes
+# first, and the share is generous enough to drain a real backlog while still
+# leaving three quarters of the time for everyone else.
+RECHECK_FLOOR_TIME_SHARE = 0.25
 # The longest any one source may hold the scan. An HTTP read timeout bounds
 # each chunk of a response, not the whole of it, so a server that trickles
 # bytes keeps its connection open for as long as it likes: AvalonBay took 200
@@ -127,6 +143,25 @@ def _remaining_label(seconds: int | None, *, running: bool) -> str:
     return f"about {minutes} minute{'' if minutes == 1 else 's'} left"
 
 
+def _rechecking_sources_remaining(active_sources: list[ListingSource], source_index: int) -> int:
+    """How many sources from here on can actually spend the recheck allowance.
+
+    The allowance is divided by the sources still to come, so that one of them
+    cannot take it all. Dividing by *every* remaining source counted the ten
+    with no ``enrich`` method and no queue, which reserved shares that were
+    never spent and left the source with the deepest backlog on the thinnest
+    slice.
+    """
+    remaining = active_sources[max(0, source_index - 1):]
+    countable = sum(
+        1
+        for source in remaining
+        if hasattr(source, "enrich")
+        and int(getattr(source, "recheck_budget", RECHECK_HARD_CEILING)) > 0
+    )
+    return max(1, countable)
+
+
 class Scanner:
     def __init__(
         self,
@@ -137,6 +172,7 @@ class Scanner:
         detail_delay_seconds: float = 0.25,
         max_scan_seconds: float = 110.0,
         deep_scan_max_seconds: float | None = None,
+        scan_allowed: Callable[[str, list[ListingSource] | None], bool] | None = None,
     ):
         self.repository = repository
         self.preference_loader = preference_loader
@@ -147,8 +183,18 @@ class Scanner:
         # A sweep that inherits the interactive budget is not a sweep: it would
         # spend four minutes and skip the sources it exists to read deeply.
         self.deep_scan_max_seconds = deep_scan_max_seconds or max_scan_seconds
+        # Injected rather than imported: the daily budget is decided against the
+        # schedule, and scheduling imports this module. Left out, a Scanner is
+        # unbudgeted -- which is what the tests that are about scanning itself
+        # want, and what the app never does.
+        self.scan_allowed = scan_allowed
         self._scan_lock = threading.Lock()
         self._process_lock_handle = None
+        # Set whenever no scan is in flight, so a caller can block on the end of
+        # one instead of asking over and over whether it is over yet. Starts
+        # set: a scanner that has never run is idle.
+        self._scan_finished = threading.Event()
+        self._scan_finished.set()
         self._progress_lock = threading.Lock()
         self._progress_state: dict[str, object] = {
             "status": "idle",
@@ -546,11 +592,18 @@ class Scanner:
             LOGGER.warning("%s recheck lookup failed", source.platform, exc_info=True)
             return 0
 
+        # The floor's own deadline, so that being owed twenty reads is never the
+        # same as being owed the rest of the scan.
+        floor_deadline = now + max(0.0, available * RECHECK_FLOOR_TIME_SHARE)
         checked = 0
         for listing_id, candidate in candidates:
             # The floor is what a source is owed regardless of its share; past
             # that it stops at its share, and never past the scan's own deadline.
-            limit = deadline if checked < floor else min(recheck_deadline, deadline)
+            limit = (
+                min(deadline, floor_deadline)
+                if checked < floor
+                else min(recheck_deadline, deadline)
+            )
             if time.monotonic() + self.timeout_seconds > limit:
                 break
             try:
@@ -603,6 +656,7 @@ class Scanner:
         )
 
     def _begin_progress(self, trigger: str, sources: list[ListingSource] | None = None) -> None:
+        self._scan_finished.clear()
         with self._progress_lock:
             self._progress_state.update(
                 {
@@ -679,6 +733,44 @@ class Scanner:
                     "elapsed_seconds": max(0, elapsed),
                 }
             )
+        # Last, so anybody woken by this reads the finished state rather than
+        # the one it is in the middle of replacing.
+        self._scan_finished.set()
+
+    def wait_until_idle(self, timeout: float = 30.0) -> bool:
+        """Block until no scan is in flight. False if it timed out instead.
+
+        For callers that have to see the end of a scan they did not run inline
+        -- chiefly tests, which otherwise poll ``is_running`` against a fixed
+        wall-clock deadline. A deadline long enough today is only long enough
+        until the thing being waited on gets slower, and a test that fails that
+        way blames the code rather than the clock.
+
+        The event on its own is not quite the answer: a run sets it inside
+        ``_finish_progress``, which happens a moment before the worker lets go
+        of the scan locks. Taking the lock here and dropping it again is what
+        makes "idle" mean the run is entirely over rather than one instruction
+        away from it, and it costs nothing on the paths that were refused
+        before any lock was taken.
+        """
+        if not self._scan_finished.wait(timeout):
+            return False
+        if not self._scan_lock.acquire(timeout=max(0.0, timeout)):
+            return False
+        self._scan_lock.release()
+        return True
+
+    def _within_daily_budget(self, trigger: str, sources: list[ListingSource] | None) -> bool:
+        """Whether this run may go out to the sources at all today.
+
+        A scan aimed at one source is a connector being tested, not the app
+        going out on its own account: it is one read of one site, asked for by
+        somebody sitting in front of the setup page, and refusing it would
+        break setting the source up at all. Only a full sweep is charged.
+        """
+        if self.scan_allowed is None or sources is not None:
+            return True
+        return bool(self.scan_allowed(trigger, sources))
 
     def start_scan(self, trigger: str = "manual", sources: list[ListingSource] | None = None) -> bool:
         """Start a scan in a daemon thread after acquiring the overlap lock.
@@ -689,6 +781,11 @@ class Scanner:
         if not self.preference_loader().profile_active:
             self._begin_progress(trigger, sources or [])
             self._finish_progress("profile_required")
+            return False
+        if not self._within_daily_budget(trigger, sources):
+            self._begin_progress(trigger, sources or [])
+            self._finish_progress("budget_reached")
+            LOGGER.info("Refused %s scan: today's source budget is spent", trigger)
             return False
         if not self._acquire_scan_locks():
             return False
@@ -712,6 +809,11 @@ class Scanner:
             self._begin_progress(trigger, sources or [])
             self._finish_progress("profile_required")
             return ScanOutcome(0, "profile_required")
+        if not self._within_daily_budget(trigger, sources):
+            self._begin_progress(trigger, sources or [])
+            self._finish_progress("budget_reached")
+            LOGGER.info("Refused %s scan: today's source budget is spent", trigger)
+            return ScanOutcome(0, "budget_reached")
         if not self._acquire_scan_locks():
             run_id = self.repository.begin_scan(trigger)
             self.repository.finish_scan(run_id, "skipped", message="Another scan is already running.")
@@ -1205,7 +1307,14 @@ class Scanner:
                             preferences,
                             seen_source_ids={item["listing"].source_id for item in prepared},
                             deadline=deadline,
-                            sources_remaining=max(1, len(active_sources) - source_index + 1),
+                            # Only the sources that can actually recheck. Ten of
+                            # the twenty-four have no enrich at all, so counting
+                            # them reserved a share none of them could ever
+                            # spend and handed the smallest slice to Craigslist,
+                            # which runs third and carries the deepest queue.
+                            sources_remaining=_rechecking_sources_remaining(
+                                active_sources, source_index
+                            ),
                         )
                         message = (
                             f"Completed with {detail_failures} detail-page warning(s)."

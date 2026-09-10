@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import threading
+import pathlib
+import tempfile
 import time
 from dataclasses import replace
 
@@ -338,9 +340,48 @@ def test_start_scan_marks_running_before_returning(
     release.set()
 
 
+def test_waiting_for_a_scan_does_not_give_up_when_the_machine_is_busy(
+    repository: Repository, preferences: Preferences
+) -> None:
+    """The scan is waited on, not timed.
+
+    The suite used to poll ``is_running`` until three seconds had passed and
+    then assert on whatever it found. Three seconds is plenty on an idle
+    machine -- 188ms measured -- but this runs in a process full of other
+    tests' scan threads, and under that contention the same scan took 9.6
+    seconds with eight busy threads and 28 with twenty-four. The deadline was
+    not measuring the scanner; it was measuring the machine.
+    """
+    started, release = threading.Event(), threading.Event()
+    scanner = Scanner(
+        repository,
+        lambda: preferences,
+        [BlockingSource(started, release)],
+        detail_delay_seconds=0,
+    )
+
+    assert scanner.wait_until_idle(timeout=0) is True, "an idle scanner is idle"
+    assert scanner.start_scan("manual") is True
+    assert started.wait(timeout=30)
+    assert scanner.wait_until_idle(timeout=0.05) is False, "a running scan is not idle"
+
+    release.set()
+    assert scanner.wait_until_idle() is True
+    assert scanner.is_running is False
+    assert scanner.progress["status"] == "completed"
+
+
 def test_scan_progress_reports_real_source_and_completion(
     repository: Repository, preferences: Preferences
 ) -> None:
+    """The progress panel has to describe the scan that is actually running.
+
+    Waited on rather than polled against a deadline. This asked whether the
+    scan was over every ten milliseconds until three seconds had passed, and
+    then asserted on whatever it found -- so on a machine busy enough to take
+    longer it read the half-finished state and blamed the scanner for it. The
+    suite got slower, and the failure that followed was about the clock.
+    """
     started, release = threading.Event(), threading.Event()
     scanner = Scanner(
         repository,
@@ -350,7 +391,8 @@ def test_scan_progress_reports_real_source_and_completion(
     )
 
     assert scanner.start_scan("manual") is True
-    assert started.wait(timeout=2)
+    # A failsafe, not a pace: the wait returns the moment the source is entered.
+    assert started.wait(timeout=30), "the scan never reached the first source"
     active = scanner.progress
     assert active["running"] is True
     assert active["current_source"] == "Blocking"
@@ -359,9 +401,7 @@ def test_scan_progress_reports_real_source_and_completion(
     assert active["percent"] == 0
 
     release.set()
-    deadline = time.monotonic() + 3
-    while scanner.is_running and time.monotonic() < deadline:
-        time.sleep(0.01)
+    assert scanner.wait_until_idle(), "the scan never finished"
 
     finished = scanner.progress
     assert finished["running"] is False
