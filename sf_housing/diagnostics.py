@@ -22,7 +22,7 @@ from .gmail_alerts import GmailAlertMailbox
 from .preferences import PreferenceError, load_preferences
 from .scanner import Scanner
 from .scheduling import schedule_coverage
-from .settings import Settings
+from .settings import Settings, _configured_path
 from .sources import ListingSource
 
 
@@ -832,8 +832,14 @@ def _launch_agent_check(settings: Settings) -> DiagnosticCheck:
             "Nothing to do in development.",
             owner="App",
         )
-    launch_agents = Path(
-        os.environ.get("SF_HOUSING_LAUNCH_AGENTS_DIR", Path.home() / "Library" / "LaunchAgents")
+    # install.sh reads this as "${SF_HOUSING_LAUNCH_AGENTS_DIR:-$DEFAULT_LAUNCH_AGENTS_DIR}",
+    # and the shell's ":-" falls back on an empty value as readily as on an absent one.
+    # Reading it any other way here would leave plist_path relative and ask is_file()
+    # about the directory the process happened to start in -- "/" under launchd -- and
+    # report the login service missing on a Mac where it is installed and running, which
+    # sends someone to Repair to fix a problem they do not have.
+    launch_agents = _configured_path(
+        "SF_HOUSING_LAUNCH_AGENTS_DIR", Path.home() / "Library" / "LaunchAgents"
     )
     plist_path = launch_agents / "com.sfhousing.monitor.plist"
     if not plist_path.is_file():

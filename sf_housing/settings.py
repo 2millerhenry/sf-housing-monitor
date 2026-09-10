@@ -8,6 +8,26 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
+def _configured_path(variable: str, default: Path) -> Path:
+    """The location an environment variable asks for, or the default if it asks
+    for nothing.
+
+    ``os.environ.get`` falls back only when the variable is *absent*. Set but
+    empty, it hands back ``""``, and ``Path("")`` is ``.``, which ``resolve()``
+    turns into whatever directory the process happened to start in -- ``/``
+    under launchd. The database, the log and the lock would be written there,
+    silently, and the person looking for their listings would never find them.
+    A variable exported empty by a launcher or a shell profile is not a choice
+    of location; it is the absence of one, which is what the default is for.
+
+    Surrounding whitespace is dropped for the same reason: a value that arrives
+    padded from a plist or a ``.env`` file was not meant to name a directory
+    whose name is a space.
+    """
+    requested = os.environ.get(variable, "").strip()
+    return Path(requested or default).expanduser().resolve()
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     data_dir: Path
@@ -43,10 +63,10 @@ class Settings:
 
     @classmethod
     def from_environment(cls) -> "Settings":
-        data_dir = Path(os.environ.get("SF_HOUSING_DATA_DIR", PROJECT_ROOT / "data")).expanduser().resolve()
-        preferences_path = Path(
-            os.environ.get("SF_HOUSING_PREFERENCES", data_dir / "config" / "preferences.yaml")
-        ).expanduser().resolve()
+        data_dir = _configured_path("SF_HOUSING_DATA_DIR", PROJECT_ROOT / "data")
+        preferences_path = _configured_path(
+            "SF_HOUSING_PREFERENCES", data_dir / "config" / "preferences.yaml"
+        )
         return cls(
             data_dir=data_dir,
             preferences_path=preferences_path,
