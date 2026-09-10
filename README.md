@@ -14,12 +14,27 @@ It keeps three searches separate, each with its own budget and rules that you se
 - entire studios and one-bedrooms,
 - entire 2–3 bedroom homes to split, priced per person as well as in total.
 
-## Install
+## Get it running
 
-Download the ZIP for your platform from the
-[Releases page](https://github.com/2millerhenry/sf-housing-monitor/releases), extract it, and
-run the installer inside. The first install downloads a private Python runtime; it does not
-use `sudo`, Homebrew, an administrator account, or your system Python.
+1. Download **SF-Housing-Monitor-0.4.0-macOS-arm64.zip** from the
+   [Releases page](https://github.com/2millerhenry/sf-housing-monitor/releases).
+2. Double-click it to extract, open the folder, then **Control-click**
+   `2 Install SF Housing Monitor.command` and choose **Open** — twice. (Control-click, not
+   double-click: macOS blocks unsigned apps opened the normal way. See below.)
+3. Wait a few minutes. Your browser opens by itself. Fill in **Your deal** and save.
+
+That is the whole setup. No account, no sign-up, no payment, nothing to configure first. Your
+own email and any other accounts are added later, only if you want those extra sources, and
+they stay on your machine.
+
+Currently released for **Apple Silicon Macs (M1 and later), macOS 15.6 or later**. Intel Macs
+are not supported. A Windows build exists in the source tree but has not been built or tested
+for a release yet, so there is no Windows download.
+
+## Install detail
+
+The first install downloads a private Python runtime; it does not use `sudo`, Homebrew, an
+administrator account, or your system Python.
 
 **The build is not code-signed**, so both operating systems will warn you the first time. Real
 signing needs a paid Apple Developer account and a Windows code-signing certificate; this
@@ -32,7 +47,8 @@ project has neither, so it asks for one approval instead of hiding the fact.
 3. The installer clears the download quarantine flag for the rest of the release, so Open,
    Verify, Repair, and Uninstall do not each ask again.
 
-**Windows** (x64, Windows 10 or later):
+**Windows** (x64, Windows 10 or later) — *not currently released; these are the steps once a
+Windows build is published*:
 
 1. Extract the ZIP first — do not run it from inside the ZIP.
 2. Double-click `2 Install SF Housing Monitor.cmd`.
@@ -169,6 +185,21 @@ search. They are deliberately not presented as working integrations.
   whoever builds the release. Outlook.com is not supported: Microsoft no longer allows app
   passwords for mail.
 - Apify and the Chrome bridge are optional, capped, and reported separately.
+
+## Why macOS warns you, and what it means
+
+The download is not code-signed. Signing needs a paid Apple Developer account
+(99 USD a year), which this project does not have, so macOS shows
+*"cannot be opened because it is from an unidentified developer"* the first time.
+
+Control-click, **Open**, **Open** is Apple's own documented way through that, and it is how
+most free open-source Mac software is installed. The installer then clears the download flag
+for the rest of the release, so Open, Verify, Repair and Uninstall do not each ask again.
+
+Do **not** turn Gatekeeper off system-wide to avoid this. It is a real protection for
+everything else on your machine, and no single app is worth disabling it for. If you would
+rather read the code than trust the download, everything here is public — build it yourself
+with the steps under **Running from source**.
 
 ## Using this responsibly
 
