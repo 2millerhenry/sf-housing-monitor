@@ -1,10 +1,23 @@
 # SF Housing Monitor
 
-**Finds San Francisco apartments for you, twice a day, on your own laptop.**
+Finding a place in San Francisco is miserable right now. Rent is about as high as it has ever
+been, the tech money is back, and anything decent is gone before you have finished reading it.
+You end up with fourteen tabs open, checking the same sites at midnight, and still missing
+things.
 
-You describe what you are looking for once. It then checks eighteen listing sites on a
-schedule, ranks everything it finds against what you asked for, and keeps it all on a private
-page only you can open. Nothing is hosted, there is no account, and it costs nothing to run.
+I built this for my own search. Figured other people might get some use out of it, so here it is.
+
+It reads eighteen of the big rental sites twice a day, plus the smaller local ones where the
+cheaper rooms and the rent-controlled places actually turn up. Everything it finds is ranked
+against what *you* said you wanted — your budget, your neighbourhoods, a whole place or a room
+in a house — and lands on one page you can look at over coffee instead of hunting for it.
+
+**It never contacts anyone on your behalf.** No automated emails to landlords, no forms filled
+in, no messages sent, no applications. It reads what is already public and hands it to you. A
+landlord sees nothing from this that they would not see from you browsing.
+
+It runs on your own laptop. No account, no server, no subscription, and your search never
+leaves your machine.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shortlist-dark.png">
@@ -149,14 +162,17 @@ access may conflict with those sites' terms of service, and their terms can chan
 You are responsible for deciding what you point it at and for complying with the rules of the
 sites you use. It is provided as-is, with no warranty — see [LICENSE](LICENSE).
 
-## Keeping it working
+## Keeping it going
 
-The app is free, runs entirely on your own machine, and collects nothing. What it costs is
-maintenance: the sites it reads change their pages without warning, and each change has to be
-found and fixed before that source goes quiet.
+This is free and it stays free. I wrote it because I needed it, and it is more use to other
+people than it is sitting on my laptop.
 
-If it helped you find somewhere to live, a one-off contribution is welcome and entirely
-optional. Nothing in the app is gated, degraded, or nagged behind it.
+What it costs is upkeep. These sites redesign their pages without telling anyone, and when one
+does, that source goes quiet until somebody fixes it — which is me, in the evenings.
+
+If it helped you find somewhere, or just saved you a few weeks of refreshing, there is a donate
+link in the app's footer and a Sponsor button on this repo. Entirely optional, and genuinely
+so: nothing is locked, nothing is nagged, and nothing gets worse if you skip it.
 
 If you are forking this, the donation link lives in two places:
 `_DEFAULT_DONATE_URL` in [`sf_housing/__init__.py`](sf_housing/__init__.py) and
