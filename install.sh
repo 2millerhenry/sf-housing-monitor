@@ -36,4 +36,9 @@ ROOT="$(find "$WORK/x" -maxdepth 1 -type d -name 'SF-Housing-Monitor-*' | head -
 [ -f "${ROOT:-}/payload/install.sh" ] || fail "that is not a release. Try the ZIP instead: https://github.com/$REPO/releases/latest"
 
 echo
-exec /bin/bash "$ROOT/payload/install.sh" "$ROOT"
+# Run it rather than exec it. exec replaces this shell, which would mean the
+# EXIT trap above never fires and roughly 60MB of download and unpacked release
+# stayed in the temp folder after every install.
+status=0
+/bin/bash "$ROOT/payload/install.sh" "$ROOT" || status=$?
+exit "$status"
