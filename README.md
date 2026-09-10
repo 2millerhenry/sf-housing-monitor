@@ -6,40 +6,14 @@ You end up with fourteen tabs open, checking the same sites at midnight, and sti
 things.
 
 I built this for my own search. Figured other people might get some use out of it, so here it
-is.
-
-**It finds far more than you would on your own.** Eighteen rental sites, checked twice a day —
-the big ones everybody knows, plus the small local boards where the cheap rooms and the
-rent-controlled places actually turn up. Thousands of listings a week, read so you do not have
-to. Connect an inbox and three more sites join in; there are Facebook Marketplace and Furnished
-Finder connectors too. All optional, all off until you ask.
-
-**Then it does the boring part.** Every home is scored against what *you* said you wanted and
-sorted best-first, so what you open is a shortlist with reasons attached rather than a
-firehose. Star the good ones, pass on the rest, leave yourself notes, filter by neighborhood or
-source or move-in date.
-
-**You set the rules.** A room in a shared house, a whole studio or one-bed, or a two- or
-three-bed to split with friends — each with its own budget, its own areas, its own answers.
-Change your mind next month and everything it has ever collected is scored again against the
-new answer.
-
-**Nothing goes out in your name, and nothing goes anywhere else.** No automated emails to
-landlords, no forms filled in, no applications. It reads what is already public and hands it to
-you. It runs on your own laptop — no account, no server, no subscription — and your search
-never leaves your machine.
+is. It is free, it runs on your own laptop, and it takes about three minutes to start.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shortlist-dark.png">
   <img alt="The shortlist: studios ranked by how well they match, each row showing the score, rent, neighborhood, source and what still needs confirming" src="docs/screenshots/shortlist.png">
 </picture>
 
-## Get it
-
-**Works on:** a Mac with Apple Silicon — an M1 or newer — running macOS 15.6 or later. Not
-Intel Macs, and not Windows yet.
-
-### 1. Install it
+## Install it
 
 Open **Terminal** — press `Cmd` + `Space`, type `Terminal`, press Return — then paste this and
 press Return:
@@ -48,14 +22,16 @@ press Return:
 curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
 ```
 
-It never asks for your password. It takes a few minutes, most of it one download: the app
-brings its own copy of Python rather than touching the one your Mac came with, so nothing else
-on your machine changes. If the window looks like it is sitting still, it is working.
+**Works on** a Mac with Apple Silicon — an M1 or newer — on macOS 15.6 or later. Not Intel
+Macs, and not Windows yet.
 
-Your browser opens by itself when it is ready.
+It never asks for your password, and it takes a few minutes — most of that one download, since
+the app brings its own copy of Python rather than touching the one your Mac came with. If the
+window looks like it is sitting still, it is working. Your browser opens by itself when it is
+done.
 
 <details>
-<summary>Rather click than paste? Use the ZIP.</summary>
+<summary><b>Rather click than paste?</b> Use the ZIP instead.</summary>
 
 <br>
 
@@ -72,21 +48,45 @@ either way.
 
 </details>
 
-### 2. Tell it what you want
+## What it does for you
 
-The page that opens asks what you are looking for: your budget, the neighborhoods you would
+**It finds far more than you would on your own.** Eighteen rental sites are already connected
+the moment you install it — the big ones everybody knows, plus the small local boards where the
+cheap rooms and the rent-controlled places actually turn up. No sign-ups, no keys, nothing to
+switch on. That is thousands of listings a week, read so you do not have to.
+
+**Want more? Adding a source takes about two minutes.** Connect an inbox and HotPads,
+Apartments.com and Roomies start contributing too. There is a Facebook Marketplace connector
+and a Furnished Finder one alongside them. Each is a couple of fields and a save — and every
+one of them is optional, and off until you ask.
+
+**Then it does the boring part.** Every home is scored against what *you* said you wanted and
+sorted best-first, so what you open is a shortlist with reasons attached rather than a
+firehose. Star the good ones, pass on the rest, leave yourself notes, filter by neighborhood or
+source or move-in date.
+
+**You set the rules.** A room in a shared house, a whole studio or one-bed, or a two- or
+three-bed to split with friends — each with its own budget, its own areas, its own answers.
+Change your mind next month and everything it has ever collected is scored again against the
+new answer.
+
+**Free, private, and quiet.** No account, no server, no subscription, ever. It collects nothing
+about you — no analytics, no logs sent anywhere, no email address, not even a sign-up — and
+your search never leaves your laptop. It never acts in your name either: no automated emails to
+landlords, no forms filled in, no applications. It reads what is already public and hands it to
+you.
+
+## Once it is running
+
+**Tell it what you want.** The page that opens asks your budget, the neighborhoods you would
 live in, whether you want a whole place or a room in a shared house, how long a lease, when you
-need to be in. Five minutes, and you never do it again.
+need to be in. Five minutes, and you never do it again. Press save and it goes looking straight
+away — the first search usually brings back a few hundred homes.
 
-Press save and it goes looking immediately. The first search usually brings back a few hundred
-homes.
+**Then leave it alone.** It looks again at ten in the morning and six in the evening, every
+day, as long as your Mac is awake and logged in. Nothing to remember, nothing to keep open.
 
-### 3. That is it — check in whenever
-
-It looks again at ten in the morning and six in the evening, every day, as long as your Mac is
-awake and logged in. You do not have to remember or keep anything open.
-
-When you feel like it, open the page. Best matches at the top, with the reason each one scored
+**Check in whenever it suits you.** Best matches at the top, with the reason each one scored
 that way. Star the ones worth a message, pass on the rest — what you have dealt with does not
 come back.
 
@@ -112,9 +112,10 @@ starting from an empty page. [How scoring works](docs/how-it-works.md).
 
 ### Is it really free?
 
-Yes, and there is nothing to buy later. It runs on your own machine, so there is no server to
-pay for. If it finds you somewhere to live there is one optional donation line in the footer,
-and that is the whole of the ask — nothing is locked, degraded, or nagged.
+Yes — free to install, free to run, free forever, and there is no paid version to graduate to.
+It runs on your own machine, so there is no server for anyone to pay for. If it finds you
+somewhere to live there is one optional donation line in the footer, and that is the whole of
+the ask.
 
 ### Where does my information go?
 
@@ -191,17 +192,20 @@ they like. Where you point it, and whether that is alright with the site, is you
 It comes with no warranty. If it misses the apartment you would have loved, that is bad
 luck rather than something anyone owes you for — see [LICENSE](LICENSE).
 
-## Keeping it going
+## Say thanks
 
-This is free and it stays free. I wrote it because I needed it, and it is more use to other
-people than it is sitting on my laptop.
+This is free and it stays free — no account, no server, no subscription, and nothing held back
+for a paid version, because there isn't one. I wrote it because I needed it, and it is more use
+to other people than it is sitting on my laptop.
 
 What it costs is upkeep. These sites redesign their pages without telling anyone, and when one
 does, that source goes quiet until somebody fixes it — which is me, in the evenings.
 
-If it helped you find somewhere, or just saved you a few weeks of refreshing, there is a donate
-link in the app's footer and a Sponsor button on this repo. Entirely optional, and genuinely
-so: nothing is locked, nothing is nagged, and nothing gets worse if you skip it.
+**If it helped you find somewhere, or just saved you a few weeks of refreshing:
+[buy me a coffee](https://ko-fi.com/millerhenry).**
+
+Entirely optional, and genuinely so. Nothing is locked, nothing nags you, and nothing gets
+worse if you skip it.
 
 ## License
 
