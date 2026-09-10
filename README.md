@@ -5,98 +5,108 @@ been, the tech money is back, and anything decent is gone before you have finish
 You end up with fourteen tabs open, checking the same sites at midnight, and still missing
 things.
 
-I built this for my own search. Figured other people might get some use out of it, so here it is.
+I built this for my own search. Figured other people might get some use out of it, so here it
+is.
 
-It watches eighteen rental sites for you — the big ones, plus the smaller local boards where
-the cheaper rooms and the rent-controlled places actually turn up — and puts everything worth
-seeing on one page, in the order you would want it.
+**It finds far more than you would on your own.** Eighteen rental sites, checked twice a day —
+the big ones everybody knows, plus the small local boards where the cheap rooms and the
+rent-controlled places actually turn up. Thousands of listings a week, read so you do not have
+to. Connect an inbox and three more sites join in; there are Facebook Marketplace and Furnished
+Finder connectors too. All optional, all off until you ask.
 
-**It never contacts anyone on your behalf.** No automated emails to landlords, no forms filled
-in, no applications, nothing sent in your name. It reads what is already public and hands it to
-you. A landlord sees nothing from this they would not see from you browsing.
+**Then it does the boring part.** Every home is scored against what *you* said you wanted and
+sorted best-first, so what you open is a shortlist with reasons attached rather than a
+firehose. Star the good ones, pass on the rest, leave yourself notes, filter by neighborhood or
+source or move-in date.
 
-It runs on your own laptop. No account, no server, no subscription, and your search never
-leaves your machine.
+**You set the rules.** A room in a shared house, a whole studio or one-bed, or a two- or
+three-bed to split with friends — each with its own budget, its own areas, its own answers.
+Change your mind next month and everything it has ever collected is scored again against the
+new answer.
+
+**Nothing goes out in your name, and nothing goes anywhere else.** No automated emails to
+landlords, no forms filled in, no applications. It reads what is already public and hands it to
+you. It runs on your own laptop — no account, no server, no subscription — and your search
+never leaves your machine.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shortlist-dark.png">
   <img alt="The shortlist: studios ranked by how well they match, each row showing the score, rent, neighborhood, source and what still needs confirming" src="docs/screenshots/shortlist.png">
 </picture>
 
-## How it works
+## Get it
 
-**You describe what you want, once.** Your budget, the neighborhoods you would live in,
-whether you are after a whole place or a room in a shared house, how long a lease, when you
-need to be in. Five minutes, and you never do it again.
+**Works on:** a Mac with Apple Silicon — an M1 or newer — running macOS 15.6 or later. Not
+Intel Macs, and not Windows yet.
 
-**It goes and looks, twice a day.** Ten in the morning and six in the evening. You do not have
-to remember, keep a tab open, or do anything at all — as long as your Mac is awake and logged
-in, it checks.
+### 1. Install it
 
-**You look at one page when it suits you.** Everything is ranked, best fit first, with the
-reason it scored that way and anything still worth confirming. Star what you like, pass on what
-you do not, leave yourself notes. What you have already dealt with does not come back.
-
-## Install it
-
-**You need:** a Mac with Apple Silicon (M1 or later) on macOS 15.6 or newer. Intel Macs and
-Windows are not supported yet.
-
-Open **Terminal** (press `Cmd` + `Space`, type `Terminal`, press Return), then paste this line
-and press Return:
+Open **Terminal** — press `Cmd` + `Space`, type `Terminal`, press Return — then paste this and
+press Return:
 
 ```
 curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
 ```
 
-That is the whole thing. It asks for no password and opens your browser when it is done.
+It never asks for your password. It takes a few minutes, most of it one download: the app
+brings its own copy of Python rather than touching the one your Mac came with, so nothing else
+on your machine changes. If the window looks like it is sitting still, it is working.
 
-It takes a few minutes, and most of that is one download: the app brings its own copy of Python
-rather than touching the one your Mac came with, so nothing else on your machine changes and
-removing it later leaves no trace. If the window looks like it is sitting still, it is working.
+Your browser opens by itself when it is ready.
 
 <details>
-<summary>Rather click than type? Download the ZIP instead.</summary>
+<summary>Rather click than paste? Use the ZIP.</summary>
 
 <br>
 
 1. **[Download the ZIP](https://github.com/2millerhenry/sf-housing-monitor/releases/latest)**
-   and double-click it to unpack.
-2. Open the folder. **Control-click** `2 Install SF Home Finder.command`, choose **Open**,
-   then **Open** again.
+   and double-click to unpack it.
+2. Open the folder. **Control-click** `2 Install SF Home Finder.command`, choose **Open**, then
+   **Open** again.
 3. Wait a few minutes. Your browser opens on its own.
 
-Control-click instead of double-click, because a browser marks its downloads and macOS blocks
-unsigned apps opened the normal way. [Why that is safe to click through](#why-does-my-mac-warn-me).
-The command above has no such warning, because `curl` is not a browser and does not add that
-mark — the file is identical either way.
+Control-click rather than double-click, because macOS blocks unsigned apps opened the normal
+way. [Why that is safe to click through](#why-does-my-mac-warn-me). The command above does not
+show that warning, because macOS only marks what a *browser* downloaded — the file is identical
+either way.
 
 </details>
 
-## What you get
+### 2. Tell it what you want
 
-### Eighteen sites checked for you, with no accounts
+The page that opens asks what you are looking for: your budget, the neighborhoods you would
+live in, whether you want a whole place or a room in a shared house, how long a lease, when you
+need to be in. Five minutes, and you never do it again.
+
+Press save and it goes looking immediately. The first search usually brings back a few hundred
+homes.
+
+### 3. That is it — check in whenever
+
+It looks again at ten in the morning and six in the evening, every day, as long as your Mac is
+awake and logged in. You do not have to remember or keep anything open.
+
+When you feel like it, open the page. Best matches at the top, with the reason each one scored
+that way. Star the ones worth a message, pass on the rest — what you have dealt with does not
+come back.
+
+## A closer look
+
+**Eighteen sites, no accounts, nothing to set up.**
 
 ![Eighteen sources already work: Zillow, Trulia, Redfin, Craigslist, Movoto, ApartmentGuide, Zumper, Rent.com, Apartment List, AvalonBay, UDR, AppFolio, RentSFNow, Abacus, SF Housing Portal, SpareRoom, Uloop and Listings Project](docs/screenshots/sources.png)
 
-They run twice a day without you doing anything. Three more sites — HotPads, Apartments.com and
-Roomies — only ever send listings by email, so those need one inbox connected. That is
-optional, and the eighteen keep running either way.
-[The full list, and what is read from each](docs/sources.md).
+HotPads, Apartments.com and Roomies only ever send listings by email, so those three need one
+inbox connected — optional, and the eighteen keep running either way.
+[What is read from each site](docs/sources.md).
 
-### Nothing quietly thrown away
-
-A home that just misses your budget does not vanish — it waits in **Near matches**, where you
-can still see it. And if you change your mind in a month, everything ever collected is scored
-again against the new answer, so widening your search does not mean starting from an empty
-page. [How scoring works](docs/how-it-works.md).
-
-### A number that shows what your deal is costing you
+**Being fussy has a price, and you can see it.**
 
 ![The shortlist cut-off slider reading "60 and up, 446 homes"](docs/screenshots/match-slider.png)
 
-Tighten your budget or drop a neighborhood and the count moves as you type, so you can see the
-price of being fussy before you commit to it.
+Tighten your budget or drop a neighborhood and the count moves as you type. Homes below the
+line are not lost — they wait in **Near matches**, and widening your search later does not mean
+starting from an empty page. [How scoring works](docs/how-it-works.md).
 
 ## Questions
 
