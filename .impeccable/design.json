@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-07-20T20:00:00-07:00",
-  "title": "Design System: SF Housing Monitor",
+  "title": "Design System: SF Home Finder",
   "extensions": {
     "colorMeta": {
       "accent-forest": {"role": "primary", "displayName": "Presidio Forest", "canonical": "oklch(43% 0.09 162)", "tonalRamp": ["oklch(18% 0.05 162)", "oklch(28% 0.07 162)", "oklch(38% 0.085 162)", "oklch(48% 0.09 162)", "oklch(60% 0.075 162)", "oklch(72% 0.055 162)", "oklch(84% 0.035 162)", "oklch(95% 0.022 162)"]},

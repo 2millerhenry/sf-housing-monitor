@@ -1,4 +1,4 @@
-# SF Housing Monitor
+# SF Home Finder
 
 Finding a place in San Francisco is miserable right now. Rent is about as high as it has ever
 been, the tech money is back, and anything decent is gone before you have finished reading it.
@@ -46,7 +46,7 @@ when it is ready. Fill in **Your deal**, press save, and the first search starts
 
 1. **[Download the ZIP](https://github.com/2millerhenry/sf-housing-monitor/releases/latest)**
    and double-click it to unpack.
-2. Open the folder. **Control-click** `2 Install SF Housing Monitor.command`, choose **Open**,
+2. Open the folder. **Control-click** `2 Install SF Home Finder.command`, choose **Open**,
    then **Open** again.
 3. Wait a few minutes. Your browser opens on its own.
 
@@ -131,7 +131,7 @@ entirely.
 
 ### Something looks broken. What do I do?
 
-Double-click **Verify SF Housing Monitor.command**. It runs a check over the whole app and
+Double-click **Verify SF Home Finder.command**. It runs a check over the whole app and
 names one specific thing to do for each problem it finds. **Repair** fixes most of them without
 touching your deal, your saved homes or your notes.
 

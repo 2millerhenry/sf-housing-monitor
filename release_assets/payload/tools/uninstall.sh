@@ -19,7 +19,7 @@ fi
 /bin/rm -rf "$APP_ROOT/current" "$APP_ROOT/runtimes" "$APP_ROOT/releases" "$APP_ROOT/python" "$APP_ROOT/cache" "$APP_ROOT/tools"
 /bin/rm -f "$APP_ROOT/service.pid"
 
-printf 'SF Housing Monitor was removed. Your private data remains at:\n%s/data\n' "$APP_ROOT"
+printf 'SF Home Finder was removed. Your private data remains at:\n%s/data\n' "$APP_ROOT"
 printf 'To permanently delete it too, type DELETE now. Press Return to keep it: '
 read -r CONFIRMATION || CONFIRMATION=""
 if [ "$CONFIRMATION" = "DELETE" ]; then

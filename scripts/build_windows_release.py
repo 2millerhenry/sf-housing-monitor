@@ -24,13 +24,13 @@ from build_release import (
 )
 
 
-RELEASE_NAME = f"SF-Housing-Monitor-{VERSION}-Windows-x64"
+RELEASE_NAME = f"SF-Home-Finder-{VERSION}-Windows-x64"
 COMMAND_FILES = (
-    "2 Install SF Housing Monitor.cmd",
-    "3 Open SF Housing Monitor.cmd",
-    "Repair SF Housing Monitor.cmd",
-    "Verify SF Housing Monitor.cmd",
-    "Uninstall SF Housing Monitor.cmd",
+    "2 Install SF Home Finder.cmd",
+    "3 Open SF Home Finder.cmd",
+    "Repair SF Home Finder.cmd",
+    "Verify SF Home Finder.cmd",
+    "Uninstall SF Home Finder.cmd",
 )
 
 

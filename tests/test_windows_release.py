@@ -9,11 +9,11 @@ WINDOWS = ROOT / "release_assets" / "windows"
 
 def test_windows_release_has_normal_user_handoff_commands() -> None:
     expected = {
-        "2 Install SF Housing Monitor.cmd",
-        "3 Open SF Housing Monitor.cmd",
-        "Repair SF Housing Monitor.cmd",
-        "Verify SF Housing Monitor.cmd",
-        "Uninstall SF Housing Monitor.cmd",
+        "2 Install SF Home Finder.cmd",
+        "3 Open SF Home Finder.cmd",
+        "Repair SF Home Finder.cmd",
+        "Verify SF Home Finder.cmd",
+        "Uninstall SF Home Finder.cmd",
         "1 START HERE.txt",
         "RELEASE_NOTES.txt",
     }

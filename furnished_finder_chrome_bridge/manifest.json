@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SF Housing Monitor – Furnished Finder Bridge",
+  "name": "SF Home Finder – Furnished Finder Bridge",
   "version": "1.4.0",
-  "description": "Imports supported private rooms and entire studios, one-bedrooms, two-bedrooms, and three-bedrooms into your local SF Housing Monitor.",
+  "description": "Imports supported private rooms and entire studios, one-bedrooms, two-bedrooms, and three-bedrooms into your local SF Home Finder.",
   "permissions": ["alarms", "storage", "tabs"],
   "host_permissions": [
     "https://furnishedfinder.com/*",

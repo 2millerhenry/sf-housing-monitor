@@ -7,7 +7,7 @@ foreach ($name in @('current', 'python', 'uv', 'tools', 'releases')) {
   $path = Join-Path $AppRoot $name
   if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force }
 }
-Write-Host "SF Housing Monitor was removed. Your private data remains at:`n$AppRoot\data"
+Write-Host "SF Home Finder was removed. Your private data remains at:`n$AppRoot\data"
 $confirmation = Read-Host 'Type DELETE to permanently remove private data, or press Enter to keep it'
 if ($confirmation -eq 'DELETE') {
   foreach ($name in @('data', 'logs', 'backups')) { $path = Join-Path $AppRoot $name; if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force } }

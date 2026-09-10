@@ -11,6 +11,6 @@ if (-not (Test-HealthyMonitor)) {
   & schtasks.exe /Run /TN $TaskName 2>$null | Out-Null
   foreach ($attempt in 1..30) { if (Test-HealthyMonitor) { break }; Start-Sleep -Seconds 1 }
 }
-if (-not (Test-HealthyMonitor)) { throw "The dashboard did not start. Double-click Repair SF Housing Monitor. Logs are in $AppRoot\logs." }
+if (-not (Test-HealthyMonitor)) { throw "The dashboard did not start. Double-click Repair SF Home Finder. Logs are in $AppRoot\logs." }
 Start-Process $Url
-Write-Host "SF Housing Monitor is ready at $Url"
+Write-Host "SF Home Finder is ready at $Url"

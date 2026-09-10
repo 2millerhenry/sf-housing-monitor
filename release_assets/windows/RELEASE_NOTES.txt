@@ -1,4 +1,16 @@
-SF Housing Monitor 0.4.0 for Windows x64
+SF Home Finder 0.4.1 for Windows x64
+
+Renamed. The app called itself SF Home Finder while everything around it said
+SF Housing Monitor, so people downloaded one name and were greeted by another.
+The app, the download, the installer and every command file now agree.
+
+Your existing installation is unaffected and nothing needs reinstalling twice:
+the folder your profile and listings live in, and the login service that runs
+the checks, deliberately keep their old names. Renaming those would have
+orphaned the history of everyone who already had it, which is a poor trade for
+a tidier path.
+
+SF Home Finder 0.4.0 for Windows x64
 
 Homes that have been taken down now leave the shortlist promptly. The app has
 always gone and read the page rather than guessing from a listing's absence,
@@ -22,9 +34,9 @@ The login-service check no longer reports the service missing on a Mac where it
 is installed and running, which could happen when a location variable was set
 but left empty.
 
-SF Housing Monitor 0.3.9 for Windows x64
+SF Home Finder 0.3.9 for Windows x64
 
-This Windows release uses the same local-only SF Housing Monitor application as
+This Windows release uses the same local-only SF Home Finder application as
 the macOS release. A blank install contains no housing profile, listings,
 credentials, tokens, or personal paths.
 

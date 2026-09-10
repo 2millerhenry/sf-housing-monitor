@@ -179,7 +179,7 @@ def _application_checks(
             "pass" if port_ok else "attention",
             "Local dashboard port" if port_ok else "Dashboard opened on an unexpected port",
             (
-                f"The verified SF Housing Monitor is answering on local port {request_port}."
+                f"The verified SF Home Finder is answering on local port {request_port}."
                 if port_ok
                 else f"The app expected local port {expected_port}, but this page used {request_port}."
             ),
@@ -195,8 +195,8 @@ def _application_checks(
             "Application",
             "pass" if runtime_ok else "blocked",
             "Application runtime" if runtime_ok else "Runtime needs repair",
-            f"SF Housing Monitor {app_version} is running on Python {sys.version_info.major}.{sys.version_info.minor}.",
-            "Nothing to do." if runtime_ok else "Double-click Repair SF Housing Monitor.",
+            f"SF Home Finder {app_version} is running on Python {sys.version_info.major}.{sys.version_info.minor}.",
+            "Nothing to do." if runtime_ok else "Double-click Repair SF Home Finder.",
             owner="Repair" if not runtime_ok else "App",
             metadata={"app_version": app_version, "python": f"{sys.version_info.major}.{sys.version_info.minor}"},
         )
@@ -222,7 +222,7 @@ def _application_checks(
                 if data_ok
                 else "The app data folder is missing, unwritable, or broader than the installed privacy setting."
             ),
-            "Nothing to do." if data_ok else "Double-click Repair SF Housing Monitor. Your data will be preserved.",
+            "Nothing to do." if data_ok else "Double-click Repair SF Home Finder. Your data will be preserved.",
             owner="Repair" if not data_ok else "App",
             metadata={"readable": data_exists, "writable": writable, "private_permissions": private},
         )
@@ -341,7 +341,7 @@ def _schedule_check(
             "Automatic checking is not running",
             "Nothing is scheduled, so the 10:00 and 18:00 checks will not happen "
             "and the shortlist will quietly stop updating.",
-            "Double-click Repair SF Housing Monitor, then run this check again.",
+            "Double-click Repair SF Home Finder, then run this check again.",
             owner="Repair", metadata=metadata,
         )
     if health.state == "overdue":
@@ -812,7 +812,7 @@ def _windows_startup_task_check(settings: Settings) -> DiagnosticCheck:
         "The normal-user Windows startup task points to this private app runtime."
         if installed
         else "The app runtime exists, but Windows does not report its normal-user startup task.",
-        "Nothing to do." if installed else "Double-click Repair SF Housing Monitor.",
+        "Nothing to do." if installed else "Double-click Repair SF Home Finder.",
         owner="App" if installed else "Repair",
     )
 
@@ -849,7 +849,7 @@ def _launch_agent_check(settings: Settings) -> DiagnosticCheck:
             "blocked",
             "Login service is missing",
             "The application runtime exists, but its macOS login service file is missing.",
-            "Double-click Repair SF Housing Monitor.",
+            "Double-click Repair SF Home Finder.",
             owner="Repair",
         )
     try:
@@ -876,7 +876,7 @@ def _launch_agent_check(settings: Settings) -> DiagnosticCheck:
             "blocked",
             "Login service needs repair",
             "The generated macOS login service is invalid or points at the wrong runtime.",
-            "Double-click Repair SF Housing Monitor.",
+            "Double-click Repair SF Home Finder.",
             owner="Repair",
         )
     if os.environ.get("SF_HOUSING_NO_LAUNCH_AGENT") == "1":
@@ -906,7 +906,7 @@ def _launch_agent_check(settings: Settings) -> DiagnosticCheck:
         "pass" if loaded else "attention",
         "Starts when you log in" if loaded else "Login start needs verification",
         "The macOS login service is loaded and points to the current runtime." if loaded else "The service file is valid but macOS does not report it loaded.",
-        "Nothing to do." if loaded else "Double-click Repair SF Housing Monitor.",
+        "Nothing to do." if loaded else "Double-click Repair SF Home Finder.",
         owner="App" if loaded else "Repair",
     )
 

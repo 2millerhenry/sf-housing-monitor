@@ -18,8 +18,8 @@ from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.4.0"
-RELEASE_NAME = f"SF-Housing-Monitor-{VERSION}-macOS-arm64"
+VERSION = "0.4.1"
+RELEASE_NAME = f"SF-Home-Finder-{VERSION}-macOS-arm64"
 UV_SOURCE = Path.home() / ".local" / "bin" / "uv"
 EXTENSION_FILES = (
     "manifest.json",
@@ -30,11 +30,11 @@ EXTENSION_FILES = (
     "popup.css",
 )
 COMMAND_FILES = (
-    "2 Install SF Housing Monitor.command",
-    "3 Open SF Housing Monitor.command",
-    "Repair SF Housing Monitor.command",
-    "Verify SF Housing Monitor.command",
-    "Uninstall SF Housing Monitor.command",
+    "2 Install SF Home Finder.command",
+    "3 Open SF Home Finder.command",
+    "Repair SF Home Finder.command",
+    "Verify SF Home Finder.command",
+    "Uninstall SF Home Finder.command",
 )
 
 

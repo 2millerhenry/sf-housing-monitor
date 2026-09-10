@@ -213,7 +213,7 @@ class Repository:
         except sqlite3.DatabaseError as exc:
             raise DatabaseUnreadableError(
                 f"The housing database at {self.path} could not be opened ({exc}). "
-                "Your saved homes are not lost: double-click Repair SF Housing Monitor, "
+                "Your saved homes are not lost: double-click Repair SF Home Finder, "
                 "which restores the most recent backup from the app's backups folder. "
                 "Do not delete the file."
             ) from exc

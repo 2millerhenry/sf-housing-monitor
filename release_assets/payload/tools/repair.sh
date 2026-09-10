@@ -10,7 +10,7 @@ elif [ -n "${SF_HOUSING_RELEASE_ROOT:-}" ] && [ -x "$SF_HOUSING_RELEASE_ROOT/pay
   RELEASE_ROOT="$SF_HOUSING_RELEASE_ROOT"
   INSTALLER="$SF_HOUSING_RELEASE_ROOT/payload/install.sh"
 else
-  printf 'Repair needs the downloaded SF Housing Monitor folder. Open it and double-click Repair there.\n'
+  printf 'Repair needs the downloaded SF Home Finder folder. Open it and double-click Repair there.\n'
   exit 1
 fi
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}SF Housing Monitor{% endblock %}</title>
+  <title>{% block title %}SF Home Finder{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}?v={{ asset_version() }}">
   {# The SVG answers the browser's own light or dark setting; the PNG is for a
      browser too old to take an SVG icon at all, and carries the light colour. #}
@@ -37,7 +37,7 @@
   <main>{% block content %}{% endblock %}</main>
   <footer class="site-footer">
     <div class="footer-inner">
-      <p>SF Housing Monitor {{ app_version }} &middot; MIT licensed &middot; runs entirely on this computer</p>
+      <p>SF Home Finder {{ app_version }} &middot; MIT licensed &middot; runs entirely on this computer</p>
       {% if donate_url %}
       {# Still a real link to a real page: without JavaScript, or if the panel
          fails to load, clicking it goes to Ko-fi exactly as before. #}

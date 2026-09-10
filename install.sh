@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install SF Housing Monitor:
+# Install SF Home Finder:
 #
 #   curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
 #
@@ -32,7 +32,10 @@ echo "Downloading..."
 curl -fL --progress-bar "$URL" -o "$WORK/r.zip" || fail "the download did not finish. Check your connection and run it again."
 /usr/bin/unzip -q "$WORK/r.zip" -d "$WORK/x" || fail "the download was incomplete. Run it again."
 
-ROOT="$(find "$WORK/x" -maxdepth 1 -type d -name 'SF-Housing-Monitor-*' | head -1)"
+# Found by what it contains rather than by what it is called, so a release
+# renamed between versions still installs.
+ROOT="$(find "$WORK/x" -maxdepth 3 -type f -path '*/payload/install.sh' | head -1)"
+ROOT="${ROOT%/payload/install.sh}"
 [ -f "${ROOT:-}/payload/install.sh" ] || fail "that is not a release. Try the ZIP instead: https://github.com/$REPO/releases/latest"
 
 echo

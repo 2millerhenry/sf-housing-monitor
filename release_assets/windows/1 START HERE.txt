@@ -1,8 +1,8 @@
-SF Housing Monitor for Windows
+SF Home Finder for Windows
 ==============================
 
 Extract this ZIP first, then double-click
-"2 Install SF Housing Monitor.cmd".
+"2 Install SF Home Finder.cmd".
 
 Extracting first matters: Windows will let you open files while they are still
 inside the ZIP, and the install cannot finish from in there.
@@ -23,12 +23,12 @@ Afterwards
 The monitor runs only on this PC, at http://127.0.0.1:8000. Closing the browser
 does not stop it. The PC has to be awake and signed in for scheduled checks.
 
-- "3 Open SF Housing Monitor.cmd" reopens the dashboard.
-- "Verify SF Housing Monitor.cmd" opens a private Ready Check that names one
+- "3 Open SF Home Finder.cmd" reopens the dashboard.
+- "Verify SF Home Finder.cmd" opens a private Ready Check that names one
   clear next action for each problem it finds.
-- "Repair SF Housing Monitor.cmd" if the dashboard will not open. It keeps your
+- "Repair SF Home Finder.cmd" if the dashboard will not open. It keeps your
   deal, your listings and your connectors.
-- "Uninstall SF Housing Monitor.cmd" removes the app, and only removes your
+- "Uninstall SF Home Finder.cmd" removes the app, and only removes your
   private data if you explicitly confirm it.
 
 What this build supports

@@ -623,7 +623,7 @@ def create_app(
         # recovery has to be readable there rather than only in a traceback.
         logging.getLogger(__name__).error(
             "Startup stopped: the housing database could not be opened. "
-            "Run Repair SF Housing Monitor; the most recent backup is restored and "
+            "Run Repair SF Home Finder; the most recent backup is restored and "
             "the existing file is left untouched."
         )
         raise
@@ -724,7 +724,7 @@ def create_app(
         if enable_scheduler and scheduler.running:
             scheduler.shutdown(wait=False)
 
-    application = FastAPI(title="SF Housing Monitor", version=__version__, lifespan=lifespan)
+    application = FastAPI(title="SF Home Finder", version=__version__, lifespan=lifespan)
     application.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=["127.0.0.1", "localhost", "testserver"],

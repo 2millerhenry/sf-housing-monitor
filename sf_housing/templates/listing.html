@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% from "_listing.html" import listing_card %}
-{% block title %}{{ listing.title }} · SF Housing Monitor{% endblock %}
+{% block title %}{{ listing.title }} · SF Home Finder{% endblock %}
 {% block content %}
 <script src="{{ url_for('static', path='listing-actions.js') }}?v={{ asset_version() }}" defer></script>
 

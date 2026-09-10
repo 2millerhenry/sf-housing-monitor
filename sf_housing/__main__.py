@@ -6,7 +6,7 @@ from dataclasses import asdict
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the local SF Housing Monitor")
+    parser = argparse.ArgumentParser(description="Run the local SF Home Finder")
     subparsers = parser.add_subparsers(dest="command")
     serve = subparsers.add_parser("serve", help="Start the dashboard and scheduler")
     serve.add_argument("--host", default="127.0.0.1")

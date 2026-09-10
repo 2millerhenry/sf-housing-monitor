@@ -17,7 +17,7 @@ health() {
 
 if ! health; then
   if /usr/sbin/lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-    MESSAGE="Port $PORT is being used by another app. SF Housing Monitor did not stop it. Close that app, then use Open again."
+    MESSAGE="Port $PORT is being used by another app. SF Home Finder did not stop it. Close that app, then use Open again."
     printf '%s\n' "$MESSAGE"
     [ "${SF_HOUSING_NO_BROWSER:-0}" = "1" ] || /usr/bin/osascript -e "display dialog \"$MESSAGE\" buttons {\"OK\"} default button \"OK\" with icon caution"
     exit 1
@@ -43,4 +43,4 @@ health || { printf 'The dashboard did not start. Run Repair and check the log in
 if [ "${1:-}" != "--no-browser" ] && [ "${SF_HOUSING_NO_BROWSER:-0}" != "1" ]; then
   /usr/bin/open "$URL"
 fi
-printf 'SF Housing Monitor is ready at %s\n' "$URL"
+printf 'SF Home Finder is ready at %s\n' "$URL"

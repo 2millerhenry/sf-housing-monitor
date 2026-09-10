@@ -2,7 +2,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LOG_FILE="$HOME/Desktop/SF Housing Monitor Install.log"
+LOG_FILE="$HOME/Desktop/SF Home Finder Install.log"
 "$SCRIPT_DIR/payload/install.sh" "$SCRIPT_DIR" 2>&1 | tee "$LOG_FILE"
 STATUS=${PIPESTATUS[0]}
 if [ "$STATUS" -ne 0 ]; then

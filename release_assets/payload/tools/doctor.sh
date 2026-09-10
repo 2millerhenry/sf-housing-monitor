@@ -15,7 +15,7 @@ show_problem() {
 }
 
 if [ ! -x "$OPEN_TOOL" ]; then
-  show_problem "SF Housing Monitor is not installed. Run Install SF Housing Monitor first."
+  show_problem "SF Home Finder is not installed. Run Install SF Home Finder first."
   exit 1
 fi
 
@@ -23,7 +23,7 @@ fi
 # this, a healthy dashboard deliberately launched without a LaunchAgent is
 # mistaken for an unrelated app occupying the selected port.
 if ! SF_HOUSING_APP_ROOT="$APP_ROOT" SF_HOUSING_PORT="$PORT" SF_HOUSING_NO_LAUNCH_AGENT="${SF_HOUSING_NO_LAUNCH_AGENT:-0}" SF_HOUSING_NO_BROWSER="${SF_HOUSING_NO_BROWSER:-0}" "$OPEN_TOOL" --no-browser; then
-  show_problem "The ready check could not start the local dashboard. Run Repair SF Housing Monitor, then Verify again."
+  show_problem "The ready check could not start the local dashboard. Run Repair SF Home Finder, then Verify again."
   exit 1
 fi
 
@@ -31,7 +31,7 @@ REPORT="$(/usr/bin/curl -fsS --max-time 5 "${URL}support/report.json" 2>/dev/nul
 case "$REPORT" in
   *'"overall"'*) ;;
   *)
-    show_problem "The local dashboard started, but its ready report did not respond. Run Repair SF Housing Monitor."
+    show_problem "The local dashboard started, but its ready report did not respond. Run Repair SF Home Finder."
     exit 1
     ;;
 esac

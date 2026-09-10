@@ -1,4 +1,16 @@
-SF Housing Monitor 0.4.0
+SF Home Finder 0.4.1
+
+Renamed. The app called itself SF Home Finder while everything around it said
+SF Housing Monitor, so people downloaded one name and were greeted by another.
+The app, the download, the installer and every command file now agree.
+
+Your existing installation is unaffected and nothing needs reinstalling twice:
+the folder your profile and listings live in, and the login service that runs
+the checks, deliberately keep their old names. Renaming those would have
+orphaned the history of everyone who already had it, which is a poor trade for
+a tidier path.
+
+SF Home Finder 0.4.0
 
 Homes that have been taken down now leave the shortlist promptly. The app has
 always gone and read the page rather than guessing from a listing's absence,
@@ -22,7 +34,7 @@ The login-service check no longer reports the service missing on a Mac where it
 is installed and running, which could happen when a location variable was set
 but left empty.
 
-SF Housing Monitor 0.3.9
+SF Home Finder 0.3.9
 
 Source setup now explains the safe order: start with account-free public
 sources, add only optional coverage, and trust connectors only after their
@@ -30,14 +42,14 @@ own observed checks. Gmail makes its one owner OAuth-client prerequisite clear
 before you start, and explains that a provider remains unverified until a
 real saved-search alert arrives.
 
-SF Housing Monitor 0.3.8
+SF Home Finder 0.3.8
 
 Setup is easier to scan: each housing choice now shows its own monthly budget
 immediately, and the deal form uses the full available width instead of leaving
 large blank regions. Split-rent choices still calculate a clear total from the
 per-person budget and group size.
 
-SF Housing Monitor 0.3.7
+SF Home Finder 0.3.7
 ========================
 
 Release scope

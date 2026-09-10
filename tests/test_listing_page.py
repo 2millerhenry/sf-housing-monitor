@@ -84,7 +84,7 @@ def test_a_listing_has_a_page_of_its_own(tmp_path: pathlib.Path) -> None:
     page = page_of(application, listing_id)
 
     assert "Sunny private room in NOPA" in page
-    assert "<title>Sunny private room in NOPA · SF Housing Monitor</title>" in page
+    assert "<title>Sunny private room in NOPA · SF Home Finder</title>" in page
 
 
 def test_a_listing_that_does_not_exist_is_a_clean_404(tmp_path: pathlib.Path) -> None:

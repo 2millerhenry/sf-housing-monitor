@@ -1,7 +1,7 @@
-SF Housing Monitor for macOS
+SF Home Finder for macOS
 ============================
 
-Double-click "2 Install SF Housing Monitor.command".
+Double-click "2 Install SF Home Finder.command".
 
 That is the whole setup. It takes a few minutes: the first install downloads a
 private Python runtime that belongs only to this app. It never uses sudo,
@@ -19,12 +19,12 @@ The monitor runs only on this Mac, at http://127.0.0.1:8000. Closing the
 browser does not stop it. The Mac has to be awake and logged in for checks to
 run.
 
-- "3 Open SF Housing Monitor.command" reopens the dashboard.
-- "Verify SF Housing Monitor.command" opens a private Ready Check that names
+- "3 Open SF Home Finder.command" reopens the dashboard.
+- "Verify SF Home Finder.command" opens a private Ready Check that names
   one recovery step for each problem it finds.
-- "Repair SF Housing Monitor.command" if the dashboard will not open. It keeps
+- "Repair SF Home Finder.command" if the dashboard will not open. It keeps
   your deal, your listings and your connectors.
-- "Uninstall SF Housing Monitor.command" removes the app. Your private data
+- "Uninstall SF Home Finder.command" removes the app. Your private data
   stays unless you explicitly type DELETE when asked.
 
 What this build supports

@@ -82,7 +82,7 @@ foreach ($line in $checksumLines) {
 
 if ((Test-PortInUse) -and -not (Test-HealthyMonitor)) { Fail "port $Port is already used by another app. Close that app, then run Install again. Nothing was stopped." }
 
-Write-Host "Installing SF Housing Monitor $Version for Windows..."
+Write-Host "Installing SF Home Finder $Version for Windows..."
 New-Item -ItemType Directory -Force -Path $DataDir, $LogDir, $ToolsDir, (Join-Path $AppRoot 'releases'), $UvDir | Out-Null
 
 $stage = Join-Path $AppRoot ('.install.' + [guid]::NewGuid().ToString('N'))

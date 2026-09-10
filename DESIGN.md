@@ -1,5 +1,5 @@
 ---
-name: SF Housing Monitor
+name: SF Home Finder
 description: A calm daily shortlist for finding the right San Francisco home.
 colors:
   accent-forest: "oklch(43% 0.09 162)"
@@ -69,7 +69,7 @@ components:
     padding: "24px"
 ---
 
-# Design System: SF Housing Monitor
+# Design System: SF Home Finder
 
 ## Overview
 

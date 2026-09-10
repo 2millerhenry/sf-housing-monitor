@@ -55,7 +55,7 @@ async function importCards(cards, searchUrl) {
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(payload.detail || "The local SF Housing Monitor could not import the cards.");
+    const error = new Error(payload.detail || "The local SF Home Finder could not import the cards.");
     error.status = response.status;
     throw error;
   }

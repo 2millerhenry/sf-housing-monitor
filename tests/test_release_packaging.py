@@ -58,8 +58,8 @@ def test_release_assets_are_generic_and_preserve_private_data_by_default() -> No
     assert "no admin rights" in (release_assets / "windows" / "1 START HERE.txt").read_text()
     assert "Your private data remains" in text
     assert 'if [ "$CONFIRMATION" = "DELETE" ]' in text
-    assert "Verify SF Housing Monitor.command" in (release_assets / "1 START HERE.txt").read_text()
-    assert (release_assets / "Verify SF Housing Monitor.command").stat().st_mode & 0o100
+    assert "Verify SF Home Finder.command" in (release_assets / "1 START HERE.txt").read_text()
+    assert (release_assets / "Verify SF Home Finder.command").stat().st_mode & 0o100
     assert (release_assets / "payload" / "tools" / "doctor.sh").stat().st_mode & 0o100
     assert 'support/report.json' in (release_assets / "payload" / "tools" / "doctor.sh").read_text()
     assert "SF_HOUSING_NO_LAUNCH_AGENT" in (
@@ -70,10 +70,10 @@ def test_release_assets_are_generic_and_preserve_private_data_by_default() -> No
     ).read_text()
     assert '"ok": true' in (release_assets / "payload" / "tools" / "open.sh").read_text()
     for command in (
-        "3 Open SF Housing Monitor.command",
-        "Verify SF Housing Monitor.command",
-        "Repair SF Housing Monitor.command",
-        "Uninstall SF Housing Monitor.command",
+        "3 Open SF Home Finder.command",
+        "Verify SF Home Finder.command",
+        "Repair SF Home Finder.command",
+        "Uninstall SF Home Finder.command",
     ):
         assert "SF_HOUSING_APP_ROOT" in (release_assets / command).read_text()
 
