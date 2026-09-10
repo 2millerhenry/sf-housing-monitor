@@ -1,230 +1,146 @@
 # SF Housing Monitor
 
-A small local service that finds and organizes San Francisco housing listings on your own
-computer. It checks free public sources on a schedule, scores what it finds against a housing
-profile you fill in yourself, and shows the results on a private dashboard at
-`http://127.0.0.1:8000`.
+**Finds San Francisco apartments for you, twice a day, on your own laptop.**
 
-Nothing is hosted. There is no account, no server, and no cost to run: the app, its database,
-and every credential you add stay on the machine you install it on.
-
-It keeps three searches separate, each with its own budget and rules that you set:
-
-- private rooms in shared homes,
-- entire studios and one-bedrooms,
-- entire 2–3 bedroom homes to split, priced per person as well as in total.
+You describe what you are looking for once. It then checks eighteen listing sites on a
+schedule, ranks everything it finds against what you asked for, and keeps it all on a private
+page only you can open. Nothing is hosted, there is no account, and it costs nothing to run.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/shortlist-dark.png">
   <img alt="The shortlist: studios ranked by how well they match, each row showing the score, rent, neighbourhood, source and what still needs confirming" src="docs/screenshots/shortlist.png">
 </picture>
 
-Every home is scored against the deal you wrote, and the score says why. Nothing is thrown
-away: what falls below your line waits in **Near matches**, and changing the deal later
-rescores everything you have ever collected.
+## Install it
 
-## Eighteen sources, no accounts
+**You need:** a Mac with Apple Silicon (M1 or later) on macOS 15.6 or newer. Intel Macs and
+Windows are not supported yet.
+
+Open **Terminal** (press `Cmd` + `Space`, type `Terminal`, press Return), then paste this line
+and press Return:
+
+```
+curl -fsSL https://raw.githubusercontent.com/2millerhenry/sf-housing-monitor/main/install.sh | bash
+```
+
+That is the whole thing. It takes a few minutes, asks for no password, and opens your browser
+when it is ready. Fill in **Your deal**, press save, and the first search starts.
+
+<details>
+<summary>Rather click than type? Download the ZIP instead.</summary>
+
+<br>
+
+1. **[Download the ZIP](https://github.com/2millerhenry/sf-housing-monitor/releases/latest)**
+   and double-click it to unpack.
+2. Open the folder. **Control-click** `2 Install SF Housing Monitor.command`, choose **Open**,
+   then **Open** again.
+3. Wait a few minutes. Your browser opens on its own.
+
+Control-click instead of double-click, because a browser marks its downloads and macOS blocks
+unsigned apps opened the normal way. [Why that is safe to click through](#why-does-my-mac-warn-me).
+The command above has no such warning, because `curl` is not a browser and does not add that
+mark — the file is identical either way.
+
+</details>
+
+## What you get
+
+### Eighteen sites checked for you, with no accounts
 
 ![Eighteen sources already work: Zillow, Trulia, Redfin, Craigslist, Movoto, ApartmentGuide, Zumper, Rent.com, Apartment List, AvalonBay, UDR, AppFolio, RentSFNow, Abacus, SF Housing Portal, SpareRoom, Uloop and Listings Project](docs/screenshots/sources.png)
 
-Those run on their own, twice a day, with nothing to sign up for. Three more sites — HotPads,
-Apartments.com and Roomies — only ever send listings by email, so connecting one inbox with a
-read-only app password turns on all three at once. That is optional; the eighteen keep running
-either way.
+They run twice a day without you doing anything. Three more sites — HotPads, Apartments.com and
+Roomies — only ever send listings by email, so those need one inbox connected. That is
+optional, and the eighteen keep running either way.
+[The full list, and what is read from each](docs/sources.md).
 
-## One number that tells you what your deal costs
+### Ranked against your deal, not theirs
+
+Every home gets a score out of 100 for how well it fits what you actually asked for, and the
+row tells you why it scored that way and what still needs checking. Nothing is thrown away:
+homes below your line wait in **Near matches**, and if you change your mind later, everything
+ever collected is re-ranked against the new answer. [How scoring works](docs/how-it-works.md).
+
+### A number that shows what your deal is costing you
 
 ![The shortlist cut-off slider reading "60 and up, 446 homes"](docs/screenshots/match-slider.png)
 
-Tighten the deal and the count follows as you type, so you can see what a smaller budget or one
-fewer neighbourhood actually costs you before you commit to it.
+Tighten your budget or drop a neighbourhood and the count moves as you type, so you can see the
+price of being fussy before you commit to it.
 
-## Get it running
+## Questions
 
-1. Download **SF-Housing-Monitor-0.4.0-macOS-arm64.zip** from the
-   [Releases page](https://github.com/2millerhenry/sf-housing-monitor/releases).
-2. Double-click it to extract, open the folder, then **Control-click**
-   `2 Install SF Housing Monitor.command` and choose **Open** — twice. (Control-click, not
-   double-click: macOS blocks unsigned apps opened the normal way. See below.)
-3. Wait a few minutes. Your browser opens by itself. Fill in **Your deal** and save.
+### Is it really free?
 
-That is the whole setup. No account, no sign-up, no payment, nothing to configure first. Your
-own email and any other accounts are added later, only if you want those extra sources, and
-they stay on your machine.
+Yes, and there is nothing to buy later. It runs on your own machine, so there is no server to
+pay for. If it finds you somewhere to live there is one optional donation line in the footer,
+and that is the whole of the ask — nothing is locked, degraded, or nagged.
 
-Currently released for **Apple Silicon Macs (M1 and later), macOS 15.6 or later**. Intel Macs
-are not supported. A Windows build exists in the source tree but has not been built or tested
-for a release yet, so there is no Windows download.
+### Where does my information go?
 
-## Install detail
+Nowhere. Your answers, the listings, your notes and any password you add are written to one
+folder on your Mac and never leave it. There is no account and no analytics. Uninstalling keeps
+your data unless you explicitly type `DELETE` when it asks.
 
-The first install downloads a private Python runtime; it does not use `sudo`, Homebrew, an
-administrator account, or your system Python.
+### Why does my Mac warn me?
 
-**The build is not code-signed**, so both operating systems will warn you the first time. Real
-signing needs a paid Apple Developer account and a Windows code-signing certificate; this
-project has neither, so it asks for one approval instead of hiding the fact.
+Only the ZIP does this — the one-line command does not. If you downloaded the ZIP through a
+browser, it happens because the app is not code-signed. Signing requires a paid Apple Developer account, which this
+project does not have, so macOS says *"cannot be opened because it is from an unidentified
+developer"* the first time.
 
-**macOS** (Apple Silicon, macOS 15.6 or later):
+Control-click → **Open** → **Open** is Apple's own way through that, and it is how most free
+Mac software is installed. The installer then clears the flag for the rest of the release, so
+Open, Verify, Repair and Uninstall do not each ask again.
 
-1. Double-click `2 Install SF Housing Monitor.command`.
-2. macOS blocks it. Control-click the same file, choose **Open**, then **Open** again.
-3. The installer clears the download quarantine flag for the rest of the release, so Open,
-   Verify, Repair, and Uninstall do not each ask again.
+**Do not turn Gatekeeper off system-wide to avoid this.** It protects everything else on your
+machine. If you would rather not trust a download at all, the whole source is here and you can
+[build it yourself](docs/development.md).
 
-**Windows** (x64, Windows 10 or later) — *not currently released; these are the steps once a
-Windows build is published*:
+### Do I have to connect my email?
 
-1. Extract the ZIP first — do not run it from inside the ZIP.
-2. Double-click `2 Install SF Housing Monitor.cmd`.
-3. If SmartScreen appears, choose **More info**, then **Run anyway**.
+No. The eighteen main sites need nothing. Connecting an inbox only adds HotPads,
+Apartments.com and Roomies, and it uses a read-only app password — a separate one-purpose
+password, never your real one — that stays on your machine. Messages are opened without being
+marked read, only known housing senders are searched, and no message is ever stored.
 
-The installer verifies every payload file against a checksum before using it, and stops without
-changing anything if a file does not match. When it finishes, your browser opens the dashboard.
+### Does it run when my laptop is shut?
 
-Your profile, listings, decisions, and tokens live in one folder — `~/Library/Application
-Support/SF Housing Monitor` on macOS, `%LOCALAPPDATA%\SF Housing Monitor` on Windows — and
-uninstalling preserves them unless you explicitly type `DELETE` when asked.
+No. It needs the Mac awake and logged in. If it misses a check because you were asleep or away,
+it catches up when you come back.
 
-## First run
+### Can I check right now instead of waiting?
 
-A new installation starts blank. There is no bundled profile, no sample listings, and no
-pre-filled budget or neighborhood: **Your deal** asks what you are looking for, and only what
-you answer is used.
+Yes — there is a **Check for new homes** button, once a day. It is limited to once because
+these are other people's websites, and hammering them is how you get blocked from a source
+entirely.
 
-Saving that form the first time triggers one initial discovery scan, so the dashboard opens on
-real listings instead of an empty page — a first run typically stores several hundred. The free
-public sources are queried newest-first and return what they currently list. Where a source
-publishes a post date, that first scan keeps only the **last seven days**; a listing with no
-usable date is kept rather than discarded, since most public sources publish none. The city
-housing portal and Zumper both date every entry, so their results are genuinely bounded to
-that window.
+### Something looks broken. What do I do?
 
-After that, scans run at 10:00 and 18:00 America/Los_Angeles, and each later scan updates
-`last_seen` instead of inserting duplicates, so your stars, notes, and dismissals survive.
+Double-click **Verify SF Housing Monitor.command**. It runs a check over the whole app and
+names one specific thing to do for each problem it finds. **Repair** fixes most of them without
+touching your deal, your saved homes or your notes.
 
-## Running from source
+### Is pasting a command from the internet safe?
 
-Python 3.11 or newer:
+It is worth being suspicious of, so here is what that one does. It reads the
+[release list](https://github.com/2millerhenry/sf-housing-monitor/releases), downloads the same
+ZIP the button gives you, checks every file inside it against a checksum, and runs the
+installer. It never asks for your password, because nothing here needs an administrator.
+It is [twenty lines long and you can read it first](install.sh) — or skip it entirely and use
+the ZIP.
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[test]'
-python -m sf_housing serve
-```
+### What if I am not looking in San Francisco?
 
-One scan without the dashboard:
+Then this will not help you much as it stands — the sources, neighbourhoods and the city
+housing portal are all SF-specific. It is MIT licensed, so you are welcome to fork it.
 
-```bash
-python -m sf_housing scan
-```
+## For developers
 
-The test suite:
-
-```bash
-pytest
-```
-
-A source checkout keeps its data under `data/`, which is git-ignored. Override locations with
-`SF_HOUSING_DATA_DIR` and `SF_HOUSING_PREFERENCES` to run more than one instance. A complete,
-fully-populated example of the profile schema lives in
-[`tests/fixtures/benchmark_profile.yaml`](tests/fixtures/benchmark_profile.yaml); it is a test
-fixture for the ranking benchmark, and the application never reads it.
-
-Inspect or restart the installed background service:
-
-```bash
-launchctl print gui/$(id -u)/com.sfhousing.monitor
-```
-
-## What it checks
-
-| Platform | Mode | Notes |
-|---|---|---|
-| Craigslist | Automatic | Public SF rooms/share and apartments searches. Separate room, 0–1 bedroom, broad 2–3 bedroom, and exact 3-bedroom searches each get a bounded detail-page budget. |
-| Listings Project | Automatic | The public SF Bay Area collection, filtered to explicit San Francisco rentals and sublets. Each card keeps its direct lister-contact page. |
-| Abacus (small buildings) | Automatic | The public San Francisco availability feed, preserving the manager's Apply Now route. Building size stays unknown unless stated. |
-| SpareRoom | Automatic | Public SF result cards: price, area, type, and short description. |
-| SF Housing Portal | Automatic | The city's own below-market-rate portal (DAHLIA) over its public JSON API. No key, no scraping — one entry per unit type, with real rents and application deadlines. |
-| Apartment List | Automatic | Published schema.org data for SF buildings. The search feed carries no bedroom count, so each building is completed from its own page for size, address, amenities and unit count. Where a building publishes no rent per home, its smallest home stands in and the building's starting rent is kept. |
-| Zumper | Automatic | Its published schema.org search feed: bedroom count, address, amenities and a real posting date. Most buildings publish no rent on the search page, so a bounded number are enriched from their building page and the rest stay marked unconfirmed. |
-| Uloop | Automatic | A university off-campus housing board: rooms in shared flats, sublets and small landlords who post where students look. The only source whose cards all carry a real posting date. One board is read, not five: the San Francisco schools publish the same homes under per-board ids, so the listing's slug is its identity and reading them all would be five times the requests for one board's inventory. |
-| RentSFNow | Automatic | The leasing feed of San Francisco's largest landlord: roughly 6,500 apartments across 293 mostly older, rent-controlled buildings, with the neighbourhood stated by the landlord rather than inferred. Nothing is on the page and the sitemap is almost all long-gone units, so the search plugin's own JSON endpoint is read instead. Asked for something it has not got, the site answers with recommendations in place of results; those are never stored. |
-| AvalonBay | Automatic | One request to its San Francisco page, which ships the whole result set as JSON: unit by unit, with a floor, a square footage, a real move-in date and a rent. Half the buildings on that page are Equity Residential stock AvalonBay markets, which is said rather than implied, and a third of the units are in San Bruno and Pacifica, which are dropped. |
-| AppFolio | Automatic | One parser for every small manager who lets through AppFolio, driven by a list in data/appfolio_managers.json so adding a manager is a row rather than code. These are older buildings let by people who post where their own tenants look. A subdomain that is not a tenant site answers 200 with AppFolio's own page-not-found, which is reported as misconfigured rather than as a manager with nothing available. |
-| UDR | Automatic | Six San Francisco buildings, each publishing a starting rent per bedroom size rather than per home, so one candidate per building and size the way the city portal files its unit types. A size with nothing free reads '0 Available Apartments' where the rent goes; a rent has to carry a dollar sign to count. |
-| Redfin | Automatic | Its published schema.org cards, which pair each building's address, map pin and bedroom range with the rent quoted against that same URL. Where a building lets several sizes, the published rent belongs to its smallest home, so a larger home keeps the building's starting rate as context and its own rent stays unconfirmed. No detail pages are read: a Redfin building page publishes rents for its neighbours and none for the home being viewed. |
-| Rent.com | Automatic | Cards to find San Francisco buildings, then each building's own page for the number of homes it holds, a rent per bedroom count, and the earliest published move-in date. Asked for a bedroom count and a rent ceiling together it pads the results with other Bay Area cities, so only the bedroom count is ever requested and the padding it names in its own payload is dropped. |
-| ApartmentGuide | Automatic | Rent.com's sister site on the same payload, read a different way: its search pages carry the whole building — a rent per bedroom count, floor plans with their own counts and move-in dates — so no detail page is ever fetched and no building can be stranded by a second request that never lands. Its move-in dates mark the plans that are *not* lettable yet, so a building with homes free today publishes no future date. Past its last page it re-serves the first, which ends the walk. |
-| Zillow | Automatic | Read directly, where it used to be a one-time email setup that had delivered nothing. Its own search page answers an ordinary request -- including one that identifies itself honestly, which is rarer here than the browser string most of these need -- and carries 41 rentals of a stated 2,568 in the page itself. Two record shapes have to be read differently: a building, whose sizes and rents are text inside a `units` array, and a single home, whose numbers are numbers. Read as one shape, four homes in every page of 41 lose their bedroom count and 37 lose their rent. One building can also appear twice, as itself and as a unit inside it, both pointing at one page; the id goes in the link so the second does not overwrite the first. |
-| Movoto | Automatic | Individual homes rather than buildings: 1,964 San Francisco rentals across forty pages, each with its own rent, unit number and bedroom count, which is why a third of the addresses it brings in belong to no other source. Two payloads sit on the page and only the second is worth reading -- the schema.org blocks carry an address and nothing else, while the page-state script behind them carries the whole record. A home for sale and a home to let are the same record with a different status and a `listPrice` that means a sale price on one and a monthly rent on the other, so every record is checked against that status before it is believed. |
-| Trulia | Automatic | Its search payload, one card per building, with the address as separate fields and a rent written as a range. Where a building lets more than one size the bottom of that range belongs to its smallest home, so a larger home keeps it as the building's starting rate and its own rent stays unconfirmed. It refuses unattended requests often, and hard: read too quickly it turns everything away for the best part of an hour, so two pages are read per scan, nothing is retried inside one, and a refusal is reported as rate-limiting rather than breakage. It publishes a placeholder unit number of 32767 where a home has none, which is stripped by value rather than by guessing which numbers are real. |
-| HotPads | After one-time setup | Official saved-search emails through the same email connection. |
-| Roomies | After one-time setup | Realtime or daily listing-alert emails through the same connection. |
-| Facebook Marketplace | After one-time setup | A capped Apify free-tier connector reads ten newest SF Property Rentals cards per scan. No Facebook credentials are used. |
-| Furnished Finder | After one-time Chrome setup | A local Chrome bridge reads cards already visible in your own browser session for up to three saved searches. Needs Chrome and the monitor running at check time. |
-
-Sources that cannot run are shown in **Source health** with a direct link to the equivalent
-search. They are deliberately not presented as working integrations.
-
-## Scoring behavior
-
-- Only criteria you configure participate in the weighted score.
-- A configured criterion the listing does not describe gets neutral (50%) credit, not a failure.
-- Known out-of-area locations never qualify for the main results, however good the price. They
-  stay stored and visible under **All stored**.
-- An explicit match gets full credit; an explicit mismatch gets low or zero credit.
-- The three strongest supported matches become the displayed reasons. The highest-weight
-  explicit mismatch becomes the concern; with none, the most important unknown is shown.
-- A configured dealbreaker phrase subtracts 20 points and is reported as the main concern.
-- Whole-unit and split shortlists require explicit evidence of an entire home, apply your exact
-  per-bedroom caps, and show both total and per-person cost. A known building above your unit
-  ceiling stays in the archive; unknown size stays reviewable with a warning.
-- Everything fetched is retained in SQLite, including results below the display threshold, so
-  changing your profile later rescores the whole history instead of starting over.
-
-## Reliability boundaries
-
-- Thread and cross-process locks stop scheduled, manual, command-line, and service scans from
-  overlapping. The process lock is released by the operating system if a scan dies partway.
-- Each platform is isolated: a parser, timeout, or HTTP failure is recorded, logged, and shown
-  in the dashboard without stopping later sources.
-- The freshness watchdog derives its state from durable source runs. A successful zero-result
-  check reads as "Working, no matches", while stale data and repeated failures show one
-  recovery action. After two consecutive automatic failures a source pauses briefly.
-- HTTP requests use a descriptive user agent, an 8-second timeout, a small connection pool, and
-  bounded detail reads. The public-source path is capped at 110 seconds.
-- The app does not bypass CAPTCHAs, login gates, or bot protections. Public page HTML can change
-  at any time; when it does, the adapter fails visibly instead of silently reporting no listings.
-- Scans need the computer awake and logged in. Missed scheduled runs are caught up after wake or
-  reboot; a machine that is asleep or off does no network work.
-- Whether checking is actually happening is observed, not assumed. The dashboard shows when the
-  last check finished and when the next one runs, `/health` reports the scheduler's real state
-  under `scheduled_checking`, and Support raises it if the scheduler has stopped or two
-  scheduled checks have passed without one completing. All three read the same computation.
-- Email is read with an app password over IMAP: messages are opened without being marked as
-  read, only known alert senders are searched, message bodies are never stored, and the
-  password is written to this machine alone with owner-only permissions. Gmail's OAuth path
-  remains for accounts that cannot make app passwords, and needs a Google OAuth client from
-  whoever builds the release. Outlook.com is not supported: Microsoft no longer allows app
-  passwords for mail.
-- Apify and the Chrome bridge are optional, capped, and reported separately.
-
-## Why macOS warns you, and what it means
-
-The download is not code-signed. Signing needs a paid Apple Developer account
-(99 USD a year), which this project does not have, so macOS shows
-*"cannot be opened because it is from an unidentified developer"* the first time.
-
-Control-click, **Open**, **Open** is Apple's own documented way through that, and it is how
-most free open-source Mac software is installed. The installer then clears the download flag
-for the rest of the release, so Open, Verify, Repair and Uninstall do not each ask again.
-
-Do **not** turn Gatekeeper off system-wide to avoid this. It is a real protection for
-everything else on your machine, and no single app is worth disabling it for. If you would
-rather read the code than trust the download, everything here is public — build it yourself
-with the steps under **Running from source**.
+- [Running from source, and the test suite](docs/development.md)
+- [Where the listings come from](docs/sources.md)
+- [How scoring works, and what it promises when a source breaks](docs/how-it-works.md)
 
 ## Using this responsibly
 
@@ -240,14 +156,11 @@ maintenance: the sites it reads change their pages without warning, and each cha
 found and fixed before that source goes quiet.
 
 If it helped you find somewhere to live, a one-off contribution is welcome and entirely
-optional. Nothing in the app is gated, degraded, or nagged behind it — there is one line in the
-dashboard footer, and that is the whole of the ask.
+optional. Nothing in the app is gated, degraded, or nagged behind it.
 
-Set your donation page in two places to turn it on:
-
-- `_DEFAULT_DONATE_URL` in [`sf_housing/__init__.py`](sf_housing/__init__.py) — controls the
-  footer line and the Support page note. Empty means nothing is shown.
-- [`.github/FUNDING.yml`](.github/FUNDING.yml) — controls the Sponsor button on this repository.
+If you are forking this, the donation link lives in two places:
+`_DEFAULT_DONATE_URL` in [`sf_housing/__init__.py`](sf_housing/__init__.py) and
+[`.github/FUNDING.yml`](.github/FUNDING.yml). Empty means nothing is shown.
 
 ## License
 
