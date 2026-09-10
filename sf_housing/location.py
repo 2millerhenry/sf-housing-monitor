@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 
 from .deal_profile import SF_NEIGHBORHOODS
@@ -132,6 +133,12 @@ _CITY_BY_GRAMMAR = tuple(
 _WHITESPACE = re.compile(r"\s+")
 
 
+# Keyed on the listing text, which is what makes it worth keeping: scoring the
+# same board against a second deal asks this the same questions about the same
+# strings. It was 45% of a scoring pass -- 227 regex searches per listing, most
+# of them here -- and the shortlist estimate re-scores on every keystroke.
+# Bounded because the key is the whole text of a listing, not a word of it.
+@lru_cache(maxsize=2048)
 def declared_outside_sf_area_hint(text: str | None) -> str | None:
     """Return a clearly declared city outside San Francisco."""
     normalized = _WHITESPACE.sub(" ", (text or "").casefold()).strip()

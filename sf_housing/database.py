@@ -503,6 +503,74 @@ class Repository:
             rows = connection.execute("SELECT * FROM listings").fetchall()
         return [(int(row["id"]), self._row_to_candidate(row)) for row in rows]
 
+    def shortlist_pool(
+        self, kinds: Sequence[str] = (), ceiling: int = 900, strata: int = 20
+    ) -> tuple[list[tuple[int, ListingCandidate]], dict[int, int], bool]:
+        """The homes a cut-off would be measured against, whole or sampled.
+
+        The pool is not the board: of 5,600 listings stored on a real install,
+        351 were live and eligible. Scoring 351 takes about a third of a second,
+        which a number under a slider can afford, so the usual answer here is
+        the whole pool and the usual count is exact.
+
+        Above ``ceiling`` it is sampled instead, stratified on the score each
+        home already has and evenly spaced within each band. Stratified because
+        the old score and the new one are not independent -- a home that scored
+        80 under the old deal rarely lands at 20 under an edited one -- so bands
+        of the old score carry most of the information about the new. Evenly
+        spaced rather than randomly drawn so that a deal asked twice gives the
+        same number, instead of flickering between keystrokes that changed
+        nothing.
+
+        Returns the listings paired with the band they came from, the true size
+        of every band, and whether this is the whole pool or a sample of it.
+        """
+        clauses = [
+            "status IN ('active', 'saved')",
+            "eligibility IN ('eligible', 'needs_verification')",
+        ]
+        parameters: list[Any] = []
+        wanted = [str(kind) for kind in kinds if str(kind)]
+        if wanted:
+            clauses.append(f"housing_kind IN ({','.join('?' for _ in wanted)})")
+            parameters.extend(wanted)
+        where = " AND ".join(clauses)
+        width = 100 / max(1, strata)
+        with self.connection() as connection:
+            index = connection.execute(
+                f"SELECT id, score FROM listings WHERE {where}", parameters
+            ).fetchall()
+            bands: dict[int, list[int]] = {}
+            for row in index:
+                band = min(strata - 1, int(max(0, int(row["score"] or 0)) / width))
+                bands.setdefault(band, []).append(int(row["id"]))
+            sizes = {band: len(ids) for band, ids in bands.items()}
+            total = len(index)
+            exact = total <= ceiling
+            if exact:
+                picked = [int(row["id"]) for row in index]
+            else:
+                picked = []
+                per_band = max(1, ceiling // max(1, len(bands)))
+                for ids in bands.values():
+                    ordered = sorted(ids)
+                    step = max(1, len(ordered) // per_band)
+                    picked.extend(ordered[::step][:per_band])
+            if not picked:
+                return [], {}, True
+            band_of = {
+                listing_id: band for band, ids in bands.items() for listing_id in ids
+            }
+            rows = connection.execute(
+                f"SELECT * FROM listings WHERE id IN ({','.join('?' for _ in picked)})",
+                picked,
+            ).fetchall()
+        return (
+            [(band_of[int(row["id"])], self._row_to_candidate(row)) for row in rows],
+            sizes,
+            exact,
+        )
+
     @staticmethod
     def _row_to_candidate(row: sqlite3.Row) -> ListingCandidate:
         return ListingCandidate(

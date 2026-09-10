@@ -15,6 +15,11 @@
   } catch (error) {
     counts = {};
   }
+  // The page is rendered with the counts for the deal as saved. While the deal
+  // is being edited the form sends replacements, which are for a deal that has
+  // not been saved and may be measured from a sample rather than the whole
+  // pool -- so the readout has to be able to say "about".
+  let approximate = false;
 
   function render() {
     const current = Number(slider.value);
@@ -25,9 +30,22 @@
     value.textContent = String(current);
     const homes = counts[String(current)];
     // A count we do not have is left unsaid rather than shown as zero.
-    count.textContent =
-      homes === undefined ? "and up" : "and up · " + homes + (homes === 1 ? " home" : " homes");
+    if (homes === undefined) {
+      count.textContent = "and up";
+      return;
+    }
+    const noun = homes === 1 ? " home" : " homes";
+    count.textContent = "and up · " + (approximate ? "about " : "") + homes + noun;
   }
+
+  // Sent by the deal form each time it has measured the deal on screen.
+  document.addEventListener("cutoff-counts", (event) => {
+    const next = event.detail && event.detail.counts;
+    if (!next) return;
+    counts = next;
+    approximate = Boolean(event.detail.approximate);
+    render();
+  });
 
   slider.addEventListener("input", render);
   render();
