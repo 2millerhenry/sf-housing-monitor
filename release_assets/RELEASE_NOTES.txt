@@ -1,3 +1,18 @@
+SF Home Finder 0.4.2
+
+Installing no longer reports failure when it worked. A first start on a full
+board spends about fifteen seconds re-ranking what is already stored, and macOS
+waits ten seconds between restarts of a background service, so a normal install
+could take longer than the old 45-second window and be told "installation
+stopped" for an app that was seconds from answering. It now waits properly, and
+if it still has not answered it says what is actually true -- installed, still
+starting, here is the address -- instead of sending you to Repair.
+
+The installer also says less. Fifty-one package names scrolled past on every
+install; now it tells you what it is doing and stays quiet about the rest. When
+it finishes it tells you the address to bookmark, which matters if you
+installed with the one-line command and so have no folder of shortcuts.
+
 SF Home Finder 0.4.1
 
 Renamed. The app called itself SF Home Finder while everything around it said

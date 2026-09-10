@@ -151,12 +151,35 @@ def test_an_upgrade_gives_the_disk_back_on_its_own() -> None:
     assert '"$TOOLS_DIR/reclaim.sh"' in script
 
 
-def test_nothing_is_reclaimed_until_the_new_version_has_served_a_request() -> None:
-    """Until the new runtime answers, the old one is the way back. Reclaiming
-    first would delete the rollback copy on exactly the upgrades that need it.
+def test_a_healthy_start_is_actually_recognised_as_one() -> None:
+    """The gate has to be able to pass, not only to fail safely.
+
+    A gate that never sets its flag is still safe -- nothing is reclaimed --
+    but every install then ends by saying it has not answered yet, on an app
+    that is running perfectly. Safe and wrong is still wrong.
     """
     script = installer()
 
-    assert script.index("reclaim.sh") > script.index("did not become healthy"), (
+    assert "HEALTHY=1; break ;;" in script, "a healthy response never marks the start as healthy"
+    assert script.index("HEALTHY=1; break ;;") < script.index('if [ "$HEALTHY" != 1 ]; then')
+
+
+def test_nothing_is_reclaimed_until_the_new_version_has_served_a_request() -> None:
+    """Until the new runtime answers, the old one is the way back. Reclaiming
+    first would delete the rollback copy on exactly the upgrades that need it.
+
+    This used to be an ordering check against the wording of a failure message,
+    which broke the moment that message changed -- and it changed because
+    calling a finished install a failure was itself the bug. The guarantee is
+    now structural: a start that never answered leaves before it can reach the
+    reclaim, so the test looks for that exit rather than for a sentence.
+    """
+    script = installer()
+
+    assert 'if [ "$HEALTHY" != 1 ]; then' in script, "there is no health gate at all"
+    unhealthy_exit = script.index('if [ "$HEALTHY" != 1 ]; then')
+    early_exit = script.index("exit 0", unhealthy_exit)
+
+    assert script.index("reclaim.sh") > early_exit, (
         "the disk is reclaimed before the new version is known to work"
     )

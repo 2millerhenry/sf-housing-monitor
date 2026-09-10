@@ -65,8 +65,11 @@ if [ -d "$CACHE_DIR" ]; then
   /bin/mkdir -p "$CACHE_DIR"
 fi
 
+# Reporting what was freed is worth a line; reporting that nothing needed
+# freeing is not. Run from the installer, that line landed on every first
+# install, where there has never been an old runtime to remove.
 if [ "$freed" -gt 0 ]; then
   say "Removed $freed old runtime(s); kept $in_use and ${rollback:-no rollback copy}."
-else
+elif [ "${SF_HOUSING_RECLAIM_QUIET:-0}" != "1" ]; then
   say "Nothing to remove; kept $in_use and ${rollback:-no rollback copy}."
 fi

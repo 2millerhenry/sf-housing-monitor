@@ -3,7 +3,7 @@ set -euo pipefail
 
 RELEASE_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 PAYLOAD_DIR="$RELEASE_ROOT/payload"
-VERSION="0.4.1"
+VERSION="0.4.2"
 PYTHON_VERSION="3.12.10"
 PORT="${SF_HOUSING_PORT:-8000}"
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
@@ -26,7 +26,7 @@ RUNTIMES_DIR="$APP_ROOT/runtimes"
 RELEASES_DIR="$APP_ROOT/releases"
 UV_BIN="$PAYLOAD_DIR/uv"
 LOCK_FILE="$PAYLOAD_DIR/requirements.lock"
-WHEEL_FILE="$PAYLOAD_DIR/sf_housing_monitor-0.4.1-py3-none-any.whl"
+WHEEL_FILE="$PAYLOAD_DIR/sf_housing_monitor-0.4.2-py3-none-any.whl"
 
 say() { printf '%s\n' "$*"; }
 fail() { say "Installation stopped: $*"; exit 1; }
@@ -68,11 +68,11 @@ trap cleanup EXIT
 say "Preparing the private Python runtime (the first install needs internet access)..."
 export UV_CACHE_DIR="$APP_ROOT/cache"
 export UV_PYTHON_INSTALL_DIR="$APP_ROOT/python"
-"$UV_BIN" python install "$PYTHON_VERSION" --install-dir "$UV_PYTHON_INSTALL_DIR" --no-bin --no-progress
-"$UV_BIN" venv "$STAGE/runtime" --python "$PYTHON_VERSION" --managed-python --no-project
-"$UV_BIN" pip sync "$LOCK_FILE" --python "$STAGE/runtime/bin/python" --strict --no-progress
-"$UV_BIN" pip install "$WHEEL_FILE" --python "$STAGE/runtime/bin/python" --no-deps --no-progress
-"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.1"'
+"$UV_BIN" python install "$PYTHON_VERSION" --install-dir "$UV_PYTHON_INSTALL_DIR" --no-bin --no-progress --quiet
+"$UV_BIN" venv "$STAGE/runtime" --python "$PYTHON_VERSION" --managed-python --no-project --quiet
+"$UV_BIN" pip sync "$LOCK_FILE" --python "$STAGE/runtime/bin/python" --strict --no-progress --quiet
+"$UV_BIN" pip install "$WHEEL_FILE" --python "$STAGE/runtime/bin/python" --no-deps --no-progress --quiet
+"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.2"'
 
 if [ -f "$DATA_DIR/housing.sqlite3" ] && [ -x "$APP_ROOT/current/bin/python" ]; then
   /bin/mkdir -p "$APP_ROOT/backups"
@@ -146,26 +146,55 @@ else
   /bin/launchctl kickstart -k "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || true
 fi
 
-say "Waiting for the private dashboard..."
-for attempt in $(/usr/bin/seq 1 45); do
+say "Starting it up..."
+# launchd throttles a restart to ThrottleInterval, ten seconds, and a first
+# start on a full board spends about fifteen more re-ranking what is already
+# stored. Two throttled attempts and that is a minute gone, which is why this
+# waits well past what a healthy start needs rather than the 45 seconds it used
+# to: the old window was tight enough that a normal install could miss it.
+HEALTHY=0
+for attempt in $(/usr/bin/seq 1 150); do
   HEALTH="$(/usr/bin/curl -fsS --max-time 2 "http://127.0.0.1:$PORT/health" 2>/dev/null || true)"
   case "$HEALTH" in
-    *'"app":"sf-housing-monitor"'*|*'"app": "sf-housing-monitor"'*|*'"ok":true'*|*'"ok": true'*) break ;;
+    *'"app":"sf-housing-monitor"'*|*'"app": "sf-housing-monitor"'*|*'"ok":true'*|*'"ok": true'*) HEALTHY=1; break ;;
   esac
   /bin/sleep 1
 done
-case "${HEALTH:-}" in
-  *'"app":"sf-housing-monitor"'*|*'"app": "sf-housing-monitor"'*|*'"ok":true'*|*'"ok": true'*) ;;
-  *) fail "the service did not become healthy. Run Repair; details are in $LOG_DIR/service-error.log" ;;
-esac
+
+if [ "$HEALTHY" != 1 ]; then
+  # The install itself finished: the runtime is in place and the login service
+  # is registered. Only the first response is late. Saying "installation
+  # stopped" here sent people to Repair for an app that was seconds from
+  # answering, so this says what is actually true and leaves the previous
+  # runtime in place as the way back.
+  say ""
+  say "Installed, but it has not answered yet. It is probably still starting."
+  say ""
+  say "  Wait a minute, then open:  http://127.0.0.1:$PORT/"
+  say "  Still nothing? Double-click: Repair SF Home Finder"
+  say "  What went wrong is logged in: $LOG_DIR/service-error.log"
+  say ""
+  say "Your profile and history are safe in: $DATA_DIR"
+  exit 0
+fi
 
 # Deliberately last, and only past the health check above: until the new
 # runtime has actually served a request, the old one is the way back.
 if [ -x "$TOOLS_DIR/reclaim.sh" ]; then
-  SF_HOUSING_APP_ROOT="$APP_ROOT" "$TOOLS_DIR/reclaim.sh" || true
+  SF_HOUSING_APP_ROOT="$APP_ROOT" SF_HOUSING_RECLAIM_QUIET=1 "$TOOLS_DIR/reclaim.sh" || true
 fi
 
-say "Installed. Your profile and history stay in: $DATA_DIR"
+# Somebody who installed with the one-line command has no folder of .command
+# files to go back to, so the way back has to be said out loud rather than
+# assumed. It is always the same: the login service keeps it running, so the
+# address works whenever they want it.
+say ""
+say "Done. SF Home Finder is running."
+say ""
+say "  Open it any time:   http://127.0.0.1:$PORT/     <- bookmark this"
+say "  It checks for you:  10:00 and 18:00, every day, on its own"
+say "  Your data lives in: $DATA_DIR"
+say ""
 if [ "${SF_HOUSING_NO_BROWSER:-0}" != "1" ]; then
   /usr/bin/open "http://127.0.0.1:$PORT/"
 fi

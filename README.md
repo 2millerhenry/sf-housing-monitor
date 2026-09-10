@@ -22,13 +22,15 @@ press Return:
 curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
 ```
 
+<sub>*19 MB download · about 2–3 minutes · roughly 155 MB on disk when it is done · no password,
+no admin*</sub>
+
 **Works on** a Mac with Apple Silicon — an M1 or newer — on macOS 15.6 or later. Not Intel
 Macs, and not Windows yet.
 
-It never asks for your password, and it takes a few minutes — most of that one download, since
-the app brings its own copy of Python rather than touching the one your Mac came with. If the
-window looks like it is sitting still, it is working. Your browser opens by itself when it is
-done.
+Most of that time is one download: the app brings its own copy of Python rather than touching
+the one your Mac came with, so nothing else on your machine changes. If the window looks like
+it is sitting still, it is working. Your browser opens by itself when it is done.
 
 <details>
 <summary><b>Rather click than paste?</b> Use the ZIP instead.</summary>
@@ -89,6 +91,15 @@ day, as long as your Mac is awake and logged in. Nothing to remember, nothing to
 **Check in whenever it suits you.** Best matches at the top, with the reason each one scored
 that way. Star the ones worth a message, pass on the rest — what you have dealt with does not
 come back.
+
+### Getting back to it later
+
+It keeps running by itself, so there is nothing to start. Just open:
+
+**http://127.0.0.1:8000** — bookmark it.
+
+It comes back on its own when you restart your Mac, so that address works whenever you want it.
+Closing the tab does not stop anything.
 
 ## A closer look
 
