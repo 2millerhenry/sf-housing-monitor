@@ -20,7 +20,7 @@ Open **Terminal** (press `Cmd` + `Space`, type `Terminal`, press Return), then p
 and press Return:
 
 ```
-curl -fsSL https://raw.githubusercontent.com/2millerhenry/sf-housing-monitor/main/install.sh | bash
+curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
 ```
 
 That is the whole thing. It takes a few minutes, asks for no password, and opens your browser
@@ -128,7 +128,7 @@ It is worth being suspicious of, so here is what that one does. It reads the
 [release list](https://github.com/2millerhenry/sf-housing-monitor/releases), downloads the same
 ZIP the button gives you, checks every file inside it against a checksum, and runs the
 installer. It never asks for your password, because nothing here needs an administrator.
-It is [twenty lines long and you can read it first](install.sh) — or skip it entirely and use
+It is [forty lines long and you can read it first](install.sh) — or skip it entirely and use
 the ZIP.
 
 ### What if I am not looking in San Francisco?

@@ -1,46 +1,39 @@
 #!/bin/bash
-# One-command install for SF Housing Monitor.
+# Install SF Housing Monitor:
 #
-#   curl -fsSL https://sfhousing.link/install | bash
+#   curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
 #
-# ...or, without the short link:
+# Downloads the current release and runs the installer inside it -- the same one
+# the ZIP contains, which checks every file against a checksum before using it.
 #
-#   curl -fsSL https://raw.githubusercontent.com/2millerhenry/sf-housing-monitor/main/install.sh | bash
+# It never asks for your password, because nothing here needs an administrator;
+# anything claiming otherwise is not this. It works in a temporary folder that is
+# removed however it ends, and it touches nothing outside the app's own folder.
 #
-# This downloads the current release, checks it, and runs the same installer the
-# ZIP contains. Two things it deliberately does not do: ask for your password --
-# nothing here needs an administrator, and anything claiming otherwise is not
-# this -- and leave anything behind on failure.
-#
-# It also avoids the Gatekeeper prompt that the ZIP shows, for a real reason
-# rather than a trick: macOS marks files a *browser* downloaded, and curl is not
-# a browser. The bytes are identical either way, and the installer verifies every
-# one of them against a checksum before using it.
+# There is no Gatekeeper prompt this way, which is a real difference rather than
+# a trick: macOS marks what a *browser* downloads, and curl is not a browser. The
+# bytes are identical to the ZIP either way.
 set -euo pipefail
 
 REPO="2millerhenry/sf-housing-monitor"
-say() { printf '%s\n' "$*"; }
 fail() { printf '\nStopped: %s\n' "$*" >&2; exit 1; }
 
-[ "$(uname -s)" = "Darwin" ] || fail "this app is macOS only."
-[ "$(uname -m)" = "arm64" ] || fail "this build needs an Apple Silicon Mac (M1 or later). Intel Macs are not supported yet."
+[ "$(uname -s)" = Darwin ] || fail "this app is macOS only."
+[ "$(uname -m)" = arm64 ] || fail "this needs an Apple Silicon Mac (M1 or later)."
 
-WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 
-say "Looking up the latest release..."
-ASSET="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-  | grep -o '"browser_download_url": *"[^"]*macOS-arm64\.zip"' \
-  | head -1 | sed 's/.*"https/https/; s/"$//')"
-[ -n "$ASSET" ] || fail "could not find the download. Check https://github.com/$REPO/releases"
+echo "Finding the latest release..."
+URL="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" |
+  sed -n 's/.*"\(https[^"]*macOS-arm64\.zip\)".*/\1/p' | head -1)"
+[ -n "$URL" ] || fail "could not find the download. See https://github.com/$REPO/releases"
 
-say "Downloading $(basename "$ASSET")..."
-curl -fL --progress-bar "$ASSET" -o "$WORK/release.zip" || fail "the download did not finish. Check your internet connection and try again."
+echo "Downloading..."
+curl -fL --progress-bar "$URL" -o "$WORK/r.zip" || fail "the download did not finish. Check your connection and run it again."
+/usr/bin/unzip -q "$WORK/r.zip" -d "$WORK/x" || fail "the download was incomplete. Run it again."
 
-say "Unpacking..."
-/usr/bin/unzip -q "$WORK/release.zip" -d "$WORK/unpacked" || fail "the download was incomplete. Run the command again."
-ROOT="$(find "$WORK/unpacked" -maxdepth 1 -type d -name 'SF-Housing-Monitor-*' | head -1)"
-[ -n "$ROOT" ] && [ -f "$ROOT/payload/install.sh" ] || fail "that download does not look like a release. Try again, or download the ZIP by hand."
+ROOT="$(find "$WORK/x" -maxdepth 1 -type d -name 'SF-Housing-Monitor-*' | head -1)"
+[ -f "${ROOT:-}/payload/install.sh" ] || fail "that is not a release. Try the ZIP instead: https://github.com/$REPO/releases/latest"
 
-say ""
+echo
 exec /bin/bash "$ROOT/payload/install.sh" "$ROOT"
