@@ -288,6 +288,28 @@ def setting_int(value: object, default: int) -> int:
         return default
 
 
+def preferences_with_deal(profile: DealProfile, previous: Preferences | None = None) -> Preferences:
+    """The preferences a deal would produce, without writing anything.
+
+    Built through ``canonical_document`` and read back through
+    ``parse_preferences`` -- the same two steps saving and loading take -- so a
+    deal previewed on the page scores exactly as it will once it is saved. A
+    shortcut that assembled the legacy view directly would be a second way of
+    turning a deal into preferences, free to drift from the one that counts.
+    """
+    base = (
+        previous.canonical
+        if previous is not None and previous.canonical is not None
+        else previous.data
+        if previous is not None
+        else {}
+    )
+    document = canonical_document(profile, base)
+    return parse_preferences(
+        yaml.safe_dump(document, sort_keys=False, allow_unicode=True, width=100_000)
+    )
+
+
 def save_deal_profile(
     path: Path,
     profile: DealProfile,

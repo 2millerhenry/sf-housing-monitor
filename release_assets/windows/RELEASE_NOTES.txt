@@ -1,3 +1,27 @@
+SF Housing Monitor 0.4.0 for Windows x64
+
+Homes that have been taken down now leave the shortlist promptly. The app has
+always gone and read the page rather than guessing from a listing's absence,
+but it was only managing a few of those checks per scan against a backlog of
+ninety, so a post could be flagged and pulled and still sit there looking live
+for two days. It now gets through about twenty a scan, and nothing is ever
+marked gone on a failed request, a timeout or a block -- only on the page
+itself saying so.
+
+Checking for new homes by hand is now limited to once a day. The scheduled
+checks, the nightly sweep and the catch-up after a sleeping Mac are unchanged
+and never refused; the limit is on the button, which previously had none, and
+it is there so that pressing it repeatedly cannot get a source to stop
+answering. Refusing tells you when the app next checks on its own.
+
+While you are editing your deal, the number beside the match slider now follows
+what you have typed rather than what was last saved, so changing a budget or an
+area shows what it would actually cost you straight away.
+
+The login-service check no longer reports the service missing on a Mac where it
+is installed and running, which could happen when a location variable was set
+but left empty.
+
 SF Housing Monitor 0.3.9 for Windows x64
 
 This Windows release uses the same local-only SF Housing Monitor application as

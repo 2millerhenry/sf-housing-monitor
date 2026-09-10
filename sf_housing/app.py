@@ -14,7 +14,9 @@ from datetime import UTC, date, datetime, timedelta
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from statistics import median
-from urllib.parse import parse_qsl, quote, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qsl, quote, quote_plus, urlencode, urlparse, urlunparse
+
+from starlette.concurrency import run_in_threadpool
 from zoneinfo import ZoneInfo
 
 import yaml
@@ -56,6 +58,7 @@ from .preferences import (
     Preferences,
     ensure_preferences,
     load_preferences,
+    preferences_with_deal,
     save_deal_profile,
     save_preferences,
 )
@@ -74,10 +77,13 @@ from .scheduling import (
     CATCH_UP_INTERVAL_MINUTES,
     PACIFIC,
     build_scheduler,
+    manual_scan_allowed,
+    next_scheduled_check,
     scheduled_scan_due,
     sweep_if_due,
 )
 from .settings import Settings
+from .shortlist_estimate import ShortlistEstimate, estimate_shortlist_counts
 from .sources import (
     FacebookGroupsSource,
     FacebookMarketplaceSource,
@@ -681,6 +687,12 @@ def create_app(
         timeout_seconds=active_settings.request_timeout_seconds,
         max_scan_seconds=active_settings.scan_max_seconds,
         deep_scan_max_seconds=active_settings.deep_scan_max_seconds,
+        # One check by hand a day. Asked per run rather than held as a number,
+        # because whether one has been used changes as the day does, and the
+        # trigger is what decides whether the limit applies at all.
+        scan_allowed=lambda trigger, sources: manual_scan_allowed(
+            repository.recent_scans(40), trigger
+        ),
     )
     # A check that was in flight when the app was last stopped is still
     # recorded as running. Settling it here, before anything can start a new
@@ -1032,8 +1044,20 @@ def create_app(
         if not scanner.start_scan("manual"):
             destination = _safe_return(return_to)
             separator = "&" if "?" in destination else "?"
+            # Two different noes. "Already running" is a wait; a check already
+            # used today is not, and saying the wrong one would have somebody
+            # pressing again.
+            if not manual_scan_allowed(repository.recent_scans(40), "manual"):
+                when = next_scheduled_check().strftime("%-I:%M %p").lower()
+                note = quote_plus(
+                    "You have had your check for today, which is how the sources "
+                    f"stay happy to answer. The app checks again on its own at {when}, "
+                    "and your next one by hand is available tomorrow."
+                )
+            else:
+                note = "Scan+already+running"
             return RedirectResponse(
-                destination + separator + "message=Scan+already+running", status_code=303
+                destination + separator + "message=" + note, status_code=303
             )
         destination = _safe_return(return_to)
         separator = "&" if "?" in destination else "?"
@@ -1262,7 +1286,41 @@ def create_app(
             profile = deal_profile_from_form(await request.form(), state="draft")
         except (DealProfileError, ValueError) as exc:
             return JSONResponse({"ok": False, "reason": str(exc)}, status_code=200)
-        return JSONResponse({"ok": True, "summary": profile.summary()})
+
+        current = load_preferences(active_settings.preferences_path)
+
+        def measure() -> ShortlistEstimate:
+            draft = preferences_with_deal(profile, current)
+            # Only the home shapes this deal shows, the same narrowing the
+            # tabs do, so the number is the number of rows they will hold.
+            kinds = sorted(
+                {
+                    "room" if path == "private_room" else "whole_unit"
+                    for path in profile.enabled_paths
+                }
+            )
+            return estimate_shortlist_counts(
+                repository, draft, CUTOFF_STOPS, kinds=kinds
+            )
+
+        # Scoring the pool is a third of a second of solid CPU. Run inline it
+        # would hold the event loop for that long on every keystroke, and the
+        # dashboard behind this form would stop answering while somebody typed.
+        try:
+            estimate = await run_in_threadpool(measure)
+        except (PreferenceError, DealProfileError, ValueError):
+            # A form mid-edit is often not a whole deal yet. The sentence above
+            # is still worth returning; the number simply waits.
+            return JSONResponse({"ok": True, "summary": profile.summary()})
+        return JSONResponse(
+            {
+                "ok": True,
+                "summary": profile.summary(),
+                "counts": {str(stop): count for stop, count in estimate.counts.items()},
+                "exact": estimate.exact,
+                "pool": estimate.pool,
+            }
+        )
 
     @application.post("/preferences/deal/reset")
     async def reset_deal_profile(request: Request):

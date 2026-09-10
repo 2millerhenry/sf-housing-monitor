@@ -20,6 +20,7 @@ def main() -> None:
         from .gmail_alerts import GmailAlertMailbox
         from .preferences import ensure_preferences, load_preferences
         from .scanner import Scanner
+        from .scheduling import manual_scan_allowed
         from .settings import Settings
         from .sources import default_sources
 
@@ -41,6 +42,11 @@ def main() -> None:
             timeout_seconds=settings.request_timeout_seconds,
             max_scan_seconds=settings.scan_max_seconds,
             deep_scan_max_seconds=settings.deep_scan_max_seconds,
+            # A scan from the command line reads the same sites as one from the
+            # button, so it counts as the same one check a day.
+            scan_allowed=lambda trigger, sources: manual_scan_allowed(
+                repository.recent_scans(40), trigger
+            ),
         )
         outcome = scanner.run_scan("command_line")
         print(json.dumps(asdict(outcome), indent=2))

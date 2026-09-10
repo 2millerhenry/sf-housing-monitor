@@ -42,9 +42,16 @@
       {# Still a real link to a real page: without JavaScript, or if the panel
          fails to load, clicking it goes to Ko-fi exactly as before. #}
       <p class="footer-support">
-        Free to use, forever.
-        <a href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external"
-           data-donate-open data-donate-embed="{{ donate_url }}?hidefeed=true&amp;widget=true&amp;embed=true&amp;preview=true">Say thanks</a>
+        <span>Free to use, forever.</span>
+        <a class="donate-button" href="{{ donate_url }}" target="_blank" rel="noopener noreferrer external"
+           data-donate-open data-donate-embed="{{ donate_url }}?hidefeed=true&amp;widget=true&amp;embed=true&amp;preview=true">
+          {# Decorative. The label already says what the button does, so the
+             heart is hidden rather than announced as a second one. #}
+          <svg class="donate-heart" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+          </svg>
+          Say thanks
+        </a>
       </p>
       {% endif %}
     </div>

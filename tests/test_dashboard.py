@@ -443,9 +443,10 @@ def test_dashboard_shows_live_scan_progress_and_status_endpoint(tmp_path: Path) 
         assert active["sources_total"] == 1
 
         release.set()
-        deadline = time.monotonic() + 3
-        while client.get("/scan/status").json()["running"] and time.monotonic() < deadline:
-            time.sleep(0.01)
+        # Waited on through the scanner rather than by asking the endpoint over
+        # and over until a deadline passed: what the endpoint reports is what
+        # the scanner has finished writing, so that is the thing to block on.
+        assert application.state.scanner.wait_until_idle(), "the scan never finished"
         finished = client.get("/scan/status").json()
 
     assert finished["running"] is False

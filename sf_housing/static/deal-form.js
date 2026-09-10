@@ -51,6 +51,16 @@
         // A form mid-edit is often not a valid deal yet. Keeping the last good
         // sentence is better than flashing an error at someone still typing.
         if (data.ok && data.summary) summaryTarget.textContent = data.summary;
+        // The same reply carries what this deal would shortlist. Only the
+        // newest one is allowed to land, for the same reason as the sentence:
+        // a slower earlier request must not overwrite a faster later one.
+        if (data.ok && data.counts) {
+          document.dispatchEvent(
+            new CustomEvent("cutoff-counts", {
+              detail: { counts: data.counts, approximate: data.exact === false },
+            })
+          );
+        }
       })
       .catch(() => {});
   };

@@ -56,7 +56,31 @@ DEEP_SWEEP_MINUTE = 20
 # stays the normal path, and this is the floor under it: a day and a bit,
 # so a machine that is awake at 03:20 always uses the cron and one that is
 # not still gets a sweep rather than none.
+# A day and a bit, so a machine awake at 03:20 always uses the cron and only
+# one that is not falls through to the net under it.
 DEEP_SWEEP_MAX_AGE = timedelta(hours=26)
+
+# How many scans a person may ask for themselves in one Pacific day.
+#
+# Each source is somebody else's site being read by a program, and the ones
+# that mind say so by blocking: Zillow by address for six hours or more,
+# Trulia with a 403, Redfin with a 202 that never turns into a listing. The
+# scheduled checks are bounded by their own cron and are the whole point of the
+# app, so they are never refused. The button beside them was the part with no
+# limit at all -- held down while somebody waited, it could spend an account's
+# welcome in an afternoon. One a day is the limit on that, and on nothing else.
+MANUAL_SCANS_PER_DAY = 1
+
+# A run that reached the sources spent its share whether or not it came back
+# with anything. Being turned away is still a request, and refusals are what a
+# block is built out of, so only a run that never started is free.
+BUDGET_SPENDING_STATUSES = frozenset({"completed", "completed_with_errors", "failed"})
+
+# The scans a person asks for. Everything else -- the two scheduled checks, the
+# nightly sweep, the catch-up that covers a slot the Mac slept through, the one
+# that runs when a deal is first set up -- is the app running on its own clock,
+# and is not what this limit is about.
+BY_HAND_TRIGGERS = frozenset({"manual", "command_line"})
 
 # How far back the schedule reports on itself. A week is long enough to expose a
 # pattern and short enough that a fault shows up while it still matters.
@@ -261,6 +285,72 @@ def deep_sweep_due(recent_scans: list[dict], now: datetime | None = None) -> boo
         if current - started.astimezone(UTC) < DEEP_SWEEP_MAX_AGE:
             return False
     return True
+
+
+def manual_scans_today(recent_scans: list[dict], now: datetime | None = None) -> int:
+    """How many scans a person has asked for today, Pacific.
+
+    The day is the Pacific calendar day: it is the day the schedule is written
+    in, and "one check a day" is a sentence somebody can hold in their head and
+    predict. A rolling twenty-four hours would be no safer here -- there is
+    only ever one of these -- and much harder to explain.
+    """
+    current = (now or datetime.now(PACIFIC)).astimezone(PACIFIC)
+    midnight = datetime.combine(current.date(), time(0), tzinfo=PACIFIC)
+    spent = 0
+    for scan in recent_scans:
+        if str(scan.get("trigger") or "") not in BY_HAND_TRIGGERS:
+            continue
+        if scan.get("status") not in BUDGET_SPENDING_STATUSES:
+            continue
+        timestamp = scan.get("started_at")
+        if not timestamp:
+            continue
+        try:
+            started = datetime.fromisoformat(str(timestamp))
+        except ValueError:
+            continue
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        if started.astimezone(PACIFIC) >= midnight:
+            spent += 1
+    return spent
+
+
+def manual_scan_allowed(
+    recent_scans: list[dict], trigger: str = "manual", now: datetime | None = None
+) -> bool:
+    """Whether this scan may start.
+
+    Only a scan somebody asked for is ever refused. The scheduled checks, the
+    nightly sweep and the catch-ups run on their own clock, which is its own
+    limit, and refusing one of those to protect a button would be exactly the
+    wrong way round.
+    """
+    if trigger not in BY_HAND_TRIGGERS:
+        return True
+    return manual_scans_today(recent_scans, now) < MANUAL_SCANS_PER_DAY
+
+
+def next_scheduled_check(now: datetime | None = None) -> datetime:
+    """The next clocked check, for telling somebody when the app looks next.
+
+    A refusal that only says no is a fault report. This is what makes it an
+    answer instead.
+    """
+    current = (now or datetime.now(PACIFIC)).astimezone(PACIFIC)
+    upcoming = [
+        datetime.combine(current.date() + timedelta(days=offset), time(hour), tzinfo=PACIFIC)
+        for offset in (0, 1)
+        for hour in SCHEDULE_HOURS
+    ]
+    return min(slot for slot in upcoming if slot > current)
+
+
+def next_manual_scan_allowed(now: datetime | None = None) -> datetime:
+    """When the next check by hand becomes available: the next midnight."""
+    current = (now or datetime.now(PACIFIC)).astimezone(PACIFIC)
+    return datetime.combine(current.date() + timedelta(days=1), time(0), tzinfo=PACIFIC)
 
 
 def catch_up_if_due(scanner: Scanner) -> bool:

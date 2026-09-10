@@ -75,6 +75,19 @@ class Source:
         return replace(listing, summary="Still up, with a full description.")
 
 
+class Costly(Source):
+    """A source whose reads cost real time, the way a network read does.
+
+    Rechecking is not free in production -- a detail page is a request, spaced
+    from the next one. A test where it costs nothing cannot tell a generous
+    allowance from a starved one.
+    """
+
+    def enrich(self, client, listing):
+        time.sleep(0.01)
+        return super().enrich(client, listing)
+
+
 def board(tmp_path: pathlib.Path):
     repository = Repository(tmp_path / "housing.sqlite3")
     repository.initialize()
@@ -120,6 +133,53 @@ def confirmations(repository: Repository) -> dict[str, str | None]:
             row["source_id"]: _json.loads(row["metadata_json"] or "{}").get("last_verified_at")
             for row in connection.execute("SELECT source_id, metadata_json FROM listings")
         }
+
+
+def confirmation_ages_hours(repository: Repository) -> dict[str, float]:
+    """How long ago each home was last confirmed, in hours.
+
+    Presence of a stamp says nothing: every home gets one from the search that
+    first collected it, and it never goes away. Only its age moves.
+    """
+    import json as _json
+    from datetime import UTC as _UTC, datetime as _datetime
+
+    now = _datetime.now(_UTC)
+    ages: dict[str, float] = {}
+    with repository.connection() as connection:
+        for row in connection.execute("SELECT source_id, metadata_json FROM listings"):
+            stamp = _json.loads(row["metadata_json"] or "{}").get("last_verified_at")
+            if not isinstance(stamp, str):
+                ages[row["source_id"]] = float("inf")
+                continue
+            try:
+                moment = _datetime.fromisoformat(stamp).astimezone(_UTC)
+            except ValueError:
+                ages[row["source_id"]] = float("inf")
+                continue
+            ages[row["source_id"]] = (now - moment).total_seconds() / 3600
+    return ages
+
+
+class Quiet:
+    """A source that collects nothing and cannot recheck anything.
+
+    Ten of the twenty-four sources a real install runs have no ``enrich`` at
+    all. They are here because the recheck allowance used to be divided by
+    every remaining source, including these, which reserved shares that none of
+    them could ever spend.
+    """
+
+    mode = "automatic"
+    search_url = "https://example.test/quiet"
+    manual_reason = None
+    detail_budget = 0
+
+    def __init__(self, platform: str) -> None:
+        self.platform = platform
+
+    def search(self, client, preferences):
+        return []
 
 
 def shortlist(repository: Repository, preferences) -> set[str]:
@@ -339,23 +399,176 @@ def test_a_page_that_still_loads_and_says_removed_is_also_gone() -> None:
 
 
 def test_a_whole_shortlist_is_confirmed_within_one_day(tmp_path: pathlib.Path) -> None:
-    """The claim this change exists to make.
+    """The claim this change exists to make, measured in hours rather than in
+    whether a stamp exists at all.
 
-    Six rechecks per source per scan meant a sixty-home shortlist took days to
-    cycle, so a home could sit unconfirmed all week. Two scans is one day.
+    The earlier version of this test asked whether ``last_verified_at`` was
+    None. It never was: the search that first collects a home stamps it, and
+    winding the clock back moves that stamp rather than removing it. So the
+    assertion held with the recheck pass disabled outright, and a real install
+    drifted to a median confirmation age of 52 hours -- with the oldest at 127
+    -- while this stayed green. A home flagged on Craigslist sat on the
+    shortlist for two days looking live.
+
+    Scans run eight hours apart, so three of them is a day.
     """
     repository, preferences = board(tmp_path)
     homes = [room(f"r{index}") for index in range(60)]
-    Scanner(repository, lambda: preferences, [Source(homes)]).run_scan("manual")
-    assert all(confirmations(repository).values()), "the first search confirms them all"
+    Scanner(
+        repository, lambda: preferences, [Costly(homes, recheck_budget=60)],
+        detail_delay_seconds=0,
+    ).run_scan("manual")
+    assert max(confirmation_ages_hours(repository).values()) < 1, "the first search confirms them all"
 
-    # The source goes quiet: every one of the sixty now needs a page read.
-    for gap in (8, 16):
-        hours_pass(repository, gap)
-        Scanner(repository, lambda: preferences, [Source([])]).run_scan("scheduled")
+    # The source goes quiet, so every one of the sixty now needs a page read --
+    # and it sits third among twenty-two that cannot recheck at all, which is
+    # the shape a real install has. The scan is held to a few seconds and each
+    # read costs something, so the share arithmetic is what decides. A test
+    # where rechecking is instant and the budget unbounded cannot see a
+    # throughput fault at all, which is how this one went unnoticed.
+    for _ in range(3):
+        hours_pass(repository, 8)
+        quiet_before = [Quiet("QuietA"), Quiet("QuietB")]
+        quiet_after = [Quiet(f"Quiet{index}") for index in range(20)]
+        Scanner(
+            repository,
+            lambda: preferences,
+            [*quiet_before, Costly([], recheck_budget=60), *quiet_after],
+            detail_delay_seconds=0,
+            timeout_seconds=0.05,
+            max_scan_seconds=3.0,
+        ).run_scan("scheduled")
 
-    stale = [source_id for source_id, stamp in confirmations(repository).items() if stamp is None]
-    assert stale == [], f"{len(stale)} homes went a day without confirmation"
+    stale = {
+        source_id: age
+        for source_id, age in confirmation_ages_hours(repository).items()
+        if age > 24
+    }
+    assert not stale, f"{len(stale)} homes went more than a day without confirmation"
+
+
+def test_the_recheck_allowance_is_divided_only_among_sources_that_can_spend_it() -> None:
+    """Ten of the twenty-four sources a real install runs have no ``enrich``.
+
+    The allowance is divided by the sources still to come so that one cannot
+    take it all. Counting the ones that can never spend a second of it reserved
+    shares nobody used, and handed the thinnest slice to Craigslist -- which
+    runs third and carries the deepest queue. On a real install that was
+    available/22, and the shortlist fell 52 hours behind.
+    """
+    from sf_housing.scanner import _rechecking_sources_remaining
+
+    sources = [Quiet("A"), Quiet("B"), Source([]), Quiet("C"), Source([]), Quiet("D")]
+
+    # source_index is 1-based, and the current source is one of the remaining.
+    assert _rechecking_sources_remaining(sources, 3) == 2, "itself and the later Source"
+    assert _rechecking_sources_remaining(sources, 1) == 2, "the two Quiets ahead count for nothing"
+    assert _rechecking_sources_remaining(sources, 5) == 1, "only itself is left"
+
+
+def test_a_source_that_cannot_recheck_never_reserves_a_share() -> None:
+    """A source with no enrich has no queue and cannot spend the allowance."""
+    from sf_housing.scanner import _rechecking_sources_remaining
+
+    assert _rechecking_sources_remaining([Quiet("A"), Quiet("B"), Quiet("C")], 1) == 1
+
+
+def test_a_source_whose_budget_is_zero_does_not_reserve_a_share() -> None:
+    """Opting out with recheck_budget=0 means opting out of the division too."""
+    from sf_housing.scanner import _rechecking_sources_remaining
+
+    sources = [Source([], recheck_budget=0), Source([], recheck_budget=6)]
+
+    assert _rechecking_sources_remaining(sources, 1) == 1
+
+
+def test_a_source_among_many_that_cannot_recheck_gets_a_real_share(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The share is what is left divided by the sources still to come, so that
+    one source cannot take it all. Counting the ones with no ``enrich`` divided
+    it by sources that could never spend a second, and the source with the
+    deepest queue got the thinnest slice.
+
+    ``recheck_floor`` is set to one here so the floor cannot mask the share --
+    what is being measured is the arithmetic, not the guarantee under it.
+    """
+    repository, preferences = board(tmp_path)
+    homes = [room(f"r{index}") for index in range(40)]
+
+    class Thin(Costly):
+        recheck_floor = 1
+
+    Scanner(
+        repository, lambda: preferences, [Thin(homes, recheck_budget=40)],
+        detail_delay_seconds=0,
+    ).run_scan("manual")
+    hours_pass(repository, 8)
+
+    source = Thin([], recheck_budget=40)
+    Scanner(
+        repository,
+        lambda: preferences,
+        [Quiet("A"), Quiet("B"), source, *[Quiet(f"q{index}") for index in range(20)]],
+        detail_delay_seconds=0,
+        timeout_seconds=0.05,
+        max_scan_seconds=3.0,
+    ).run_scan("scheduled")
+
+    assert len(source.enriched) > 20, (
+        f"only {len(source.enriched)} of 40 rechecked: the allowance is still "
+        "being divided among sources that cannot spend it"
+    )
+
+
+def test_a_thin_share_still_buys_a_source_its_floor(tmp_path: pathlib.Path) -> None:
+    """With many sources all holding queues, every share is thin.
+
+    The floor is what stops a thin share meaning no progress worth having. At
+    three it did: a real install drained roughly that many Craigslist homes a
+    scan against a backlog of ninety, so the shortlist ran 52 hours behind and
+    a flagged post sat on it for two days looking live. The floor has to be
+    worth something on its own, because the share alone is not.
+    """
+    repository, preferences = board(tmp_path)
+
+    class Rival(Costly):
+        def __init__(self, name, returns, **kwargs):
+            super().__init__(returns, **kwargs)
+            self.platform = name
+
+    def homes(name: str, count: int):
+        return [
+            replace(room(f"{name}{index}"), platform=name,
+                    original_url=f"https://example.test/{name}/{index}")
+            for index in range(count)
+        ]
+
+    names = [f"Rival{index}" for index in range(16)]
+    Scanner(
+        repository, lambda: preferences,
+        [Rival(name, homes(name, 40), recheck_budget=40) for name in names],
+        detail_delay_seconds=0,
+    ).run_scan("manual")
+    hours_pass(repository, 8)
+
+    again = [Rival(name, [], recheck_budget=40) for name in names]
+    Scanner(
+        repository, lambda: preferences, again,
+        detail_delay_seconds=0, timeout_seconds=0.05, max_scan_seconds=3.0,
+    ).run_scan("scheduled")
+
+    # The first source has the most company still to come, so the thinnest
+    # share of all. What it gets is the floor, or nothing much.
+    assert len(again[0].enriched) >= 15, (
+        f"the first source managed {len(again[0].enriched)}; a floor that small "
+        "leaves a real backlog cycling for the better part of a week"
+    )
+    # Sixteen sources each holding forty homes cannot all be served in three
+    # seconds by any allocation, so this deliberately does not claim they are.
+    # That one source cannot take the whole allowance is the separate promise
+    # below, where it can actually be kept.
+    assert sum(len(source.enriched) for source in again) > 40, "and the scan did real work"
 
 
 def test_one_slow_source_cannot_starve_the_others(tmp_path: pathlib.Path) -> None:
