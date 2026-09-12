@@ -154,23 +154,25 @@ def test_a_room_at_the_going_rate_is_not_treated_as_the_bottom_of_the_market() -
     assert ordinary < at(("private_room",), 3000, anywhere=True)
 
 
-def test_a_home_to_split_is_not_promised_like_a_home_to_live_in_alone() -> None:
-    """Homes to split are judged on rent per person, need evidence they are a
-    whole home, and are held back when the household size is not stated. Size
-    and rent alone once predicted 308 of them where a board held 29.
+def test_people_splitting_a_home_are_counted_on_what_they_can_pay_together() -> None:
+    """The regression. On a home to split, the form asks for each person's
+    share -- "$2,700 each for 2 people" -- and the estimate read that share
+    against whole-unit rents, pricing a couple as though they were renting a
+    two-bedroom alone on $2,700. Two people at $2,700 can pay $5,400, which
+    reaches a third of the two-bedrooms on a real board where $2,700 reaches a
+    sixteenth. They were told about five homes where a search holds hundreds.
     """
-    # Both at their own median rent, so each is offered half of its own slice
-    # of the market and only the slice sizes and the split penalty differ.
-    # Two-bedrooms are 0.25 of the market against one-bedrooms' 0.41, so
-    # without a penalty the two-bedroom deal would land at about 0.6 of the
-    # one-bedroom deal. It has to land well under that.
-    shared = at(("two_bedroom",), 6295, anywhere=True)
-    alone = at(("one_bedroom",), 4200, anywhere=True)
-    unpenalised = SIZE_SHARE["two_bedroom"] / SIZE_SHARE["one_bedroom"]
-    assert shared < alone * unpenalised * 0.6, (
-        f"a two-bedroom deal promises {shared} against a one-bedroom's {alone}; "
-        f"on size and rent alone it would promise about {alone * unpenalised:.0f}, "
-        "and reaching a shortlist is harder for a home to split, not the same"
+    shared = profile(("two_bedroom",), 2700, anywhere=True)
+    shared.budgets["two_bedroom"] = replace(shared.budgets["two_bedroom"], occupants=2)
+    alone = profile(("two_bedroom",), 2700, anywhere=True)
+    alone.budgets["two_bedroom"] = replace(alone.budgets["two_bedroom"], occupants=1)
+
+    together = estimate_counts(shared, STOPS)[60]
+    by_oneself = estimate_counts(alone, STOPS)[60]
+
+    assert together > by_oneself * 3, (
+        f"two people at $2,700 each are offered {together} homes and one person "
+        f"at $2,700 is offered {by_oneself}; between them they can pay $5,400"
     )
 
 

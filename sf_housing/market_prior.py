@@ -14,6 +14,22 @@ somebody close the tab.
 Measured on a board of 6,935 homes collected by this app, and against one
 fresh installation whose first search collected 4,596 homes and put 417 on the
 shortlist at a cut-off of 60 with a broad whole-unit deal.
+
+Checked against that board a deal at a time, scoring every home afresh rather
+than reading the scores already stored, which answer for whatever deal was
+saved at the time. It comes in under what the board holds every time: a little
+over three quarters of it for a search naming neighbourhoods, and about a
+quarter for one looking anywhere in San Francisco. The shape holds -- adding
+two- and three-bedrooms to a studio-and-one-bedroom search multiplies the count
+by 1.40 here against 1.33 to 1.48 on the board.
+
+That leaves one thing known and not yet acted on. Against the same board, a
+search of the whole city clears about 0.92 of the homes matching on size and
+rent at a cut-off of 60, and this estimates 0.39 -- so anywhere-in-SF searches
+are pitched two and a half times lower than naming areas, which land almost
+exactly right. Correcting it means moving the cut-off curve, which is anchored
+on the one real first search there is a record of, and one board is not enough
+to move it on.
 """
 
 from __future__ import annotations
@@ -73,25 +89,33 @@ RENT_CDF = {
 # Matching on size and rent is not the same as reaching the shortlist, and how
 # far apart those two are depends on what you are looking for.
 #
-# Measured on one board with the same geography: 300 whole small homes reached
-# a cut-off of 60 against 29 homes to split. Size and rent alone predicted the
-# split homes should have been about a third as common, not a tenth, so being
-# a home to split costs roughly another factor of three -- they are judged on
-# rent per person, need explicit evidence of a whole home, and a household size
-# that is not stated holds them back.
+# Measured on a board of 6,935 homes, one deal at a time: each size offered its
+# own median rent, with the number of people the form fills in by default, and
+# counting what share of the homes matching on size and rent then reached a
+# cut-off of 60. Against the one-bedroom case, which anchors this at 1.0:
 #
-# Rooms could not be measured here: this board's deal was whole-unit only, so
-# every room in it had already been filtered out. 0.6 is a judgement rather
-# than a measurement, on the grounds that rooms are advertised more loosely and
-# more of them land short of confirmation. It is the least evidenced number in
-# this file.
+#   studio 0.95, two-bedroom 1.03, three-bedroom 0.94, four-bedroom 1.03,
+#   private room 0.70, from 629, 695, 252, 39 and 247 homes respectively.
+#
+# Homes to split were held at 0.3 here before, on a reading of one board where
+# 300 whole small homes reached a cut-off of 60 against 29 homes to split. That
+# gap was rent, not friction: at the $3,000 that deal allowed, a three-bedroom
+# is in the cheapest 7% of three-bedrooms, and size and rent alone account for
+# the whole of it -- they predict a thirteenth, and a tenth was observed. The
+# penalty was charging a second time for something the rent curves had already
+# charged for, and it left a couple looking to share told a twentieth of what
+# was there.
+#
+# Every figure is set at or under what was measured, because under-promising is
+# the point. The room number is the one to keep an eye on: 247 homes is the
+# thinnest evidence here, and rooms are advertised more loosely than flats.
 PATH_CLEARANCE = {
-    "private_room": 0.6,
-    "studio": 1.0,
+    "private_room": 0.65,
+    "studio": 0.90,
     "one_bedroom": 1.0,
-    "two_bedroom": 0.3,
-    "three_bedroom": 0.3,
-    "four_bedroom": 0.3,
+    "two_bedroom": 0.90,
+    "three_bedroom": 0.90,
+    "four_bedroom": 0.90,
 }
 
 # Naming neighborhoods does not rule anything else out -- homes elsewhere keep
@@ -166,7 +190,14 @@ def estimate_counts(profile: DealProfile, thresholds: Sequence[int]) -> dict[int
     matched = 0.0
     for path in paths:
         budget = profile.budgets.get(path)
-        maximum = getattr(budget, "maximum_monthly", None) if budget else None
+        # What the household can pay for the whole home, which is what the rent
+        # curves above are curves of. For a home to split, ``maximum_monthly``
+        # is each person's share -- the form asks "$X each for N people" -- and
+        # reading that share against whole-unit rents priced a couple at half a
+        # flat. Two people at $2,700 each can pay $5,400, which reaches 36% of
+        # two-bedrooms; $2,700 reaches 6% of them. They were told about five
+        # homes where the board held enough for three hundred.
+        maximum = getattr(budget, "total_maximum", None) if budget else None
         if not maximum:
             continue
         # Each home type is its own slice of the market, with its own rents and
