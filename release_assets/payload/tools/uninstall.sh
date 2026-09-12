@@ -2,9 +2,13 @@
 set -euo pipefail
 
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
+# The terminal command lives outside the app folder, so removing the folder
+# would otherwise leave a command behind that points at nothing.
+CLI_PATH="$HOME/.local/bin/housefinder"
 LABEL="com.sfhousing.monitor"
 PLIST_PATH="${SF_HOUSING_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}/$LABEL.plist"
 
+[ -f "$CLI_PATH" ] && /bin/rm -f "$CLI_PATH"
 if [ -f "$PLIST_PATH" ] && [ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" != "1" ]; then
   /bin/launchctl bootout "gui/$(id -u)" "$PLIST_PATH" >/dev/null 2>&1 || true
 fi

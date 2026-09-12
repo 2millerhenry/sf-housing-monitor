@@ -94,12 +94,27 @@ come back.
 
 ### Getting back to it later
 
-It keeps running by itself, so there is nothing to start. Just open:
+It keeps running by itself, so there is nothing to start. Open **http://127.0.0.1:8000** —
+bookmark it. It comes back on its own when you restart your Mac, and closing the tab stops
+nothing.
 
-**http://127.0.0.1:8000** — bookmark it.
+Or from a terminal:
 
-It comes back on its own when you restart your Mac, so that address works whenever you want it.
-Closing the tab does not stop anything.
+```
+housefinder
+```
+
+```
+housefinder status     is it running, and when does it check next
+housefinder check      look for new homes now (once a day)
+housefinder logs       what it has been doing lately
+housefinder restart    restart it, keeping everything
+housefinder repair     fix it without losing your deal or your homes
+housefinder uninstall  remove it
+```
+
+The installer puts that in `~/.local/bin`, which needs no password. If that is not on your
+PATH it tells you the one line to add.
 
 ## A closer look
 

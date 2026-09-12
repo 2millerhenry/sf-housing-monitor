@@ -1,3 +1,14 @@
+SF Home Finder 0.4.3 for Windows x64
+
+There is a terminal command now. Type housefinder to open the dashboard, or
+housefinder status, check, logs, restart, repair and uninstall for the rest. It
+goes in ~/.local/bin, so it still needs no password, and the installer says so
+if that folder is not on your PATH rather than leaving you with a command that
+cannot be found.
+
+It matters most if you installed with the one-line command, since that leaves
+you no folder of shortcuts -- until now the bookmark was the only way back in.
+
 SF Home Finder 0.4.2 for Windows x64
 
 Installing no longer reports failure when it worked. A first start on a full

@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 
 
 ROOT = Path(__file__).resolve().parent.parent
-VERSION = "0.4.2"
+VERSION = "0.4.3"
 RELEASE_NAME = f"SF-Home-Finder-{VERSION}-macOS-arm64"
 UV_SOURCE = Path.home() / ".local" / "bin" / "uv"
 EXTENSION_FILES = (

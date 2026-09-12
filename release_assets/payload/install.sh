@@ -3,7 +3,7 @@ set -euo pipefail
 
 RELEASE_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 PAYLOAD_DIR="$RELEASE_ROOT/payload"
-VERSION="0.4.2"
+VERSION="0.4.3"
 PYTHON_VERSION="3.12.10"
 PORT="${SF_HOUSING_PORT:-8000}"
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
@@ -26,7 +26,7 @@ RUNTIMES_DIR="$APP_ROOT/runtimes"
 RELEASES_DIR="$APP_ROOT/releases"
 UV_BIN="$PAYLOAD_DIR/uv"
 LOCK_FILE="$PAYLOAD_DIR/requirements.lock"
-WHEEL_FILE="$PAYLOAD_DIR/sf_housing_monitor-0.4.2-py3-none-any.whl"
+WHEEL_FILE="$PAYLOAD_DIR/sf_housing_monitor-0.4.3-py3-none-any.whl"
 
 say() { printf '%s\n' "$*"; }
 fail() { say "Installation stopped: $*"; exit 1; }
@@ -72,7 +72,7 @@ export UV_PYTHON_INSTALL_DIR="$APP_ROOT/python"
 "$UV_BIN" venv "$STAGE/runtime" --python "$PYTHON_VERSION" --managed-python --no-project --quiet
 "$UV_BIN" pip sync "$LOCK_FILE" --python "$STAGE/runtime/bin/python" --strict --no-progress --quiet
 "$UV_BIN" pip install "$WHEEL_FILE" --python "$STAGE/runtime/bin/python" --no-deps --no-progress --quiet
-"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.2"'
+"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.3"'
 
 if [ -f "$DATA_DIR/housing.sqlite3" ] && [ -x "$APP_ROOT/current/bin/python" ]; then
   /bin/mkdir -p "$APP_ROOT/backups"
@@ -94,6 +94,25 @@ fi
 /bin/cp "$WHEEL_FILE" "$LOCK_FILE" "$RELEASES_DIR/$VERSION/"
 /bin/cp "$PAYLOAD_DIR/tools/"*.sh "$TOOLS_DIR/"
 /bin/chmod 700 "$TOOLS_DIR/"*.sh
+
+# A terminal command, for anybody who would rather type than hunt for a
+# bookmark -- and the only way in for somebody who installed with the one-line
+# command and so has no folder of shortcuts. ~/.local/bin because it needs no
+# administrator: the whole install stays password-free.
+CLI_DIR="$HOME/.local/bin"
+CLI_PATH="$CLI_DIR/housefinder"
+/bin/mkdir -p "$CLI_DIR"
+if /bin/cp "$TOOLS_DIR/housefinder.sh" "$CLI_PATH" 2>/dev/null; then
+  /bin/chmod 755 "$CLI_PATH"
+  CLI_READY=1
+  case ":$PATH:" in
+    *":$CLI_DIR:"*) CLI_ON_PATH=1 ;;
+    *) CLI_ON_PATH=0 ;;
+  esac
+else
+  CLI_READY=0
+  CLI_ON_PATH=0
+fi
 if [ -d "$PAYLOAD_DIR/furnished-finder-bridge" ]; then
   /bin/rm -rf "$APP_ROOT/furnished-finder-bridge.new"
   /bin/cp -R "$PAYLOAD_DIR/furnished-finder-bridge" "$APP_ROOT/furnished-finder-bridge.new"
@@ -192,9 +211,20 @@ say ""
 say "Done. SF Home Finder is running."
 say ""
 say "  Open it any time:   http://127.0.0.1:$PORT/     <- bookmark this"
+if [ "${CLI_READY:-0}" = 1 ] && [ "${CLI_ON_PATH:-0}" = 1 ]; then
+  say "  Or from a terminal: housefinder            (housefinder help for more)"
+fi
 say "  It checks for you:  10:00 and 18:00, every day, on its own"
 say "  Your data lives in: $DATA_DIR"
 say ""
+if [ "${CLI_READY:-0}" = 1 ] && [ "${CLI_ON_PATH:-0}" != 1 ]; then
+  # Saying so beats silently installing a command that will not be found.
+  say "One extra step if you want the 'housefinder' command in your terminal --"
+  say "$CLI_DIR is not on your PATH yet. Run this once:"
+  say ""
+  say "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
+  say ""
+fi
 if [ "${SF_HOUSING_NO_BROWSER:-0}" != "1" ]; then
   /usr/bin/open "http://127.0.0.1:$PORT/"
 fi
