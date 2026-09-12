@@ -1,3 +1,16 @@
+SF Home Finder 0.4.8
+
+While you are writing your deal, the match slider now tells you roughly how
+many homes a search like yours usually finds, instead of waiting for the first
+search to say anything. Widen your budget or add a neighborhood and the number
+moves as you type.
+
+It is an estimate and says so: it reads "about 190 homes" rather than a count,
+because nothing has been searched yet. The figures behind it were measured from
+a real board of 6,935 San Francisco homes -- what each size of home rents for,
+how many of each the sources carry -- and they are pitched low on purpose. The
+first real search usually finds more than the estimate promised.
+
 SF Home Finder 0.4.7
 
 Two things somebody found installing this on a Mac that was not mine.

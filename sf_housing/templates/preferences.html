@@ -243,7 +243,10 @@
           {#- Before the first search there is nothing to count, and "0 homes"
               there reads as "your deal matches nothing" when it means "we have
               not looked yet". The number waits until there is a pool. -#}
-          <span class="cutoff-count" id="cutoff-count">and up{% if stored_listing_count and shortlist_counts.get(minimum_score) is not none %} &middot; {{ shortlist_counts[minimum_score] }} home{% if shortlist_counts[minimum_score] != 1 %}s{% endif %}{% endif %}</span>
+          {#- Before the first search the number is what a search like this
+              usually finds, so it is offered as "about" rather than as a
+              count. A bare nought would read as a verdict on the deal. -#}
+          <span class="cutoff-count" id="cutoff-count">and up{% if shortlist_counts.get(minimum_score) %} &middot; {% if not stored_listing_count %}about {% endif %}{{ shortlist_counts[minimum_score] }} home{% if shortlist_counts[minimum_score] != 1 %}s{% endif %}{% endif %}</span>
         </p>
       </div>
       <input class="cutoff-slider" type="range" id="minimum_score" name="minimum_score"

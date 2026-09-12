@@ -24,6 +24,9 @@
   // somebody is still writing their deal reads as a verdict on the deal, when
   // the first search simply has not run.
   let pool = Number(slider.dataset.cutoffPool || 0);
+  // Nothing stored means the number is what this kind of search usually finds
+  // rather than what is on the board, so it is offered as "about".
+  if (pool === 0) approximate = true;
 
   function render() {
     const current = Number(slider.value);
@@ -33,8 +36,10 @@
     panel.style.setProperty("--cutoff-fill", fill.toFixed(2) + "%");
     value.textContent = String(current);
     const homes = counts[String(current)];
-    // A count we do not have -- or cannot have yet -- is left unsaid.
-    if (homes === undefined || pool === 0) {
+    // Nought is the one number worth saying nothing about: it is what an empty
+    // database returns and what a deal nobody can estimate returns, and
+    // neither means "your deal finds nothing".
+    if (homes === undefined || !homes) {
       count.textContent = "and up";
       return;
     }
@@ -49,6 +54,7 @@
     counts = next;
     approximate = Boolean(event.detail.approximate);
     if (typeof event.detail.pool === "number") pool = event.detail.pool;
+    if (event.detail.fromMarket) approximate = true;
     render();
   });
 

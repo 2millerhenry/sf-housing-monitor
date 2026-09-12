@@ -131,14 +131,38 @@ def test_the_sampled_count_does_not_disagree_with_itself(stocked: Repository) ->
     assert first.counts == second.counts
 
 
-def test_an_empty_pool_is_nought_at_every_cut_off(tmp_path: Path) -> None:
+def test_an_empty_pool_falls_back_to_what_the_market_usually_holds(tmp_path: Path) -> None:
+    """Nought is true of an empty database and useless to somebody writing a
+    deal, who reads it as a verdict on their answers. With a deal worth
+    reasoning about, the estimate comes from the market instead, and says so.
+    """
     empty = Repository(tmp_path / "empty.sqlite3")
     empty.initialize()
 
     estimate = estimate_shortlist_counts(empty, deal_with(), STOPS)
 
-    assert estimate.exact is True
-    assert set(estimate.counts.values()) == {0}
+    assert estimate.from_market is True
+    assert estimate.exact is False, "a guess must never be presented as a count"
+    assert estimate.pool == 0
+    assert estimate.counts[50] > 0
+    assert estimate.counts[50] >= estimate.counts[90], "a higher bar cannot find more"
+
+
+def test_a_half_written_deal_is_left_uncounted() -> None:
+    """The estimate runs on every keystroke, so it meets deals that are not
+    finished -- a saved one always has a home type, a draft halfway through
+    does not. Half a deal is not enough to reason from, and inventing a number
+    for it would be worse than saying nothing.
+    """
+    from sf_housing.deal_profile import deal_profile_from_form
+    from sf_housing.market_prior import estimate_counts
+
+    blank = deal_profile_from_form({}, state="draft")
+    assert estimate_counts(blank, STOPS) == {}
+
+    # A home type chosen but no budget typed yet is still not enough.
+    no_budget = deal_profile_from_form({"housing_paths": "studio"}, state="draft")
+    assert estimate_counts(no_budget, STOPS) == {}
 
 
 def test_only_the_home_shapes_this_deal_shows_are_counted(tmp_path: Path) -> None:
@@ -195,3 +219,36 @@ def test_the_count_is_silent_before_the_first_search(tmp_path: Path) -> None:
 
     assert 'data-cutoff-pool="0"' in page, "the page does not say the pool is empty"
     assert "0 homes" not in page, "a blank install is telling somebody it found nothing"
+
+
+def test_a_blank_install_with_a_deal_offers_an_estimate_not_a_nought(tmp_path: Path) -> None:
+    """The moment this is all about: the deal is written, nothing has been
+    searched, and the slider has to say something useful.
+
+    It says roughly what a search like this usually finds, marked as "about" so
+    nobody mistakes it for a count of homes that exist somewhere.
+    """
+    from fastapi.testclient import TestClient
+
+    from sf_housing.app import create_app
+    from sf_housing.preferences import save_deal_profile
+    from sf_housing.settings import Settings
+
+    data = tmp_path / "data"
+    settings = Settings(
+        data_dir=data,
+        preferences_path=data / "config" / "preferences.yaml",
+        database_path=data / "housing.sqlite3",
+        log_path=data / "housing.log",
+    )
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "config").mkdir(parents=True, exist_ok=True)
+    save_deal_profile(settings.preferences_path, deal_with().deal_profile)
+
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    assert 'data-cutoff-pool="0"' in page, "something was collected; this is not a blank install"
+    assert "about" in page, "the estimate is not offered as an estimate"
+    assert "0 homes" not in page, "still telling somebody their deal finds nothing"

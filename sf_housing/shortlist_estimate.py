@@ -21,6 +21,7 @@ from typing import Sequence
 
 from .classification import classify_listing
 from .database import Repository
+from .market_prior import estimate_counts as market_counts
 from .preferences import Preferences
 from .scoring import score_listing
 from .sources import facebook_coordinate_neighborhood, visible_sf_area_hint
@@ -37,6 +38,9 @@ class ShortlistEstimate:
     counts: dict[int, int]
     exact: bool
     pool: int
+    # True when there was no pool to count and the numbers come from what this
+    # kind of search usually turns up rather than from anything collected.
+    from_market: bool = False
 
 
 def _prepared(listing):
@@ -76,6 +80,12 @@ def estimate_shortlist_counts(
     stops = [int(threshold) for threshold in thresholds]
     sampled, sizes, exact = repository.shortlist_pool(kinds=kinds, ceiling=ceiling)
     if not sampled:
+        # Nothing has been collected yet, so there is nothing to count. Saying
+        # nought here reads as a verdict on the deal rather than on the empty
+        # database, so this says roughly what a search like this usually finds.
+        prior = market_counts(preferences.deal_profile, stops)
+        if prior:
+            return ShortlistEstimate(prior, False, 0, from_market=True)
         return ShortlistEstimate({stop: 0 for stop in stops}, True, 0)
 
     # Scored once and then read at every stop: nineteen cut-offs are nineteen

@@ -61,6 +61,7 @@
                 counts: data.counts,
                 approximate: data.exact === false,
                 pool: typeof data.pool === "number" ? data.pool : undefined,
+                fromMarket: Boolean(data.fromMarket),
               },
             })
           );

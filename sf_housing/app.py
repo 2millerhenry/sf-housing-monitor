@@ -83,6 +83,7 @@ from .scheduling import (
     sweep_if_due,
 )
 from .settings import Settings
+from .market_prior import estimate_counts as market_counts
 from .shortlist_estimate import ShortlistEstimate, estimate_shortlist_counts
 from .sources import (
     FacebookGroupsSource,
@@ -1179,7 +1180,7 @@ def create_app(
             # so the number means something while it is being dragged.
             # Only the home shapes this deal actually shows, so the number under
             # the slider is the number of rows the tabs will hold.
-            "shortlist_counts": repository.shortlist_counts(
+            "shortlist_counts": _counts_for_deal_page(
                 CUTOFF_STOPS,
                 kinds=sorted(
                     {
@@ -1274,6 +1275,18 @@ def create_app(
             status_code=303,
         )
 
+    def _counts_for_deal_page(thresholds, kinds):
+        """What each cut-off would shortlist, or what it usually would.
+
+        Before the first search there is nothing stored, and a page of noughts
+        reads as a verdict on the deal rather than on the empty database.
+        """
+        counts = repository.shortlist_counts(thresholds, kinds=kinds)
+        if any(counts.values()):
+            return counts
+        preferences = load_preferences(active_settings.preferences_path)
+        return market_counts(preferences.deal_profile, thresholds) or counts
+
     @application.post("/preferences/deal/preview")
     async def preview_deal_profile(request: Request):
         """Describe the deal the form currently holds, without saving anything.
@@ -1319,6 +1332,7 @@ def create_app(
                 "counts": {str(stop): count for stop, count in estimate.counts.items()},
                 "exact": estimate.exact,
                 "pool": estimate.pool,
+                "fromMarket": estimate.from_market,
             }
         )
 
