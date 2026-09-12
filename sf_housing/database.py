@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from typing import Any, Iterator, Sequence
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -189,6 +189,11 @@ def _confirmation_check(stamp: object) -> dict[str, str] | None:
         "check": "confirmation",
         "reason": f"Not confirmed as still listed for {when}; open it before relying on it.",
     }
+
+
+# Ten rent bands crossed with four score bands is forty strata for 900 samples,
+# so even the crowded ones keep enough homes to speak for themselves.
+RENT_BANDS = 10
 
 
 class Repository:
@@ -504,62 +509,116 @@ class Repository:
         return [(int(row["id"]), self._row_to_candidate(row)) for row in rows]
 
     def shortlist_pool(
-        self, kinds: Sequence[str] = (), ceiling: int = 900, strata: int = 20
+        self, kinds: Sequence[str] = (), ceiling: int = 900, strata: int = 4
     ) -> tuple[list[tuple[int, ListingCandidate]], dict[int, int], bool]:
         """The homes a cut-off would be measured against, whole or sampled.
 
-        The pool is not the board: of 5,600 listings stored on a real install,
-        351 were live and eligible. Scoring 351 takes about a third of a second,
-        which a number under a slider can afford, so the usual answer here is
-        the whole pool and the usual count is exact.
+        The pool is every home still standing, not every home that suits the
+        saved deal. Stored ``eligibility`` is a verdict on the deal as saved --
+        a home over that budget, or outside those areas, is written down
+        ineligible -- so filtering on it here would answer for the old deal
+        while somebody edits a new one. On a real board it threw away 6,442 of
+        6,935 homes and pinned the count at 423 however high the draft budget
+        went. Whether a home suits the deal in hand is for the scoring of the
+        deal in hand to say, which is why the caller rescores what it gets.
 
-        Above ``ceiling`` it is sampled instead, stratified on the score each
-        home already has and evenly spaced within each band. Stratified because
-        the old score and the new one are not independent -- a home that scored
-        80 under the old deal rarely lands at 20 under an edited one -- so bands
-        of the old score carry most of the information about the new. Evenly
-        spaced rather than randomly drawn so that a deal asked twice gives the
-        same number, instead of flickering between keystrokes that changed
-        nothing.
+        ``housing_kind`` is different and does belong here: it says what a home
+        *is*, not what anybody wants, so it narrows the pool without dating it.
+
+        Above ``ceiling`` it is sampled instead, in bands of rent crossed with
+        bands of the score each home already has.
+
+        Rent does most of the work. Stored score alone was the first attempt,
+        on the grounds that the old score and the new one are not independent,
+        and it held up everywhere except where it mattered most: on a tight
+        budget, where only a small corner of the board clears at all, it read
+        230 homes against a true 172. Homes within a narrow rent band nearly
+        all clear a given budget or nearly all fail it, so banding on rent
+        collapses the guesswork on exactly the question a budget asks. The old
+        score is kept as the second axis because it still carries what rent
+        cannot: how well a home reads against everything else in a deal.
+
+        Evenly spaced rather than randomly drawn so that a deal asked twice
+        gives the same number, instead of flickering between keystrokes that
+        changed nothing.
 
         Returns the listings paired with the band they came from, the true size
         of every band, and whether this is the whole pool or a sample of it.
         """
-        clauses = [
-            "status IN ('active', 'saved')",
-            "eligibility IN ('eligible', 'needs_verification')",
-        ]
+        clauses = ["status IN ('active', 'saved')"]
         parameters: list[Any] = []
         wanted = [str(kind) for kind in kinds if str(kind)]
         if wanted:
             clauses.append(f"housing_kind IN ({','.join('?' for _ in wanted)})")
             parameters.extend(wanted)
         where = " AND ".join(clauses)
-        width = 100 / max(1, strata)
         with self.connection() as connection:
             index = connection.execute(
-                f"SELECT id, score FROM listings WHERE {where}", parameters
+                f"SELECT id, score, price FROM listings WHERE {where}", parameters
             ).fetchall()
+            # Rent bands by quantile, not by round dollar amounts: San Francisco
+            # rents bunch up, and fixed bands would leave one band holding half
+            # the board and several holding nothing.
+            rents = sorted(int(row["price"]) for row in index if row["price"] is not None)
+            cuts = (
+                [rents[len(rents) * step // RENT_BANDS] for step in range(1, RENT_BANDS)]
+                if len(rents) >= RENT_BANDS
+                else []
+            )
+            width = 100 / max(1, strata)
             bands: dict[int, list[int]] = {}
             for row in index:
-                band = min(strata - 1, int(max(0, int(row["score"] or 0)) / width))
-                bands.setdefault(band, []).append(int(row["id"]))
-            sizes = {band: len(ids) for band, ids in bands.items()}
+                if row["price"] is None:
+                    # A home with no rent stated answers a budget differently
+                    # from any home that states one, so it gets its own band
+                    # rather than being filed with the cheapest.
+                    rent_band = RENT_BANDS
+                else:
+                    rent_band = bisect_right(cuts, int(row["price"]))
+                score = max(0, int(row["score"] or 0))
+                score_band = min(strata - 1, int(score / width))
+                # Carried with the id so the sample can be spread along it.
+                bands.setdefault(rent_band * strata + score_band, []).append(
+                    (score, int(row["id"]))
+                )
+            sizes = {band: len(members) for band, members in bands.items()}
             total = len(index)
             exact = total <= ceiling
             if exact:
                 picked = [int(row["id"]) for row in index]
             else:
+                # Shared out by how big each band is, not equally. Equal shares
+                # gave a band of 4,172 homes the same 45 samples as a band of
+                # 30, and the big band is most of the answer -- 45 homes
+                # standing in for 4,172 left the count wrong by a tenth or more.
                 picked = []
-                per_band = max(1, ceiling // max(1, len(bands)))
-                for ids in bands.values():
-                    ordered = sorted(ids)
-                    step = max(1, len(ordered) // per_band)
-                    picked.extend(ordered[::step][:per_band])
+                for members in bands.values():
+                    # Along the stored score, not along the id. Walking the ids
+                    # meant walking the order homes were found in, which says
+                    # nothing about how well they suit anybody: a band's sample
+                    # could then be drawn from one end of its scores and read
+                    # 284 homes at a cut-off of 90 against a true 238. Walking
+                    # the score instead spreads every sample evenly across the
+                    # band's range, which is what the high cut-offs ask about.
+                    ordered = sorted(members)
+                    take = min(
+                        len(ordered), max(1, round(ceiling * len(ordered) / total))
+                    )
+                    # Taken from the middle of each step rather than its start.
+                    # Starting at the step meant every band's sample began at
+                    # its lowest score and never reached its highest, which bent
+                    # every high cut-off downwards -- 195 homes at 90 against a
+                    # true 238, wrong in the same direction on every deal tried.
+                    picked.extend(
+                        ordered[(2 * index + 1) * len(ordered) // (2 * take)][1]
+                        for index in range(take)
+                    )
             if not picked:
                 return [], {}, True
             band_of = {
-                listing_id: band for band, ids in bands.items() for listing_id in ids
+                listing_id: band
+                for band, members in bands.items()
+                for _, listing_id in members
             }
             rows = connection.execute(
                 f"SELECT * FROM listings WHERE id IN ({','.join('?' for _ in picked)})",
@@ -794,10 +853,7 @@ class Repository:
         slider read six higher than the page. One pass over the scores rather
         than one query per stop.
         """
-        clauses = [
-            "status IN ('active', 'saved')",
-            "eligibility IN ('eligible', 'needs_verification')",
-        ]
+        clauses = ["status IN ('active', 'saved')"]
         parameters: list[Any] = []
         wanted = [str(kind) for kind in kinds if str(kind)]
         if wanted:

@@ -90,23 +90,34 @@ def estimate_shortlist_counts(
 
     # Scored once and then read at every stop: nineteen cut-offs are nineteen
     # questions about one pass, not nineteen passes.
-    by_band: dict[int, list[int]] = {}
+    #
+    # A home the deal rules out outright never reaches the shortlist whatever
+    # the cut-off, so it is carried as None rather than dropped. It still has to
+    # be counted in its band: the band's share is what gets multiplied back up
+    # by the band's true size, and dropping the rejects would inflate it.
+    by_band: dict[int, list[int | None]] = {}
     for band, listing in sampled:
+        result = score_listing(_prepared(listing), preferences)
         by_band.setdefault(band, []).append(
-            int(score_listing(_prepared(listing), preferences).score)
+            None if result.eligibility == "ineligible" else int(result.score)
         )
 
     counts: dict[int, int] = {}
     for stop in stops:
         if exact:
             counts[stop] = sum(
-                1 for scores in by_band.values() for value in scores if value >= stop
+                1
+                for scores in by_band.values()
+                for value in scores
+                if value is not None and value >= stop
             )
             continue
         total = 0.0
         for band, scores in by_band.items():
             if scores:
-                clearing = sum(1 for value in scores if value >= stop) / len(scores)
+                clearing = sum(
+                    1 for value in scores if value is not None and value >= stop
+                ) / len(scores)
                 total += clearing * sizes.get(band, 0)
         counts[stop] = int(round(total))
     return ShortlistEstimate(counts, exact, sum(sizes.values()))

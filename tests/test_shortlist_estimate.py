@@ -30,7 +30,7 @@ from sf_housing.shortlist_estimate import estimate_shortlist_counts
 STOPS = tuple(range(30, 100, 5))
 
 
-def store(repository: Repository, index: int, price: int, neighborhood: str,
+def store(repository: Repository, index: int, price: int | None, neighborhood: str,
           kind: str = "whole_unit", score: int = 70) -> None:
     # The words matter: upsert_listing re-classifies from the text, so a home
     # meant to be a room has to read like one.
@@ -252,3 +252,199 @@ def test_a_blank_install_with_a_deal_offers_an_estimate_not_a_nought(tmp_path: P
     assert 'data-cutoff-pool="0"' in page, "something was collected; this is not a blank install"
     assert "about" in page, "the estimate is not offered as an estimate"
     assert "0 homes" not in page, "still telling somebody their deal finds nothing"
+
+
+def stocked_as_a_real_board(repository: Repository, saved_budget: int) -> None:
+    """Homes the saved deal already ruled out, stored the way a scan stores them.
+
+    ``store`` hands ``upsert_listing`` an empty ``details`` dict, so every home
+    it writes lands as ``eligible``. A board that has actually been scanned does
+    not look like that: eligibility is worked out against the deal that was
+    saved at the time, and on a real install most rows fail it.
+    """
+    for index in range(40):
+        price = 1200 + index * 100
+        ruled_out = price > saved_budget
+        repository.upsert_listing(
+            ListingCandidate(
+                platform="Test",
+                source_id=f"home-{index}",
+                title=f"An entire studio in Mission",
+                original_url=f"https://example.test/home-{index}",
+                price=price,
+                neighborhood="Mission",
+                listing_type="apartment",
+                summary="A whole studio, entire place to yourself, nine month lease.",
+                housing_kind="whole_unit",
+            ),
+            ScoreResult(
+                0 if ruled_out else 70,
+                ["Stored"],
+                "",
+                {},
+                eligibility="ineligible" if ruled_out else "eligible",
+            ),
+        )
+
+
+def test_raising_the_budget_finds_the_homes_the_old_budget_ruled_out(tmp_path: Path) -> None:
+    """The regression. Eligibility is a verdict on the *saved* deal, stored on
+    the row, so filtering the pool by it hid every home the old budget had
+    priced out. The count stopped moving the moment the draft went above the
+    saved budget: on a real board it sat at 423 while the true answer climbed
+    past 1,300, telling somebody that raising their budget found nothing.
+    """
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    stocked_as_a_real_board(repository, saved_budget=3000)
+
+    within = estimate_shortlist_counts(repository, deal_with(budgets=budget_of(3000)), STOPS)
+    beyond = estimate_shortlist_counts(repository, deal_with(budgets=budget_of(5500)), STOPS)
+
+    assert beyond.counts[50] > within.counts[50], (
+        "the draft budget cleared homes the saved deal had ruled out, "
+        "and the count did not move"
+    )
+
+
+def test_a_home_the_draft_rules_out_is_not_counted(tmp_path: Path) -> None:
+    """The other half of dropping the stored verdict. The pool now carries
+    homes the deal may well refuse, so the refusing has to happen here -- on
+    the deal in hand -- or a home priced far above the draft budget would be
+    counted simply for scoring well under an older, richer one.
+    """
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    # Stored as a fine home, which is what a generous saved deal would have
+    # written down. The draft below cannot afford it.
+    store(repository, 0, 12000, "Mission", score=95)
+    store(repository, 1, 1400, "Mission", score=95)
+
+    counts = estimate_shortlist_counts(
+        repository, deal_with(budgets=budget_of(1500)), STOPS
+    ).counts
+
+    assert counts[30] == 1, "the home priced at $12,000 was counted against a $1,500 deal"
+
+
+
+
+AREAS = ["Mission", "Castro", "Bernal Heights", "Noe Valley",
+         "SoMa", "Sunset", "Richmond", "Excelsior"]
+
+
+def lopsided_board(repository: Repository) -> None:
+    """A board shaped like a real one rather than a tidy grid.
+
+    Rents bunch at the cheap end and thin out at the dear end, and areas are
+    dealt round so homes do not all score alike.
+
+    Stored scores are skewed on purpose. Rent bands are quantiles, so they hold
+    equal numbers whatever the rents are; the stored score is the only axis
+    that can make one band far bigger than another, and a fixture that spreads
+    scores evenly cannot tell a proportional share of the samples from an equal
+    one. Most homes here suited the saved deal poorly, as on a real board,
+    where 6,442 of 6,935 were ruled out.
+    """
+    index = 0
+    for rent, count in ((1200, 700), (1800, 300), (2600, 140),
+                        (3600, 70), (5200, 60), (9000, 30)):
+        for step in range(count):
+            # Four homes in five sit low; the rest fan out over the range.
+            score = (index * 7) % 25 if index % 5 else min(99, 25 + (index * 11) % 75)
+            store(repository, index, rent + step * 5, AREAS[index % len(AREAS)],
+                  score=score)
+            index += 1
+    # Homes that never said what they cost. They answer a budget differently
+    # from any home that states one, so they are their own band.
+    for step in range(60):
+        store(repository, index, None, AREAS[index % len(AREAS)],
+              score=(index * 13) % 100)
+        index += 1
+
+
+def tiered_deal(maximum: int):
+    # Areas in three tiers, so the homes spread across several scores instead
+    # of landing on one.
+    return deal_with(
+        budgets=budget_of(maximum),
+        geography={"anywhere_in_sf": False, "dream": AREAS[:2],
+                   "strong": AREAS[2:4], "okay": AREAS[4:6], "avoid": []},
+    )
+
+
+def test_the_sampled_count_agrees_with_counting_the_whole_pool(tmp_path: Path) -> None:
+    """The sample has to answer what the whole pool would have answered.
+
+    A broad guard rather than a proof of any one choice in the sampler: a
+    fixture of this size cannot separate the banding decisions, which were
+    settled against a real board of 6,384 homes and are recorded where they are
+    made. What this does catch is the sample drifting away from the pool it
+    stands for, whatever the cause.
+    """
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    lopsided_board(repository)
+    deal = tiered_deal(4000)
+
+    whole = estimate_shortlist_counts(repository, deal, STOPS, ceiling=10**9)
+    sample = estimate_shortlist_counts(repository, deal, STOPS, ceiling=200)
+
+    assert whole.exact and not sample.exact, "the two readings must differ in method"
+    for stop in STOPS:
+        truth = whole.counts[stop]
+        if truth < 20:
+            continue
+        drift = abs(sample.counts[stop] - truth) / truth
+        assert drift <= 0.15, (
+            f"at a cut-off of {stop} the sample read {sample.counts[stop]} "
+            f"where the whole pool holds {truth}"
+        )
+
+
+def test_a_crowded_band_is_sampled_more_than_a_sparse_one(tmp_path: Path) -> None:
+    """Shares used to be handed out equally, which is only fair if the bands
+    are the same size. They are not: a band of 700 homes got the same few as a
+    band of 30 and spoke for all 700 on that evidence.
+    """
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    lopsided_board(repository)
+
+    sampled, sizes, exact = repository.shortlist_pool(kinds=["whole_unit"], ceiling=400)
+
+    assert not exact
+    taken: dict[int, int] = {}
+    for band, _ in sampled:
+        taken[band] = taken.get(band, 0) + 1
+    assert set(taken) == set(sizes), f"bands {sorted(set(sizes) - set(taken))} went unsampled"
+    speaks_for = [sizes[band] / taken[band] for band in sizes]
+    assert max(speaks_for) <= 2 * min(speaks_for), (
+        f"one sampled home stands for {max(speaks_for):.1f} others while "
+        f"another stands for {min(speaks_for):.1f}"
+    )
+
+
+def test_the_sample_is_not_taken_from_the_bottom_of_a_band(tmp_path: Path) -> None:
+    """Each band is walked along its stored score. The walk used to start on
+    the band's very first home and stop a full step short of its last, so every
+    band was read from its weaker end -- and a strict cut-off, which is asking
+    about the strong end, came back low: 195 homes at 90 against a true 238.
+    """
+    repository = Repository(tmp_path / "housing.sqlite3")
+    repository.initialize()
+    # One rent and one stored score, so the pool is a single band and the
+    # arithmetic of which homes get taken is all that is on trial.
+    for index in range(1000):
+        store(repository, index, 2000, "Mission", score=50)
+
+    sampled, sizes, exact = repository.shortlist_pool(kinds=["whole_unit"], ceiling=100)
+
+    assert not exact and len(sizes) == 1, "this fixture is meant to make one band"
+    positions = sorted(int(listing.source_id.removeprefix("home-")) for _, listing in sampled)
+    untouched_below = positions[0]
+    untouched_above = 999 - positions[-1]
+    assert abs(untouched_below - untouched_above) <= 1, (
+        f"the sample leaves {untouched_below} homes untouched at the bottom of "
+        f"the band and {untouched_above} at the top"
+    )
