@@ -4,8 +4,16 @@ set -euo pipefail
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
 # The terminal command lives outside the app folder, so removing the folder
 # would otherwise leave a command behind that points at nothing.
-CLI_PATH="$HOME/.local/bin/homefinder"
-CLI_PATH_OLD="$HOME/.local/bin/housefinder"   # the 0.4.3 misspelling
+# Only ever the real account's command, and only when this is a real uninstall.
+# An isolated one removing it would take the command belonging to the install
+# somebody actually uses.
+if [ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" = "1" ]; then
+  CLI_PATH="$APP_ROOT/bin/homefinder"
+  CLI_PATH_OLD="$APP_ROOT/bin/housefinder"
+else
+  CLI_PATH="$HOME/.local/bin/homefinder"
+  CLI_PATH_OLD="$HOME/.local/bin/housefinder"   # the 0.4.3 misspelling
+fi
 LABEL="com.sfhousing.monitor"
 PLIST_PATH="${SF_HOUSING_LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}/$LABEL.plist"
 

@@ -1,3 +1,14 @@
+SF Home Finder 0.4.5 for Windows x64
+
+The isolated install and uninstall used for testing no longer reach into the
+copy you actually use. ~/.local/bin is shared by every install on a machine, so
+a throwaway one writing the homefinder command there -- or a throwaway
+uninstall removing it -- took the command belonging to the real installation.
+Isolated runs keep their command inside their own folder now, which is the rule
+the login service has always followed.
+
+Nothing to do if you only ever installed this the normal way.
+
 SF Home Finder 0.4.4 for Windows x64
 
 The terminal command is homefinder. It shipped in 0.4.3 as housefinder, which

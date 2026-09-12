@@ -120,3 +120,19 @@ def test_the_help_names_the_port_it_is_actually_on() -> None:
     usage = text[text.index("cat <<USAGE"):text.index("USAGE\n}")]
     assert "$URL" in usage, "the help does not name the address at all"
     assert "127.0.0.1:8000" not in usage, "the port is hard-coded rather than read"
+
+
+def test_an_isolated_install_never_touches_the_real_account_s_command() -> None:
+    """~/.local/bin is shared by every install on the machine, so a throwaway one
+    writing there reaches into the installation somebody actually uses.
+
+    Found by doing it: an isolated uninstall during testing deleted the real
+    homefinder off this machine. The plist already had this rule and the
+    comment explaining it -- "installing a second copy repointed the first
+    one's login service at a temporary directory" -- and the command is the
+    same shape of shared, account-level thing.
+    """
+    assert 'if [ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" = "1" ]; then\n  CLI_DIR="$APP_ROOT/bin"' in INSTALLER
+    assert 'CLI_PATH="$APP_ROOT/bin/homefinder"' in UNINSTALLER
+    # ...and the stale-name cleanup reaches into the same shared directory.
+    assert '[ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" != "1" ] && [ -f "$CLI_DIR/housefinder" ]' in INSTALLER
