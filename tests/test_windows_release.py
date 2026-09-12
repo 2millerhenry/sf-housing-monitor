@@ -144,3 +144,25 @@ def test_uninstalling_waits_for_the_app_to_actually_stop() -> None:
     # And a file held for a moment by antivirus is worth retrying rather than
     # reporting as a failure.
     assert "if ($attempt -eq 10) { throw" in script
+
+
+def test_upgrading_waits_for_the_old_copy_to_let_go_of_its_files() -> None:
+    """Every install after the first has to replace files the running app has
+    open, and Windows will not delete an open file.
+
+    The installer asked the app to stop, slept two seconds and started
+    deleting. Two seconds is usually enough, which is the worst kind of
+    usually: it is the slow machines and the busy ones where shutting down
+    takes longer, and those are the same machines where an upgrade matters
+    most. Repair goes through this same path, so it failed there too.
+    """
+    script = (
+        ROOT / "release_assets" / "windows" / "payload" / "install.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "Start-Sleep -Seconds 2" not in script, "still just sleeping and hoping"
+    stopping = script.index("schtasks.exe /End")
+    removing = script.index("Remove-Item -LiteralPath $RuntimeTarget")
+    waiting = script.index("Get-Process -Name 'python'")
+    assert stopping < waiting < removing, "it does not wait between stopping and deleting"
+    assert "Stop-Process -Force" in script, "a process that will not stop blocks upgrades forever"

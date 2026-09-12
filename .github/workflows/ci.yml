@@ -113,6 +113,25 @@ jobs:
           $report = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/support/report.json' -TimeoutSec 10
           Write-Host ($report | ConvertTo-Json -Depth 4)
 
+      - name: Installing over a running copy, which is what an upgrade is
+        shell: pwsh
+        env:
+          SF_HOUSING_NO_BROWSER: "1"
+        run: |
+          # The first install lands on a machine with nothing running, which is
+          # the easy half. Every install after the first has to replace files
+          # the running app has open, and Windows will not delete an open file.
+          # That path failed for real and no amount of installing onto a clean
+          # runner would have shown it.
+          & "$env:RELEASE_ROOT\payload\install.ps1" -ReleaseRoot $env:RELEASE_ROOT
+          $health = $null
+          foreach ($attempt in 1..60) {
+            try { $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 3; break }
+            catch { Start-Sleep -Seconds 2 }
+          }
+          if ($null -eq $health) { throw "it did not come back after being installed over" }
+          Write-Host "still serving $($health.version) after an in-place upgrade"
+
       - name: Uninstalling leaves nothing running
         shell: pwsh
         run: |

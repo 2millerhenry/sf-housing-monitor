@@ -1,3 +1,19 @@
+SF Home Finder 0.5.3
+
+Upgrading on Windows could fail part way through. The installer asked the
+running app to stop, waited two seconds and began replacing its files, and
+Windows will not delete a file that is still open. Two seconds is usually
+enough, which is the worst kind of usually: the machines where shutting down
+takes longer are the slow ones and the busy ones, which are the same machines
+where a failed upgrade is hardest to recover from. Repair went through the
+same path and could fail the same way.
+
+It now waits for the old copy to actually let go, insists after ten seconds,
+and retries each replacement, because antivirus and the search indexer can
+hold a file open for a moment after the process that owned it is gone.
+
+Nothing changes on a Mac.
+
 SF Home Finder 0.5.2
 
 Windows is a real download again. The last one was 0.3.9, eleven releases

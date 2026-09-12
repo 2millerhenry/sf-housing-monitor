@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '0.5.2'
+$Version = '0.5.3'
 $PythonVersion = '3.12.10'
 $Port = 8000
 $TaskName = 'SF Housing Monitor'
@@ -107,7 +107,21 @@ try {
 
   if (Test-HealthyMonitor) {
     & schtasks.exe /End /TN $TaskName 2>$null | Out-Null
-    Start-Sleep -Seconds 2
+    # Waited two seconds and hoped. schtasks /End asks a process to stop
+    # rather than waiting for it to have stopped, and Windows will not delete
+    # a file that is open -- so an upgrade begun while the app was still
+    # shutting down failed on its own Python library further down, where the
+    # old runtime is removed. Two seconds is usually enough, which is the worst
+    # kind of usually: it fails on the slow machines and the busy ones, which
+    # are exactly the ones an upgrade takes longest on.
+    foreach ($attempt in 1..40) {
+      $alive = @(Get-Process -Name 'python' -ErrorAction SilentlyContinue | Where-Object {
+        $_.Path -and $_.Path.StartsWith($AppRoot, [System.StringComparison]::OrdinalIgnoreCase)
+      })
+      if ($alive.Count -eq 0) { break }
+      if ($attempt -eq 20) { $alive | Stop-Process -Force -ErrorAction SilentlyContinue }
+      Start-Sleep -Milliseconds 500
+    }
   }
 
   Write-Host 'Preparing the private Python runtime...'
@@ -127,7 +141,17 @@ try {
     & (Join-Path $RuntimeTarget 'Scripts\python.exe') -c "import sqlite3,sys; source=sqlite3.connect(sys.argv[1]); target=sqlite3.connect(sys.argv[2]); source.backup(target); target.close(); source.close()" (Join-Path $DataDir 'housing.sqlite3') (Join-Path $backupDir "housing-$stamp.sqlite3")
   }
 
-  if (Test-Path -LiteralPath $RuntimeTarget) { Remove-Item -LiteralPath $RuntimeTarget -Recurse -Force }
+  if (Test-Path -LiteralPath $RuntimeTarget) {
+    # And retried, because antivirus and the search indexer can hold a file
+    # open for a moment after the process that owned it is gone.
+    foreach ($attempt in 1..10) {
+      try { Remove-Item -LiteralPath $RuntimeTarget -Recurse -Force -ErrorAction Stop; break }
+      catch {
+        if ($attempt -eq 10) { Fail 'the previous version could not be replaced. Close anything using SF Home Finder, then run Install again.' }
+        Start-Sleep -Milliseconds 500
+      }
+    }
+  }
   Move-Item -LiteralPath $stageRuntime -Destination $RuntimeTarget
   Copy-Item -LiteralPath (Join-Path $Payload 'tools\run-service.cmd') -Destination (Join-Path $ToolsDir 'run-service.cmd') -Force
   Get-ChildItem -LiteralPath (Join-Path $Payload 'tools') -Filter '*.ps1' | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $ToolsDir -Force }

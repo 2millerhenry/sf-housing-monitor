@@ -1,3 +1,16 @@
+SF Home Finder 0.5.3 for Windows x64
+
+Upgrading could fail part way through. Installing over a copy that is already
+running means replacing files that copy has open, and Windows will not delete
+an open file. The installer asked the app to stop, waited two seconds and
+started anyway, which is usually enough and therefore fails exactly on the
+slow and busy machines where an upgrade takes longest. Repair went through the
+same path and could fail the same way. It now waits for the old copy to let
+go, insists if it will not, and retries.
+
+Everything else is as it was in 0.5.2, which was the first Windows build since
+0.3.9. If you are coming from that one, read on.
+
 SF Home Finder 0.5.2 for Windows x64
 
 The first Windows build since 0.3.9. Everything below happened in between,
