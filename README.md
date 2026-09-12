@@ -98,23 +98,15 @@ It keeps running by itself, so there is nothing to start. Open **http://127.0.0.
 bookmark it. It comes back on its own when you restart your Mac, and closing the tab stops
 nothing.
 
-Or from a terminal:
+Or from a terminal, just:
 
 ```
-housefinder
+homefinder
 ```
 
-```
-housefinder status     is it running, and when does it check next
-housefinder check      look for new homes now (once a day)
-housefinder logs       what it has been doing lately
-housefinder restart    restart it, keeping everything
-housefinder repair     fix it without losing your deal or your homes
-housefinder uninstall  remove it
-```
-
-The installer puts that in `~/.local/bin`, which needs no password. If that is not on your
-PATH it tells you the one line to add.
+That opens it. `homefinder help` has the rest — status, logs, repair — but you will rarely
+need them. The installer puts the command in `~/.local/bin`, which needs no password, and tells
+you the one line to add if that is not on your PATH yet.
 
 ## A closer look
 

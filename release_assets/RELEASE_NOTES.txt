@@ -1,7 +1,17 @@
+SF Home Finder 0.4.4
+
+The terminal command is homefinder. It shipped in 0.4.3 as housefinder, which
+is not what the app is called and never was; upgrading removes the old name so
+you are not left with two commands, one of them wrong.
+
+Typing homefinder opens your dashboard, and that is all most people will ever
+need it for. Everything else -- status, check, logs, restart, repair,
+uninstall -- is behind homefinder help rather than in your way.
+
 SF Home Finder 0.4.3
 
-There is a terminal command now. Type housefinder to open the dashboard, or
-housefinder status, check, logs, restart, repair and uninstall for the rest. It
+There is a terminal command now. Type homefinder to open the dashboard, or
+homefinder status, check, logs, restart, repair and uninstall for the rest. It
 goes in ~/.local/bin, so it still needs no password, and the installer says so
 if that folder is not on your PATH rather than leaving you with a command that
 cannot be found.

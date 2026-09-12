@@ -1,7 +1,7 @@
 #!/bin/bash
-# housefinder -- open and look after SF Home Finder from a terminal.
+# homefinder -- open and look after SF Home Finder from a terminal.
 #
-# Installed to ~/.local/bin/housefinder. Everything here delegates to the tools
+# Installed to ~/.local/bin/homefinder. Everything here delegates to the tools
 # beside the app itself, so this stays a way in rather than a second
 # implementation of anything.
 set -euo pipefail
@@ -30,17 +30,21 @@ print("" if d is None else d)' "$1" 2>/dev/null
 
 usage() {
   cat <<USAGE
-housefinder -- your San Francisco housing search
+homefinder -- your San Francisco housing search
 
-  housefinder              open the dashboard
-  housefinder status       is it running, and when does it check next
-  housefinder check        look for new homes now (once a day)
-  housefinder logs         what it has been doing lately
-  housefinder restart      restart it, keeping everything
-  housefinder repair       fix it without losing your deal or your homes
-  housefinder uninstall    remove it (your data is kept unless you say otherwise)
+  homefinder           open your dashboard
+  homefinder help      show this
 
-Your dashboard lives at $URL and runs on its own.
+Rarely needed:
+
+  homefinder status    is it running, and when does it check next
+  homefinder check     look for new homes now (once a day)
+  homefinder logs      what it has been doing lately
+  homefinder restart   restart it, keeping everything
+  homefinder repair    fix it without losing your deal or your homes
+  homefinder uninstall remove it (your homes are kept unless you say otherwise)
+
+It runs on its own at $URL. You do not have to start it.
 USAGE
 }
 
@@ -54,7 +58,7 @@ case "${1:-open}" in
     body="$(health)"
     if [ -z "$body" ]; then
       say "Not answering yet at $URL"
-      say "  It may still be starting. Try 'housefinder restart' if it stays quiet."
+      say "  It may still be starting. Try 'homefinder restart' if it stays quiet."
       exit 1
     fi
     version="$(printf '%s' "$body" | field version || true)"
@@ -95,7 +99,7 @@ case "${1:-open}" in
         note="${note%%&*}"; note="${note//+/ }"
         printf '%b\n' "${note//%/\\x}"
         ;;
-      "") say "Could not reach it at $URL. Is it running? Try 'housefinder status'." ; exit 1 ;;
+      "") say "Could not reach it at $URL. Is it running? Try 'homefinder status'." ; exit 1 ;;
       *) say "Asked it to check. Watch it at $URL" ;;
     esac
     ;;
@@ -109,9 +113,9 @@ case "${1:-open}" in
   restart)
     if [ -f "$HOME/Library/LaunchAgents/$LABEL.plist" ]; then
       /bin/launchctl kickstart -k "gui/$(id -u)/$LABEL" >/dev/null 2>&1 || true
-      say "Restarting. Give it a few seconds, then: housefinder status"
+      say "Restarting. Give it a few seconds, then: homefinder status"
     else
-      say "No login service is installed. Try 'housefinder repair'."
+      say "No login service is installed. Try 'homefinder repair'."
       exit 1
     fi
     ;;
@@ -127,5 +131,5 @@ case "${1:-open}" in
     ;;
 
   -h|--help|help) usage ;;
-  *) say "housefinder: no such command '$1'"; say ""; usage; exit 1 ;;
+  *) say "homefinder: no such command '$1'"; say ""; usage; exit 1 ;;
 esac

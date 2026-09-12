@@ -17,7 +17,7 @@ import pytest
 
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-CLI = ROOT / "release_assets" / "payload" / "tools" / "housefinder.sh"
+CLI = ROOT / "release_assets" / "payload" / "tools" / "homefinder.sh"
 INSTALLER = (ROOT / "release_assets" / "payload" / "install.sh").read_text()
 UNINSTALLER = (ROOT / "release_assets" / "payload" / "tools" / "uninstall.sh").read_text()
 
@@ -46,19 +46,27 @@ def test_a_command_that_will_not_be_found_says_so() -> None:
 def test_uninstalling_takes_the_command_with_it() -> None:
     """It lives outside the app folder, so removing the folder alone would leave
     a command behind pointing at nothing."""
-    assert 'CLI_PATH="$HOME/.local/bin/housefinder"' in UNINSTALLER
+    assert 'CLI_PATH="$HOME/.local/bin/homefinder"' in UNINSTALLER
     assert '/bin/rm -f "$CLI_PATH"' in UNINSTALLER
+
+
+def test_the_old_misspelling_is_cleaned_up() -> None:
+    """0.4.3 shipped this as housefinder. The app has always been Home Finder,
+    so an upgrade has to remove the stale command rather than leave two in the
+    same directory, one of which is wrong."""
+    assert '/bin/rm -f "$CLI_DIR/housefinder"' in INSTALLER
+    assert 'CLI_PATH_OLD="$HOME/.local/bin/housefinder"' in UNINSTALLER
 
 
 def test_every_advertised_command_is_handled() -> None:
     """The help is the contract. A verb listed there and missing from the case
     would fail with 'no such command' on something the app told you to type."""
     text = CLI.read_text()
-    usage = text[text.index("housefinder -- your San Francisco"):text.index("USAGE")]
+    usage = text[text.index("homefinder -- your San Francisco"):text.index("USAGE")]
     advertised = {
         line.split()[1]
         for line in usage.splitlines()
-        if line.strip().startswith("housefinder ") and len(line.split()) > 1
+        if line.strip().startswith("homefinder ") and len(line.split()) > 1
     }
     handled = set()
     for line in text.splitlines():
@@ -109,4 +117,6 @@ def test_the_help_names_the_port_it_is_actually_on() -> None:
     text = CLI.read_text()
 
     assert "cat <<USAGE" in text, "a quoted heredoc would print the variable name"
-    assert "Your dashboard lives at $URL" in text
+    usage = text[text.index("cat <<USAGE"):text.index("USAGE\n}")]
+    assert "$URL" in usage, "the help does not name the address at all"
+    assert "127.0.0.1:8000" not in usage, "the port is hard-coded rather than read"
