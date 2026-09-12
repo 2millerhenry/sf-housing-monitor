@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '0.3.9'
+$Version = '0.5.1'
 $PythonVersion = '3.12.10'
 $Port = 8000
 $TaskName = 'SF Housing Monitor'
@@ -36,7 +36,12 @@ function Test-HealthyMonitor {
   }
 }
 
-function Wait-ForMonitor([int]$Seconds = 45) {
+# 45 seconds was not enough, which the macOS installer learned in 0.4.2 and
+# this never did. A first start on a full board spends about fifteen seconds
+# re-ranking what is already stored, and a slower disk or a larger board spends
+# more, so a normal install could be told it had failed seconds before it
+# answered -- and be sent to Repair for a problem it did not have.
+function Wait-ForMonitor([int]$Seconds = 150) {
   foreach ($attempt in 1..$Seconds) {
     if (Test-HealthyMonitor) { return $true }
     Start-Sleep -Seconds 1
@@ -143,7 +148,15 @@ try {
   & schtasks.exe /Run /TN $TaskName | Out-Null
   if ($LASTEXITCODE -ne 0 -or -not (Wait-ForMonitor)) { Fail "the local dashboard did not become healthy. Run Repair; details are in $LogDir." }
   Write-Host "Installed. Your profile and history stay in: $DataDir"
-  Start-Process "http://127.0.0.1:$Port/"
+  # Opening a browser is a courtesy, not part of installing. A machine with no
+  # browser association, or one being installed without a desktop session,
+  # would otherwise throw here and report a failure for an install that
+  # succeeded -- everything above this line has already worked.
+  if ($env:SF_HOUSING_NO_BROWSER -ne '1') {
+    try { Start-Process "http://127.0.0.1:$Port/" } catch {
+      Write-Host "Open it yourself at http://127.0.0.1:$Port/"
+    }
+  }
 } finally {
   if (Test-Path -LiteralPath $stage) { Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue }
 }

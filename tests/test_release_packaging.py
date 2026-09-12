@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import tomllib
 import zipfile
@@ -369,6 +370,15 @@ def test_the_version_cannot_drift_between_the_places_that_state_it() -> None:
     ):
         assert expected in installer, f"install.sh does not say {expected}"
 
+    # Windows states it too, and was not covered here: it sat at 0.3.9 for
+    # eleven releases while the builder took its version from pyproject, so a
+    # Windows build made on any of those days shipped a current wheel beside an
+    # installer looking for a file that had never existed.
+    windows = (ROOT / "release_assets" / "windows" / "payload" / "install.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert f"$Version = '{version}'" in windows, f"install.ps1 does not say {version}"
+
 
 def test_the_release_notes_open_on_the_version_being_shipped() -> None:
     """The notes are the first thing a person reads on the download page, and
@@ -378,6 +388,35 @@ def test_the_release_notes_open_on_the_version_being_shipped() -> None:
     version = declared["project"]["version"]
     notes = (ROOT / "release_assets" / "RELEASE_NOTES.txt").read_text(encoding="utf-8")
 
+    windows_notes = (ROOT / "release_assets" / "windows" / "RELEASE_NOTES.txt").read_text(
+        encoding="utf-8"
+    )
+    assert windows_notes.startswith(f"SF Home Finder {version} for Windows x64\n"), (
+        f"the Windows notes open with {windows_notes.splitlines()[0]!r}"
+    )
     assert notes.startswith(f"SF Home Finder {version}\n"), (
         f"the notes open with {notes.splitlines()[0]!r}, not SF Home Finder {version}"
     )
+
+
+def test_every_powershell_script_in_the_windows_release_parses() -> None:
+    """The macOS command is checked with `bash -n` on every run. Nothing checked
+    the PowerShell, so a syntax error would have been found by the first person
+    to double-click Install on a machine nobody here owns.
+    """
+    powershell = shutil.which("pwsh") or shutil.which("powershell")
+    if not powershell:
+        pytest.skip("no PowerShell available to parse with")
+    scripts = sorted((ROOT / "release_assets" / "windows").rglob("*.ps1"))
+    assert scripts, "no PowerShell scripts found to check"
+    for script in scripts:
+        result = subprocess.run(
+            [
+                powershell, "-NoProfile", "-Command",
+                "$e = $null; "
+                f"$null = [System.Management.Automation.Language.Parser]::ParseFile('{script}', [ref]$null, [ref]$e); "
+                "if ($e) { $e | ForEach-Object { Write-Output $_.Message }; exit 1 }",
+            ],
+            capture_output=True, text=True,
+        )
+        assert result.returncode == 0, f"{script.name} does not parse: {result.stdout}"

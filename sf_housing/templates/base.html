@@ -44,7 +44,11 @@
       {% set newer = pending_update() %}
       {% if newer %}
       <p class="footer-update">
-        {{ newer }} is available. In a terminal, run <code>homefinder update</code>.
+        {{ newer }} is available.
+        {%- if has_terminal_command %} In a terminal, run <code>homefinder update</code>.
+        {%- else %} <a href="{{ releases_url }}" target="_blank" rel="noopener noreferrer external">Download it</a>
+        and run Install again, which keeps everything.
+        {%- endif %}
       </p>
       {% endif %}
       {% if donate_url %}

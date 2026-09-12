@@ -495,3 +495,39 @@ def test_the_startup_check_survives_the_app_taking_its_time_to_start() -> None:
         assert ran.wait(timeout=10), "the check was dropped for being late"
     finally:
         scheduler.shutdown(wait=False)
+
+
+def test_a_windows_reader_is_not_told_to_run_a_mac_command(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """There is no homefinder command on Windows. The folder of shortcuts is
+    the way in there, and getting a new version means downloading it and
+    running Install again, which is what the page has to say."""
+    from fastapi.testclient import TestClient
+
+    import sys as real_sys
+
+    # The globals are decided when the app is built, so this has to be in place
+    # before build_app below.
+    monkeypatch.setattr(real_sys, "platform", "win32")
+    application, data = build_app(tmp_path)
+    write_status(data, UpdateStatus(checked_at=NOON, latest="v9.9.9", available=True))
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    assert "v9.9.9 is available" in page
+    assert "homefinder" not in page, "told a Windows reader to run a command macOS has"
+    assert "releases/latest" in page, "gave no way to actually get it"
+
+
+def test_a_mac_reader_is_given_the_command(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from fastapi.testclient import TestClient
+    import sys as real_sys
+
+    monkeypatch.setattr(real_sys, "platform", "darwin")
+    application, data = build_app(tmp_path)
+    write_status(data, UpdateStatus(checked_at=NOON, latest="v9.9.9", available=True))
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    assert "homefinder update" in page

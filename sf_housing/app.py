@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import logging
+import sys
 import os
 import re
 import subprocess
@@ -27,7 +28,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from .apify import ApifyTokenError, ApifyTokenStore
-from . import DONATE_URL, __version__
+from . import DONATE_URL, RELEASE_REPO, __version__
 from .coverage import ALERT_SETUP_SEARCHES, coverage_is_showable
 from .connectors import GMAIL_PROVIDERS, ConnectorStatus
 from .database import DatabaseUnreadableError, Repository
@@ -800,6 +801,13 @@ def create_app(
         return status.latest if status and status.available else None
 
     templates.env.globals["pending_update"] = pending_update
+    # How somebody actually gets that new version is not the same sentence
+    # everywhere. macOS has a terminal command; Windows has a folder of
+    # shortcuts and no command at all, so telling a Windows reader to run
+    # `homefinder update` is telling them to run something that does not exist
+    # on their machine.
+    templates.env.globals["has_terminal_command"] = sys.platform == "darwin"
+    templates.env.globals["releases_url"] = f"https://github.com/{RELEASE_REPO}/releases/latest"
 
     def asset_version() -> str:
         """Bust the cache when a static file actually changes.

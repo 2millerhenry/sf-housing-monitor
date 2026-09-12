@@ -1,0 +1,129 @@
+name: CI
+
+# The macOS release is built and tested on the author's own machine, which is
+# the only machine it has ever run on. That is fine for macOS and useless for
+# Windows: the Windows build had sat at a stale version for eleven releases
+# without anybody noticing, because nobody here owns a Windows PC to notice on.
+#
+# So the Windows job below is not a lint. It builds the release, installs it
+# the way a person would, waits for the dashboard to answer, and asks it a real
+# question, on a real Windows machine. If that job is green the download works.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.10.8"
+      - name: Run the suite
+        run: uv run pytest
+
+  windows-install:
+    name: Windows install, end to end
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.10.8"
+
+      - name: Build the Windows release
+        shell: pwsh
+        run: |
+          $uv = (Get-Command uv).Source
+          python scripts/build_windows_release.py --uv-bin $uv
+
+      - name: Unpack it the way a person would
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist/SF-Home-Finder-*-Windows-x64.zip | Select-Object -First 1
+          if (-not $zip) { throw "the build produced no Windows zip" }
+          Expand-Archive -LiteralPath $zip.FullName -DestinationPath "$env:RUNNER_TEMP\unpacked" -Force
+          $root = Get-ChildItem "$env:RUNNER_TEMP\unpacked" -Directory | Select-Object -First 1
+          "RELEASE_ROOT=$($root.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "unpacked to $($root.FullName)"
+
+      - name: Install it
+        shell: pwsh
+        env:
+          # There is no desktop session on a runner to open a browser into, and
+          # opening one is a courtesy rather than part of installing.
+          SF_HOUSING_NO_BROWSER: "1"
+        run: |
+          & "$env:RELEASE_ROOT\payload\install.ps1" -ReleaseRoot $env:RELEASE_ROOT
+
+      - name: It answers, and it is the version we just built
+        shell: pwsh
+        run: |
+          $expected = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          $health = $null
+          foreach ($attempt in 1..60) {
+            try { $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 3; break }
+            catch { Start-Sleep -Seconds 2 }
+          }
+          if ($null -eq $health) { throw "the dashboard never answered" }
+          Write-Host "health: ok=$($health.ok) app=$($health.app) version=$($health.version)"
+          if ($health.ok -ne $true) { throw "it answered but reported not ok" }
+          if ($health.version -ne $expected) { throw "serving $($health.version), built $expected" }
+
+      - name: It can actually answer a question about housing
+        shell: pwsh
+        run: |
+          # Not a proxy for working. This is the scoring path: a deal goes in,
+          # an estimate of what it would shortlist comes back. A process that
+          # started but cannot do this is not a working install.
+          $body = @{
+            housing_paths        = 'one_bedroom'
+            one_bedroom_maximum  = '3200'
+            one_bedroom_ideal    = '2600'
+            anywhere_in_sf       = 'on'
+            move_in_flexible     = 'on'
+          }
+          $reply = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/preferences/deal/preview' `
+            -Method Post -Body $body -Headers @{ Origin = 'http://127.0.0.1:8000' }
+          if (-not $reply.ok) { throw "the preview was refused: $($reply.reason)" }
+          $sixty = $reply.counts.'60'
+          Write-Host "a one-bedroom at `$3,200 anywhere in SF estimates $sixty homes at a cut-off of 60"
+          if ($null -eq $sixty -or [int]$sixty -le 0) { throw "no estimate came back" }
+
+      - name: The app's own ready check passes
+        shell: pwsh
+        run: |
+          $report = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/support/report.json' -TimeoutSec 10
+          Write-Host ($report | ConvertTo-Json -Depth 4)
+
+      - name: Uninstalling leaves nothing running
+        shell: pwsh
+        run: |
+          & "$env:RELEASE_ROOT\payload\tools\uninstall.ps1" -KeepData
+          Start-Sleep -Seconds 3
+          $still = $null
+          try { $still = Invoke-RestMethod -Uri 'http://127.0.0.1:8000/health' -TimeoutSec 3 } catch { }
+          if ($null -ne $still) { throw "it is still serving after being uninstalled" }
+
+      - name: What the logs said, if any of that failed
+        if: failure()
+        shell: pwsh
+        run: |
+          $logs = Join-Path $env:LOCALAPPDATA 'SF Housing Monitor\logs'
+          if (Test-Path $logs) { Get-ChildItem $logs -File | ForEach-Object {
+            Write-Host "===== $($_.Name) ====="; Get-Content $_.FullName -Tail 80 } }
+          else { Write-Host "no log directory at $logs" }

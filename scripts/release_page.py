@@ -56,25 +56,52 @@ def main() -> None:
         raise SystemExit(f"Build it first: {archive} is missing")
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
 
+    # Named only when it is actually being published. A page that offers a
+    # Windows download the release does not carry sends somebody to a 404, and
+    # a page that stays silent about Windows when the zip is right there sends
+    # them away for no reason.
+    windows = ROOT / "dist" / f"SF-Home-Finder-{version}-Windows-x64.zip"
+    if windows.is_file():
+        windows_digest = hashlib.sha256(windows.read_bytes()).hexdigest()
+        windows_install = f"""
+### On Windows
+
+Windows 10 or 11, 64-bit. Download **{windows.name}** from Assets below, unpack it, and double-click `2 Install SF Home Finder.cmd`.
+
+Windows will say the publisher is unrecognised, because this is not code-signed. Choose **More info**, then **Run anyway**. It never asks for an administrator.
+"""
+        windows_checksum = f"\n{windows_digest}  {windows.name}"
+    else:
+        windows_install = """
+### On Windows
+
+Not in this release. The most recent Windows build is on an [earlier release](https://github.com/%s/releases).
+""" % REPO
+        windows_checksum = ""
+
     print(f"""Finding a place in San Francisco is miserable. This watches 18 rental sites for you, twice a day, on your own laptop — ranked against what you actually want.
 
 <img src="{RAW}/shortlist.png" alt="The shortlist: homes ranked by how well they match, each row showing the score, rent, neighborhood and source">
 
 ## Install
 
-Paste this into Terminal:
+Takes about three minutes and never asks for a password.
+
+### On a Mac
+
+Apple Silicon (M1 or later), macOS 15.6 or newer. Intel Macs are not supported yet. Paste this into Terminal:
 
 ```
 curl -fsSL https://github.com/{REPO}/raw/HEAD/install.sh | bash
 ```
 
-*19 MB · about 2–3 minutes · no password, no admin · Apple Silicon Mac (M1 or later), macOS 15.6+*
-
-Your browser opens by itself when it is done. Fill in **Your deal**, press save, and the first search starts.
+*19 MB · no password, no admin · your browser opens by itself when it is done*
+{windows_install}
+Once it opens, fill in **Your deal**, press save, and the first search starts.
 
 ## Opening it later
 
-Type `homefinder` in a terminal, or open **http://127.0.0.1:8000** and bookmark it. It runs on its own, so there is never anything to start.
+Open **http://127.0.0.1:8000** and bookmark it. On a Mac you can also type `homefinder` in a terminal; on Windows, use the **Open SF Home Finder** shortcut in the folder you unpacked. It runs on its own, so there is never anything to start.
 
 ## Free, private, and quiet
 
@@ -97,7 +124,7 @@ Unpack it, then **Control-click** `2 Install SF Home Finder.command` and choose 
 {changes_for(version)}
 
 ```
-{digest}  {archive.name}
+{digest}  {archive.name}{windows_checksum}
 ```
 
 </details>""")

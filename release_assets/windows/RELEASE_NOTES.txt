@@ -1,132 +1,40 @@
-SF Home Finder 0.4.9 for Windows x64
+SF Home Finder 0.5.1 for Windows x64
 
-The homefinder command handles being wrong about the world. If the app is not
-installed on the machine, every command now says so and gives you the line to
-install it, instead of telling you it "may still be starting" and leaving you
-waiting for something that was never coming. Mistyping the number of lines for
-homefinder logs gets a sentence about what to type rather than one about tail.
-Problems are reported on the error stream, so piping or logging still shows
-them.
+The first Windows build since 0.3.9. Everything below happened in between, and
+all of it is new if you are coming from that one.
 
-It runs under the bash macOS itself ships, which is what an older Mac has.
+It is called SF Home Finder now. The app always called itself that while the
+download said SF Housing Monitor, so people fetched one name and were greeted
+by another. Your existing installation is unaffected and nothing needs
+installing twice: the folder your profile and listings live in, and the sign-in
+task that runs the checks, deliberately keep their old names, because renaming
+those would orphan the history of everyone who already had it.
 
-SF Home Finder 0.4.8 for Windows x64
+It can tell you when a newer version exists. When there is one, a line appears
+in small print at the bottom of the app. Getting it is the same as installing
+it: download the new release and run Install again, which keeps your deal, your
+homes and your notes. This means the app now makes one request of its own, once
+a day, asking GitHub whether a newer version has been released. It sends
+nothing about you, not even which version you are running, and the setting
+SF_HOUSING_NO_UPDATE_CHECK=1 stops it entirely.
 
-While you are writing your deal, the match slider now tells you roughly how
-many homes a search like yours usually finds, instead of waiting for the first
-search to say anything. Widen your budget or add a neighborhood and the number
-moves as you type.
+The number beside the match slider is right, in three places it was wrong.
+Raising your budget could not raise it, so asking for more money looked like it
+found nothing. People splitting a home were shown a fraction of what is there,
+because the rent each person pays was being read as the rent for the whole
+place. And naming neighborhoods made no difference to the estimate at all.
+Before you have searched anything, the slider now estimates what a search like
+yours usually finds instead of sitting at nothing.
 
-It is an estimate and says so: it reads "about 190 homes" rather than a count,
-because nothing has been searched yet. The figures behind it were measured from
-a real board of 6,935 San Francisco homes -- what each size of home rents for,
-how many of each the sources carry -- and they are pitched low on purpose. The
-first real search usually finds more than the estimate promised.
+Homes that have been taken down leave the shortlist promptly, checking for new
+homes by hand is limited to once a day so that no source stops answering you,
+and installing no longer reports failure when it worked. That last one is a
+Windows-specific fix: the installer gave up after 45 seconds, and a first start
+on a full board can spend longer than that getting itself in order.
 
-SF Home Finder 0.4.7 for Windows x64
-
-Two things somebody found installing this on a Mac that was not mine.
-
-The homefinder command could not be found. The installer told you to add a line
-to ~/.zshrc, which is the wrong file if your shell is bash, and a step that is
-printed rather than performed is a step almost nobody performs. It now adds the
-line itself, to whichever file your own shell reads, once, and tells you to
-open a new Terminal window.
-
-And while you were still filling in your deal, the match slider read "0 homes",
-because nothing had been searched yet. That looks like a verdict on your
-answers when it only means the first search has not run. The number now waits
-until there is something to count.
-
-SF Home Finder 0.4.6 for Windows x64
-
-The repository is now github.com/2millerhenry/sf-home-finder, which is what the
-app has always called itself. Links and install commands you already have keep
-working -- GitHub forwards the old address -- so there is nothing to change on
-your side.
-
-SF Home Finder 0.4.5 for Windows x64
-
-The isolated install and uninstall used for testing no longer reach into the
-copy you actually use. ~/.local/bin is shared by every install on a machine, so
-a throwaway one writing the homefinder command there -- or a throwaway
-uninstall removing it -- took the command belonging to the real installation.
-Isolated runs keep their command inside their own folder now, which is the rule
-the login service has always followed.
-
-Nothing to do if you only ever installed this the normal way.
-
-SF Home Finder 0.4.4 for Windows x64
-
-The terminal command is homefinder. It shipped in 0.4.3 as housefinder, which
-is not what the app is called and never was; upgrading removes the old name so
-you are not left with two commands, one of them wrong.
-
-Typing homefinder opens your dashboard, and that is all most people will ever
-need it for. Everything else -- status, check, logs, restart, repair,
-uninstall -- is behind homefinder help rather than in your way.
-
-SF Home Finder 0.4.3 for Windows x64
-
-There is a terminal command now. Type homefinder to open the dashboard, or
-homefinder status, check, logs, restart, repair and uninstall for the rest. It
-goes in ~/.local/bin, so it still needs no password, and the installer says so
-if that folder is not on your PATH rather than leaving you with a command that
-cannot be found.
-
-It matters most if you installed with the one-line command, since that leaves
-you no folder of shortcuts -- until now the bookmark was the only way back in.
-
-SF Home Finder 0.4.2 for Windows x64
-
-Installing no longer reports failure when it worked. A first start on a full
-board spends about fifteen seconds re-ranking what is already stored, and macOS
-waits ten seconds between restarts of a background service, so a normal install
-could take longer than the old 45-second window and be told "installation
-stopped" for an app that was seconds from answering. It now waits properly, and
-if it still has not answered it says what is actually true -- installed, still
-starting, here is the address -- instead of sending you to Repair.
-
-The installer also says less. Fifty-one package names scrolled past on every
-install; now it tells you what it is doing and stays quiet about the rest. When
-it finishes it tells you the address to bookmark, which matters if you
-installed with the one-line command and so have no folder of shortcuts.
-
-SF Home Finder 0.4.1 for Windows x64
-
-Renamed. The app called itself SF Home Finder while everything around it said
-SF Housing Monitor, so people downloaded one name and were greeted by another.
-The app, the download, the installer and every command file now agree.
-
-Your existing installation is unaffected and nothing needs reinstalling twice:
-the folder your profile and listings live in, and the login service that runs
-the checks, deliberately keep their old names. Renaming those would have
-orphaned the history of everyone who already had it, which is a poor trade for
-a tidier path.
-
-SF Home Finder 0.4.0 for Windows x64
-
-Homes that have been taken down now leave the shortlist promptly. The app has
-always gone and read the page rather than guessing from a listing's absence,
-but it was only managing a few of those checks per scan against a backlog of
-ninety, so a post could be flagged and pulled and still sit there looking live
-for two days. It now gets through about twenty a scan, and nothing is ever
-marked gone on a failed request, a timeout or a block -- only on the page
-itself saying so.
-
-Checking for new homes by hand is now limited to once a day. The scheduled
-checks, the nightly sweep and the catch-up after a sleeping Mac are unchanged
-and never refused; the limit is on the button, which previously had none, and
-it is there so that pressing it repeatedly cannot get a source to stop
-answering. Refusing tells you when the app next checks on its own.
-
-While you are editing your deal, the number beside the match slider now follows
-what you have typed rather than what was last saved, so changing a budget or an
-area shows what it would actually cost you straight away.
-
-The login-service check no longer reports the service missing on a Mac where it
-is installed and running, which could happen when a location variable was set
-but left empty.
+One thing macOS has that this does not: a homefinder command for the terminal.
+On Windows the Install, Open, Repair, Verify and Uninstall shortcuts in this
+folder are the way in, and Open is the one you will use.
 
 SF Home Finder 0.3.9 for Windows x64
 
