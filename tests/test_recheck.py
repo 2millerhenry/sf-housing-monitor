@@ -75,16 +75,48 @@ class Source:
         return replace(listing, summary="Still up, with a full description.")
 
 
+class SteadyClock:
+    """A clock that moves only when a read is paid for.
+
+    Every budget in the scanner is spent in seconds, which is right in
+    production and useless in a test about how the allowance is divided. How
+    much work a machine turns a second into varies enough that the same three
+    scans confirmed all sixty homes on the machine this was written on and left
+    sixteen unconfirmed on a CI runner -- a fact about the runner, not about the
+    arithmetic being asserted.
+
+    Charging a fixed amount per read instead makes the division the only thing
+    that decides, which is the only thing these tests are about. The scanner
+    takes the clock; production passes it none and gets ``time.monotonic``.
+    """
+
+    def __init__(self, seconds_per_read: float = 0.01) -> None:
+        self.now = 0.0
+        self.seconds_per_read = seconds_per_read
+
+    def __call__(self) -> float:
+        return self.now
+
+    def charge(self) -> None:
+        self.now += self.seconds_per_read
+
+
 class Costly(Source):
-    """A source whose reads cost real time, the way a network read does.
+    """A source whose reads cost time, the way a network read does.
 
     Rechecking is not free in production -- a detail page is a request, spaced
     from the next one. A test where it costs nothing cannot tell a generous
-    allowance from a starved one.
+    allowance from a starved one. Given a ``clock`` it charges that; given
+    none it sleeps, which is what a test with no clock of its own means.
     """
 
+    clock = None
+
     def enrich(self, client, listing):
-        time.sleep(0.01)
+        if self.clock is None:
+            time.sleep(0.01)
+        else:
+            self.clock.charge()
         return super().enrich(client, listing)
 
 
@@ -413,10 +445,13 @@ def test_a_whole_shortlist_is_confirmed_within_one_day(tmp_path: pathlib.Path) -
     Scans run eight hours apart, so three of them is a day.
     """
     repository, preferences = board(tmp_path)
+    clock = SteadyClock()
     homes = [room(f"r{index}") for index in range(60)]
+    first = Costly(homes, recheck_budget=60)
+    first.clock = clock
     Scanner(
-        repository, lambda: preferences, [Costly(homes, recheck_budget=60)],
-        detail_delay_seconds=0,
+        repository, lambda: preferences, [first],
+        detail_delay_seconds=0, clock=clock,
     ).run_scan("manual")
     assert max(confirmation_ages_hours(repository).values()) < 1, "the first search confirms them all"
 
@@ -430,21 +465,16 @@ def test_a_whole_shortlist_is_confirmed_within_one_day(tmp_path: pathlib.Path) -
         hours_pass(repository, 8)
         quiet_before = [Quiet("QuietA"), Quiet("QuietB")]
         quiet_after = [Quiet(f"Quiet{index}") for index in range(20)]
+        rechecking = Costly([], recheck_budget=60)
+        rechecking.clock = clock
         Scanner(
             repository,
             lambda: preferences,
-            [*quiet_before, Costly([], recheck_budget=60), *quiet_after],
+            [*quiet_before, rechecking, *quiet_after],
             detail_delay_seconds=0,
             timeout_seconds=0.05,
-            # Ten seconds is headroom, not part of what is being asserted. The
-            # reads here cost real time, and how much of a wall-clock budget a
-            # machine can turn into work varies with the machine: three seconds
-            # was ample here and left sixteen homes unconfirmed on a CI runner,
-            # which says nothing about the share arithmetic and everything
-            # about the runner. What is being asserted is below, and it does
-            # not get easier with a longer budget: with the recheck pass
-            # disabled, no budget confirms them.
-            max_scan_seconds=10.0,
+            max_scan_seconds=3.0,
+            clock=clock,
         ).run_scan("scheduled")
 
     stale = {
@@ -552,18 +582,24 @@ def test_a_thin_share_still_buys_a_source_its_floor(tmp_path: pathlib.Path) -> N
             for index in range(count)
         ]
 
+    clock = SteadyClock()
     names = [f"Rival{index}" for index in range(16)]
+    stocking = [Rival(name, homes(name, 40), recheck_budget=40) for name in names]
+    for source in stocking:
+        source.clock = clock
     Scanner(
-        repository, lambda: preferences,
-        [Rival(name, homes(name, 40), recheck_budget=40) for name in names],
-        detail_delay_seconds=0,
+        repository, lambda: preferences, stocking,
+        detail_delay_seconds=0, clock=clock,
     ).run_scan("manual")
     hours_pass(repository, 8)
 
     again = [Rival(name, [], recheck_budget=40) for name in names]
+    for source in again:
+        source.clock = clock
     Scanner(
         repository, lambda: preferences, again,
         detail_delay_seconds=0, timeout_seconds=0.05, max_scan_seconds=3.0,
+        clock=clock,
     ).run_scan("scheduled")
 
     # The first source has the most company still to come, so the thinnest

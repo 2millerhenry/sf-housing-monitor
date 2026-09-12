@@ -173,6 +173,7 @@ class Scanner:
         max_scan_seconds: float = 110.0,
         deep_scan_max_seconds: float | None = None,
         scan_allowed: Callable[[str, list[ListingSource] | None], bool] | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ):
         self.repository = repository
         self.preference_loader = preference_loader
@@ -188,6 +189,14 @@ class Scanner:
         # unbudgeted -- which is what the tests that are about scanning itself
         # want, and what the app never does.
         self.scan_allowed = scan_allowed
+        # Taken rather than read, so a test can decide what a second costs.
+        # Every budget here is spent in wall-clock seconds, which is right in
+        # production and useless in a test: how much work a machine turns a
+        # second into varies enough that the same scan confirmed sixty homes
+        # here and forty-four on a CI runner. Tests that are about how the
+        # allowance is divided hand in a clock they advance themselves, and
+        # measure the arithmetic instead of the hardware.
+        self._clock = clock
         self._scan_lock = threading.Lock()
         self._process_lock_handle = None
         # Set whenever no scan is in flight, so a caller can block on the end of
@@ -231,7 +240,7 @@ class Scanner:
             snapshot = dict(self._progress_state)
         started = snapshot.pop("started_monotonic", None)
         if snapshot["running"] and isinstance(started, (int, float)):
-            snapshot["elapsed_seconds"] = max(0, int(time.monotonic() - started))
+            snapshot["elapsed_seconds"] = max(0, int(self._clock() - started))
         weight_total = float(snapshot.pop("weight_total", 0.0) or 0.0)
         weight_done = float(snapshot.pop("weight_done", 0.0) or 0.0)
         weight_current = float(snapshot.pop("weight_current", 0.0) or 0.0)
@@ -248,7 +257,7 @@ class Scanner:
             # next one and show progress that has not happened.
             running = 0.0
             if snapshot["running"] and weight_current > 0 and isinstance(current_started, (int, float)):
-                spent = max(0.0, time.monotonic() - current_started)
+                spent = max(0.0, self._clock() - current_started)
                 running = min(spent / weight_current, 0.95) * weight_current
             percent = round(((weight_done + running) / weight_total) * 100)
         elif total:
@@ -473,7 +482,7 @@ class Scanner:
 
         # Never longer than the scan has left, and never so short that a
         # healthy source is cut off by a ceiling meant for a broken one.
-        remaining = deadline - time.monotonic()
+        remaining = deadline - self._clock()
         ceiling = min(self._source_ceiling_for(trigger), max(self.timeout_seconds, remaining))
         return self._within_ceiling(
             f"search-{source.platform}",
@@ -533,7 +542,7 @@ class Scanner:
         reasonably want, or what this phase has left -- so no run of detail
         pages can add up to an overrun either.
         """
-        ceiling = max(1.0, min(DETAIL_HARD_CEILING_SECONDS, limit - time.monotonic()))
+        ceiling = max(1.0, min(DETAIL_HARD_CEILING_SECONDS, limit - self._clock()))
         return self._within_ceiling(
             f"detail-{source.platform}",
             ceiling,
@@ -569,7 +578,7 @@ class Scanner:
         """
         if not hasattr(source, "enrich"):
             return 0
-        now = time.monotonic()
+        now = self._clock()
         available = deadline - now - self.timeout_seconds
         if available <= 0:
             return 0
@@ -604,7 +613,7 @@ class Scanner:
                 if checked < floor
                 else min(recheck_deadline, deadline)
             )
-            if time.monotonic() + self.timeout_seconds > limit:
+            if self._clock() + self.timeout_seconds > limit:
                 break
             try:
                 refreshed = self._enrich_within_ceiling(
@@ -664,7 +673,7 @@ class Scanner:
                     "running": True,
                     "run_id": None,
                     "trigger": trigger,
-                    "started_monotonic": time.monotonic(),
+                    "started_monotonic": self._clock(),
                     "elapsed_seconds": 0,
                     "sources_total": len(sources) if sources is not None else len(self._eligible_sources(trigger)),
                     "sources_completed": 0,
@@ -724,7 +733,7 @@ class Scanner:
     def _finish_progress(self, status: str) -> None:
         with self._progress_lock:
             started = self._progress_state.get("started_monotonic")
-            elapsed = int(time.monotonic() - started) if isinstance(started, (int, float)) else 0
+            elapsed = int(self._clock() - started) if isinstance(started, (int, float)) else 0
             self._progress_state.update(
                 {
                     "status": status,
@@ -1044,7 +1053,7 @@ class Scanner:
         """Run a scan while the caller holds ``_scan_lock``."""
         run_id: int | None = None
         budget = self._budget_for(trigger)
-        deadline = time.monotonic() + budget
+        deadline = self._clock() + budget
         scan_started_at = utc_now()
         total_seen = total_added = total_updated = sources_failed = 0
         final_status = "failed"
@@ -1066,7 +1075,7 @@ class Scanner:
                     self._update_progress(
                         current_source=source.platform,
                         weight_current=weights.get(source.platform, 0.0),
-                        current_started_monotonic=time.monotonic(),
+                        current_started_monotonic=self._clock(),
                     )
                     source_key = self._source_key(source)
                     source_run_id = self.repository.begin_source_run(
@@ -1126,7 +1135,7 @@ class Scanner:
                             )
                             self._finish_source_progress(source_index, weights.get(source.platform, 0.0))
                             continue
-                    if time.monotonic() + self.timeout_seconds > deadline:
+                    if self._clock() + self.timeout_seconds > deadline:
                         self.repository.finish_source_run(
                             source_run_id,
                             "skipped",
@@ -1231,7 +1240,7 @@ class Scanner:
                             key=lambda index: (-prepared[index]["provisional"], index),
                         )[:detail_budget]
                         for index in sorted(chosen):
-                            if time.monotonic() + self.timeout_seconds > deadline:
+                            if self._clock() + self.timeout_seconds > deadline:
                                 break
                             item = prepared[index]
                             try:
