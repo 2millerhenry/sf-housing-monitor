@@ -168,3 +168,97 @@ def test_fish_is_told_rather_than_edited() -> None:
     appending that line would leave a broken config rather than a working
     command."""
     assert "*/fish) PROFILE=" in INSTALLER
+
+
+# --- Behaviour, exercised by running the script rather than reading it --------
+
+import os
+import subprocess as sp
+import tempfile
+
+
+def run(args, root, port="9911", env=None):
+    """Run the real command against a given app root."""
+    environ = dict(os.environ, SF_HOUSING_APP_ROOT=str(root), SF_HOUSING_PORT=port)
+    environ.update(env or {})
+    return sp.run(["/bin/bash", str(CLI), *args], capture_output=True, text=True, env=environ)
+
+
+@pytest.fixture
+def missing(tmp_path):
+    return tmp_path / "not-installed"
+
+
+@pytest.fixture
+def stub(tmp_path):
+    """An app root that exists, with a stand-in for the tool this delegates to."""
+    root = tmp_path / "app"
+    (root / "tools").mkdir(parents=True)
+    (root / "logs").mkdir(parents=True)
+    opener = root / "tools" / "open.sh"
+    opener.write_text("#!/bin/bash\necho opened \"$@\"\n")
+    opener.chmod(0o755)
+    (root / "logs" / "service.log").write_text("one\ntwo\nthree\n")
+    return root
+
+
+@pytest.mark.parametrize(
+    "command", [[], ["status"], ["check"], ["logs"], ["restart"], ["repair"], ["uninstall"]]
+)
+def test_every_command_says_so_when_the_app_is_not_installed(command, missing) -> None:
+    """The command lives outside the app, so it outlives it: a restored backup,
+    an abandoned uninstall, a machine the folder was never on.
+
+    It used to tell those people the app "may still be starting" and suggest
+    waiting for something that was never coming.
+    """
+    result = run(command, missing)
+
+    assert result.returncode != 0, f"{command or ['(bare)']} reported success with no app"
+    assert "not installed" in result.stderr
+    assert "install.sh | bash" in result.stderr, "no way forward is offered"
+
+
+def test_failures_go_to_stderr(missing) -> None:
+    """So somebody piping or logging this still sees them, and a script can
+    tell an answer from a complaint."""
+    result = run(["status"], missing)
+
+    assert result.stdout.strip() == ""
+    assert result.stderr.strip() != ""
+
+
+def test_a_mistyped_line_count_is_answered_in_english(stub) -> None:
+    """tail answers a typo with "illegal offset -- abc", which is a sentence
+    about tail rather than about anything the person did."""
+    result = run(["logs", "abc"], stub)
+
+    assert result.returncode != 0
+    assert "number of lines" in result.stderr
+    assert "illegal offset" not in result.stderr + result.stdout
+
+
+def test_the_line_count_is_honoured(stub) -> None:
+    assert run(["logs", "2"], stub).stdout.splitlines() == ["two", "three"]
+
+
+def test_opening_does_not_forward_the_verb(stub) -> None:
+    """open.sh takes flags of its own. Handing it the word "open" works only
+    because it happens to ignore anything that is not --no-browser."""
+    assert run([], stub).stdout.strip() == "opened"
+    assert run(["open"], stub).stdout.strip() == "opened"
+
+
+def test_an_unknown_command_shows_the_help_and_fails(stub) -> None:
+    result = run(["nonsense"], stub)
+
+    assert result.returncode != 0
+    assert "no 'nonsense' command" in result.stderr
+    assert "homefinder status" in result.stderr, "the help is not offered"
+
+
+def test_it_runs_under_the_bash_that_macos_ships() -> None:
+    """macOS ships bash 3.2 as /bin/bash and that is what the shebang names.
+    Anything written for bash 4 or 5 would work on the author's machine only if
+    they had installed a newer one."""
+    assert sp.run(["/bin/bash", "-n", str(CLI)], capture_output=True).returncode == 0

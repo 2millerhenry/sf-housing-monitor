@@ -1,3 +1,15 @@
+SF Home Finder 0.4.9
+
+The homefinder command handles being wrong about the world. If the app is not
+installed on the machine, every command now says so and gives you the line to
+install it, instead of telling you it "may still be starting" and leaving you
+waiting for something that was never coming. Mistyping the number of lines for
+homefinder logs gets a sentence about what to type rather than one about tail.
+Problems are reported on the error stream, so piping or logging still shows
+them.
+
+It runs under the bash macOS itself ships, which is what an older Mac has.
+
 SF Home Finder 0.4.8
 
 While you are writing your deal, the match slider now tells you roughly how
