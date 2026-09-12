@@ -30,7 +30,10 @@ jobs:
         with:
           version: "0.10.8"
       - name: Run the suite
-        run: uv run pytest
+        # On the Python the release actually ships, which is 3.12, not whatever
+        # the runner happens to have newest. pytest is an optional extra here,
+        # so it has to be asked for by name.
+        run: uv run --python 3.12 --extra test pytest
 
   windows-install:
     name: Windows install, end to end

@@ -121,3 +121,26 @@ def test_installing_never_fails_because_a_browser_would_not_open() -> None:
     tail = script[script.index('Write-Host "Installed.'):]
     assert "try { Start-Process" in tail, "opening a browser can still fail the install"
     assert "$env:SF_HOUSING_NO_BROWSER -ne '1'" in tail, "no way to install without one"
+
+
+def test_uninstalling_waits_for_the_app_to_actually_stop() -> None:
+    """Windows will not delete a file that is open, and the running app holds
+    its own Python library open the whole time it is alive.
+
+    ``schtasks /End`` asks it to stop and does not wait for it to have stopped.
+    Deleting straight afterwards raced a process still shutting down and died
+    with "Access to the path ...cd.cp312-win_amd64.pyd is denied", leaving the
+    install half removed. A real Windows machine found this; reading it never
+    would have, because nothing on a Mac locks a file it is reading.
+    """
+    script = (
+        ROOT / "release_assets" / "windows" / "payload" / "tools" / "uninstall.ps1"
+    ).read_text(encoding="utf-8")
+
+    stop = script.index("function Stop-TheApp")
+    removal = script.index("foreach ($name in @('current'")
+    assert stop < removal, "it starts deleting before it has waited for anything"
+    assert "Stop-Process -Force" in script, "a process that will not stop blocks the uninstall forever"
+    # And a file held for a moment by antivirus is worth retrying rather than
+    # reporting as a failure.
+    assert "if ($attempt -eq 10) { throw" in script
