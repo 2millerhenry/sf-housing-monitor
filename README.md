@@ -50,6 +50,13 @@ either way.
 
 </details>
 
+### Opening it later
+
+Type `homefinder` in a terminal, or open **http://127.0.0.1:8000** and bookmark it. It runs on
+its own, so there is never anything to start.
+
+<sub>`homefinder help` has the rest — status, logs, repair — if you ever need them.</sub>
+
 ## What it does for you
 
 **It finds far more than you would on your own.** Eighteen rental sites are already connected
@@ -91,22 +98,6 @@ day, as long as your Mac is awake and logged in. Nothing to remember, nothing to
 **Check in whenever it suits you.** Best matches at the top, with the reason each one scored
 that way. Star the ones worth a message, pass on the rest — what you have dealt with does not
 come back.
-
-### Getting back to it later
-
-It keeps running by itself, so there is nothing to start. Open **http://127.0.0.1:8000** —
-bookmark it. It comes back on its own when you restart your Mac, and closing the tab stops
-nothing.
-
-Or from a terminal, just:
-
-```
-homefinder
-```
-
-That opens it. `homefinder help` has the rest — status, logs, repair — but you will rarely
-need them. The installer puts the command in `~/.local/bin`, which needs no password, and tells
-you the one line to add if that is not on your PATH yet.
 
 ## A closer look
 
