@@ -1,5 +1,7 @@
 # SF Home Finder
 
+[![CI](https://github.com/2millerhenry/sf-home-finder/actions/workflows/ci.yml/badge.svg)](https://github.com/2millerhenry/sf-home-finder/actions/workflows/ci.yml)
+
 Finding a place in San Francisco is miserable right now. Rent is about as high as it has ever
 been, the tech money is back, and anything decent is gone before you have finished reading it.
 You end up with fourteen tabs open, checking the same sites at midnight, and still missing

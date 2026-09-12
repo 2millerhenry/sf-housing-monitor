@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$Version = '0.5.1'
+$Version = '0.5.2'
 $PythonVersion = '3.12.10'
 $Port = 8000
 $TaskName = 'SF Housing Monitor'

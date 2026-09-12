@@ -1,40 +1,42 @@
-SF Home Finder 0.5.1 for Windows x64
+SF Home Finder 0.5.2 for Windows x64
 
-The first Windows build since 0.3.9. Everything below happened in between, and
-all of it is new if you are coming from that one.
+The first Windows build since 0.3.9. Everything below happened in between,
+and all of it is new if you are coming from that one.
 
-It is called SF Home Finder now. The app always called itself that while the
-download said SF Housing Monitor, so people fetched one name and were greeted
-by another. Your existing installation is unaffected and nothing needs
-installing twice: the folder your profile and listings live in, and the sign-in
-task that runs the checks, deliberately keep their old names, because renaming
-those would orphan the history of everyone who already had it.
+Start here: the 0.3.9 installer had been looking for a file that stopped
+being built shortly afterwards, so a Windows install has not actually
+worked for a long time. It does now, and it is checked on a real Windows
+machine every time anything changes rather than read over on a Mac. Doing
+that turned up three more faults, all fixed here: the installer gave up
+waiting after 45 seconds when a first start can honestly take longer,
+uninstalling failed part way through with a permission error because it
+began deleting the app before the app had finished stopping, and opening
+your browser at the end could fail an install that had otherwise worked.
 
-It can tell you when a newer version exists. When there is one, a line appears
-in small print at the bottom of the app. Getting it is the same as installing
-it: download the new release and run Install again, which keeps your deal, your
-homes and your notes. This means the app now makes one request of its own, once
-a day, asking GitHub whether a newer version has been released. It sends
-nothing about you, not even which version you are running, and the setting
-SF_HOUSING_NO_UPDATE_CHECK=1 stops it entirely.
+It is called SF Home Finder now. The app always called itself that while
+the download said SF Housing Monitor. Your data folder and the sign-in task
+keep their old names on purpose, so nothing is orphaned.
 
-The number beside the match slider is right, in three places it was wrong.
-Raising your budget could not raise it, so asking for more money looked like it
-found nothing. People splitting a home were shown a fraction of what is there,
-because the rent each person pays was being read as the rent for the whole
-place. And naming neighborhoods made no difference to the estimate at all.
-Before you have searched anything, the slider now estimates what a search like
+It can tell you when a newer version exists. A line appears in small print
+at the bottom of the app, and getting it is the same as installing it:
+download the new release and run Install again, which keeps your deal, your
+homes and your notes. The app asks GitHub once a day whether a newer
+version exists and sends nothing about you, not even which version you are
+running. SF_HOUSING_NO_UPDATE_CHECK=1 stops it entirely.
+
+The number beside the match slider is right in three places it was wrong.
+Raising your budget could not raise it. People splitting a home were shown
+a fraction of what is there, because the rent each person pays was read as
+the rent for the whole place. Naming neighborhoods made no difference at
+all. Before you have searched anything it now estimates what a search like
 yours usually finds instead of sitting at nothing.
 
-Homes that have been taken down leave the shortlist promptly, checking for new
-homes by hand is limited to once a day so that no source stops answering you,
-and installing no longer reports failure when it worked. That last one is a
-Windows-specific fix: the installer gave up after 45 seconds, and a first start
-on a full board can spend longer than that getting itself in order.
+Homes that have been taken down leave the shortlist promptly, and checking
+by hand is limited to once a day so that no source stops answering you.
 
-One thing macOS has that this does not: a homefinder command for the terminal.
-On Windows the Install, Open, Repair, Verify and Uninstall shortcuts in this
-folder are the way in, and Open is the one you will use.
+One thing macOS has that this does not: a homefinder command for the
+terminal. Here the Install, Open, Repair, Verify and Uninstall shortcuts in
+this folder are the way in, and Open is the one you will use.
 
 SF Home Finder 0.3.9 for Windows x64
 

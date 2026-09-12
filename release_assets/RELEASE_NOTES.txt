@@ -1,3 +1,28 @@
+SF Home Finder 0.5.2
+
+Windows is a real download again. The last one was 0.3.9, eleven releases
+ago, and the installer in it had been looking for a file that stopped being
+built long before that, so anybody who tried it got an error and no app.
+
+It is not fixed by having been read this time. Every change now builds the
+Windows release on a Windows machine, installs it the way you would, waits
+for the dashboard, asks it what a real deal would shortlist and then
+uninstalls it again. Three faults turned up doing that, all of which a
+Windows user would have hit: the installer gave up waiting after 45
+seconds, which macOS learned in 0.4.2 was too short for a first start;
+uninstalling could not delete the app while it was still shutting down and
+stopped half way with a permission error; and opening the browser at the
+very end could fail an install that had entirely worked.
+
+If you are on a Mac, one thing changed for you. When a newer version
+exists the note in the footer told everyone to run a terminal command,
+including the people on Windows, where no such command exists. It now says
+whichever is true where you are reading it.
+
+The download page says which machines this runs on before it says how to
+install it, rather than mentioning it in small print underneath, and says
+plainly that Intel Macs are not supported yet.
+
 SF Home Finder 0.5.1
 
 It can tell you when there is a newer version, and fetch it for you.
