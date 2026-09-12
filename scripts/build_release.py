@@ -166,7 +166,7 @@ def main() -> None:
         wheel_dir = temp / "wheel"
         wheel_dir.mkdir()
         run_checked(str(args.uv_bin), "build", "--wheel", "--out-dir", str(wheel_dir))
-        wheel = wheel_dir / f"sf_housing_monitor-{VERSION}-py3-none-any.whl"
+        wheel = wheel_dir / f"sf_home_finder-{VERSION}-py3-none-any.whl"
         if not wheel.is_file():
             raise SystemExit(f"Expected wheel was not built: {wheel}")
 

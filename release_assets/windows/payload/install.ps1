@@ -21,7 +21,7 @@ $UvSha256 = '2E70ECD22196CBD9D14EEFB700814BCAFC5B75A0D8275B52E8402E5FE256D928'
 $UvDir = Join-Path $AppRoot "uv\$UvVersion"
 $UvExe = Join-Path $UvDir 'uv.exe'
 $LockFile = Join-Path $Payload 'requirements.lock'
-$WheelFile = Join-Path $Payload "sf_housing_monitor-$Version-py3-none-any.whl"
+$WheelFile = Join-Path $Payload "sf_home_finder-$Version-py3-none-any.whl"
 
 function Fail([string]$Message) {
   throw "Installation stopped: $Message"
