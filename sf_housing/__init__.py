@@ -2,7 +2,7 @@
 
 import os
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 # The one place the donation link is configured.
 #
@@ -13,3 +13,11 @@ __version__ = "0.5.0"
 _DEFAULT_DONATE_URL = "https://ko-fi.com/millerhenry"
 
 DONATE_URL = os.environ.get("SF_HOUSING_DONATE_URL", _DEFAULT_DONATE_URL).strip()
+
+# The repository whose releases this checks for updates against, and which the
+# installer downloads from. Configurable for the same reason the donate link
+# is: somebody running their own fork should be told about their own releases,
+# not about this one's.
+RELEASE_REPO = os.environ.get(
+    "SF_HOUSING_RELEASE_REPO", "2millerhenry/sf-home-finder"
+).strip() or "2millerhenry/sf-home-finder"

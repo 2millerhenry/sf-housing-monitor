@@ -332,6 +332,18 @@ main { max-width: 1180px; margin: 0 auto; padding: 42px 28px 72px; }
   gap: 6px 24px;
 }
 .footer-inner p { margin: 0; color: var(--muted); font-size: 0.94rem; line-height: 1.5; }
+/* One line, in the same quiet grey as the version beside it. An update is
+   worth knowing about and is not an emergency, so it gets no colour, no icon
+   and no border -- anything louder would be nagging somebody on every page of
+   an app they are using perfectly happily. */
+.footer-update code {
+  font-size: 0.9em;
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--band);
+  white-space: nowrap;
+}
 .footer-support { color: var(--ink); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 /* The one place the app asks for anything, so the ask gets a real target
    instead of a word inside a sentence. Outlined rather than filled: at the

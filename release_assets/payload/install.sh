@@ -3,7 +3,7 @@ set -euo pipefail
 
 RELEASE_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 PAYLOAD_DIR="$RELEASE_ROOT/payload"
-VERSION="0.5.0"
+VERSION="0.5.1"
 PYTHON_VERSION="3.12.10"
 PORT="${SF_HOUSING_PORT:-8000}"
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
@@ -26,7 +26,7 @@ RUNTIMES_DIR="$APP_ROOT/runtimes"
 RELEASES_DIR="$APP_ROOT/releases"
 UV_BIN="$PAYLOAD_DIR/uv"
 LOCK_FILE="$PAYLOAD_DIR/requirements.lock"
-WHEEL_FILE="$PAYLOAD_DIR/sf_home_finder-0.5.0-py3-none-any.whl"
+WHEEL_FILE="$PAYLOAD_DIR/sf_home_finder-0.5.1-py3-none-any.whl"
 
 say() { printf '%s\n' "$*"; }
 fail() { say "Installation stopped: $*"; exit 1; }
@@ -72,7 +72,7 @@ export UV_PYTHON_INSTALL_DIR="$APP_ROOT/python"
 "$UV_BIN" venv "$STAGE/runtime" --python "$PYTHON_VERSION" --managed-python --no-project --quiet
 "$UV_BIN" pip sync "$LOCK_FILE" --python "$STAGE/runtime/bin/python" --strict --no-progress --quiet
 "$UV_BIN" pip install "$WHEEL_FILE" --python "$STAGE/runtime/bin/python" --no-deps --no-progress --quiet
-"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.5.0"'
+"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.5.1"'
 
 if [ -f "$DATA_DIR/housing.sqlite3" ] && [ -x "$APP_ROOT/current/bin/python" ]; then
   /bin/mkdir -p "$APP_ROOT/backups"
@@ -116,14 +116,23 @@ CLI_PATH="$CLI_DIR/homefinder"
 if [ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" != "1" ] && [ -f "$CLI_DIR/housefinder" ]; then
   /bin/rm -f "$CLI_DIR/housefinder"
 fi
-if /bin/cp "$TOOLS_DIR/homefinder.sh" "$CLI_PATH" 2>/dev/null; then
-  /bin/chmod 755 "$CLI_PATH"
+# Written beside the command and renamed over it, never copied onto it. cp
+# truncates and rewrites the same file, and bash reads a script incrementally
+# as it runs -- so an update started by typing `homefinder update` would be
+# rewriting the very file it was still reading, and would carry on executing
+# whatever bytes landed at the offset it had reached. Renaming leaves the
+# running command holding the old file until it finishes.
+CLI_STAGED="$CLI_DIR/.homefinder.$$.tmp"
+if /bin/cp "$TOOLS_DIR/homefinder.sh" "$CLI_STAGED" 2>/dev/null &&
+   /bin/chmod 755 "$CLI_STAGED" 2>/dev/null &&
+   /bin/mv -f "$CLI_STAGED" "$CLI_PATH" 2>/dev/null; then
   CLI_READY=1
   case ":$PATH:" in
     *":$CLI_DIR:"*) CLI_ON_PATH=1 ;;
     *) CLI_ON_PATH=0 ;;
   esac
 else
+  /bin/rm -f "$CLI_STAGED" 2>/dev/null || true
   CLI_READY=0
   CLI_ON_PATH=0
 fi

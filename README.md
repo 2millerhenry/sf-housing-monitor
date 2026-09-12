@@ -81,7 +81,8 @@ new answer.
 
 **Free, private, and quiet.** No account, no server, no subscription, ever. It collects nothing
 about you — no analytics, no logs sent anywhere, no email address, not even a sign-up — and
-your search never leaves your laptop. It never acts in your name either: no automated emails to
+your search never leaves your laptop. Once a day it asks GitHub whether a newer version exists,
+sending nothing about you, and one setting turns even that off. It never acts in your name either: no automated emails to
 landlords, no forms filled in, no applications. It reads what is already public and hands it to
 you.
 
@@ -131,6 +132,11 @@ the ask.
 Nowhere. Your answers, the listings, your notes and any password you add are written to one
 folder on your Mac and never leave it. There is no account and no analytics. Uninstalling keeps
 your data unless you explicitly type `DELETE` when it asks.
+
+It does make one request of its own: once a day it asks GitHub whether a newer version has been
+released, so that a fix can reach you at all. It sends nothing — no query, no identifier, not
+even which version you are running — and it is the same public page anyone can open in a browser.
+Set `SF_HOUSING_NO_UPDATE_CHECK=1` and it never asks.
 
 ### Why does my Mac warn me?
 

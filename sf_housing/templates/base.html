@@ -38,6 +38,15 @@
   <footer class="site-footer">
     <div class="footer-inner">
       <p>SF Home Finder {{ app_version }} &middot; MIT licensed &middot; runs entirely on this computer</p>
+      {# Beside the version, which is where somebody wondering what they are
+         running already looks. Deliberately not a banner and not dismissible:
+         a line that never demands anything needs no way to be silenced. #}
+      {% set newer = pending_update() %}
+      {% if newer %}
+      <p class="footer-update">
+        {{ newer }} is available. In a terminal, run <code>homefinder update</code>.
+      </p>
+      {% endif %}
       {% if donate_url %}
       {# Still a real link to a real page: without JavaScript, or if the panel
          fails to load, clicking it goes to Ko-fi exactly as before. #}

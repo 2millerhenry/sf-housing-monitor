@@ -23,6 +23,20 @@ health() { /usr/bin/curl -fsS --max-time 4 "${URL}health" 2>/dev/null || true; }
 
 INSTALL_LINE="curl -fsSL https://github.com/2millerhenry/sf-home-finder/raw/HEAD/install.sh | bash"
 
+# One quiet line, only when there is something to say. Nothing here asks GitHub
+# anything: the app itself checks on its own schedule and stores the answer, so
+# this reads what is already known and costs a local request. A machine that is
+# offline, or told not to check, simply has nothing to report and says nothing.
+announce_update() {
+  body="$(health)"
+  [ -n "$body" ] || return 0
+  [ "$(printf '%s' "$body" | field update.available || true)" = "True" ] || return 0
+  latest="$(printf '%s' "$body" | field update.latest || true)"
+  [ -n "$latest" ] || return 0
+  say ""
+  say "  $latest is available. Run: homefinder update"
+}
+
 # The command lives in ~/.local/bin, outside the app, so it can outlive the app
 # it points at -- a copy restored from a backup, a half-finished uninstall, a
 # machine the folder was never on. Saying "it may still be starting" to somebody
@@ -55,6 +69,7 @@ usage() {
 homefinder -- your San Francisco housing search
 
   homefinder           open your dashboard
+  homefinder update    get the newest version, keeping everything
   homefinder help      show this
 
 Rarely needed:
@@ -76,7 +91,14 @@ case "${1:-open}" in
     # open.sh starts the service if it is not running and reports honestly if
     # it cannot. Nothing is forwarded to it: it takes flags of its own, and
     # handing it the word "open" only works by luck today.
-    exec "$TOOLS/open.sh"
+    #
+    # Run rather than exec'd. exec replaces this shell, so anything worth
+    # saying afterwards can only be said before -- and a note about a newer
+    # version printed ahead of the app opening reads like part of opening it.
+    status=0
+    "$TOOLS/open.sh" || status=$?
+    [ "$status" -eq 0 ] && announce_update
+    exit "$status"
     ;;
 
   status)
@@ -157,6 +179,50 @@ case "${1:-open}" in
     else
       say "No login service is installed. Try 'homefinder repair'."
       exit 1
+    fi
+    ;;
+
+  update)
+    require_installed
+    body="$(health)"
+    # Installing restarts the app. Doing that underneath a running check
+    # abandons it part way and spends the day's manual check on nothing.
+    if [ "$(printf '%s' "$body" | field scan_running || true)" = "True" ]; then
+      err "A check for new homes is running right now."
+      err "  Updating restarts the app, which would interrupt it."
+      err "  Try again in a few minutes: homefinder status shows when it finishes."
+      exit 1
+    fi
+    before="$(printf '%s' "$body" | field version || true)"
+    say "Updating SF Home Finder${before:+ from $before}."
+    say "Your homes, your deal and your notes are kept."
+    say ""
+    # The same published command a new install uses. It finds the newest
+    # release, checks every file in it against a checksum and installs over the
+    # top, so nothing here has to know what the newest version is or how to
+    # fetch it -- there is one installer, and this is it.
+    /bin/bash -c "$INSTALL_LINE"
+    # Saying "done" is not the same as being done. The installer restarts the
+    # service, and a restart that quietly did not happen leaves somebody
+    # running the very version they just replaced, told it worked. So the
+    # answer comes from the app itself: whatever is serving now is what this
+    # reports, and if that is still the old one it says so instead.
+    after=""
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+      after="$(health | field version || true)"
+      [ -n "$after" ] && [ "$after" != "$before" ] && break
+      /bin/sleep 1
+    done
+    say ""
+    if [ -z "$after" ]; then
+      err "Updated, but it is not answering at $URL yet."
+      err "  Give it a minute, then: homefinder status"
+      exit 1
+    elif [ -n "$before" ] && [ "$after" = "$before" ]; then
+      say "Still running $after -- it was already the newest version."
+      say "If you expected a change, restart it: homefinder restart"
+    else
+      say "Now running $after."
     fi
     ;;
 

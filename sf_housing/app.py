@@ -85,6 +85,7 @@ from .scheduling import (
 from .settings import Settings
 from .market_prior import estimate_counts as market_counts
 from .shortlist_estimate import ShortlistEstimate, estimate_shortlist_counts
+from .update_check import read_status as read_update_status, refresh_status
 from .sources import (
     FacebookGroupsSource,
     FacebookMarketplaceSource,
@@ -702,7 +703,13 @@ def create_app(
     scanner.recover_interrupted_scans()
     if initial_preferences.profile_active:
         scanner.rescore_all(initial_preferences)
-    scheduler = build_scheduler(scanner)
+    def look_for_a_newer_release():
+        # Bound to this install's own data directory rather than reading the
+        # environment again, so an isolated validation install checks and
+        # stores its answer beside its own database instead of the real one's.
+        return refresh_status(active_settings.data_dir)
+
+    scheduler = build_scheduler(scanner, update_check=look_for_a_newer_release)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI):
@@ -779,6 +786,20 @@ def create_app(
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
     templates.env.globals["app_version"] = __version__
     templates.env.globals["donate_url"] = DONATE_URL
+
+    def pending_update() -> str | None:
+        """The version worth upgrading to, or None when there is nothing to say.
+
+        A function rather than a value fixed when the app was built: this
+        process runs for weeks under launchd, so anything decided at startup
+        would be answering a question nobody had asked yet. It reads the small
+        file the scheduled check stores and never goes near the network, so the
+        worst a slow GitHub can do to a page is nothing at all.
+        """
+        status = read_update_status(active_settings.data_dir)
+        return status.latest if status and status.available else None
+
+    templates.env.globals["pending_update"] = pending_update
 
     def asset_version() -> str:
         """Bust the cache when a static file actually changes.
@@ -2303,6 +2324,11 @@ def create_app(
                 # Whether checking is actually being kept is a different question
                 # from whether the server answers, and it is observed, not asserted.
                 "scheduled_checking": health_state.as_dict(),
+                # Read from what the scheduled check stored, never asked for
+                # here: a health endpoint that reached across the internet
+                # would hang the installer's own readiness poll whenever
+                # GitHub was slow.
+                "update": update_state.as_dict() if (update_state := read_update_status(active_settings.data_dir)) else None,
                 "last_scan": scans[0] if scans else None,
             }
         )

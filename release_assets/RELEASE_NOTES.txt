@@ -1,3 +1,28 @@
+SF Home Finder 0.5.1
+
+It can tell you when there is a newer version, and fetch it for you.
+
+Until now there was no way for a fix to reach anyone. If something was wrong
+with the copy on your Mac, it stayed wrong, because nothing here reports
+anything and the only way to learn a fix existed was to go back to the download
+page and look. Type homefinder update and it takes you to the newest version,
+keeping your homes, your deal and your notes.
+
+When a newer version exists, one line says so: in the terminal after you type
+homefinder, and in small print at the bottom of the app for anybody who does
+not use the terminal. It never interrupts and there is nothing to dismiss.
+
+This means the app now makes one request of its own. Once a day it asks GitHub
+whether a newer version has been released, which is the same public page anyone
+can open in a browser. It sends nothing: no search, no identifier, not even
+which version you are running, because the comparison happens on your Mac after
+the answer comes back. If you would rather it never asked, set
+SF_HOUSING_NO_UPDATE_CHECK=1 and it never will.
+
+Your Mac will not wait on any of this. The question is asked in the background
+on a schedule, the answer is kept on disk, and every page reads what was kept,
+so the app is exactly as quick offline as on.
+
 SF Home Finder 0.5.0
 
 The number beside the match slider is right now, in three places it was wrong.

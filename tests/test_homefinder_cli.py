@@ -179,7 +179,15 @@ import tempfile
 
 def run(args, root, port="9911", env=None):
     """Run the real command against a given app root."""
-    environ = dict(os.environ, SF_HOUSING_APP_ROOT=str(root), SF_HOUSING_PORT=port)
+    # Belt as well as braces: the session fixture sets this too, but this is
+    # the harness that can reach the installer, and an installer that writes
+    # the real login service plist takes the author's own app down with it.
+    environ = dict(
+        os.environ,
+        SF_HOUSING_APP_ROOT=str(root),
+        SF_HOUSING_PORT=port,
+        SF_HOUSING_NO_LAUNCH_AGENT="1",
+    )
     environ.update(env or {})
     return sp.run(["/bin/bash", str(CLI), *args], capture_output=True, text=True, env=environ)
 
@@ -262,3 +270,194 @@ def test_it_runs_under_the_bash_that_macos_ships() -> None:
     Anything written for bash 4 or 5 would work on the author's machine only if
     they had installed a newer one."""
     assert sp.run(["/bin/bash", "-n", str(CLI)], capture_output=True).returncode == 0
+
+
+# --- Telling somebody a newer version exists ---------------------------------
+
+import json
+import socket
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+
+def free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+class fake_app:
+    """A stand-in for the running app, answering /health and nothing else.
+
+    The command reads what the app already knows rather than asking GitHub
+    itself, so what it does with that answer is the whole of its behaviour
+    here and can be driven from a dictionary.
+    """
+
+    def __init__(self, payload: dict):
+        self.port = free_port()
+        body = json.dumps(payload).encode()
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path != "/health":
+                    self.send_error(404)
+                    return
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):
+                pass
+
+        self.server = HTTPServer(("127.0.0.1", self.port), Handler)
+
+    def __enter__(self):
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+        return self
+
+    def __exit__(self, *exc):
+        self.server.shutdown()
+        self.server.server_close()
+
+
+@pytest.fixture
+def stub_with_python(stub):
+    """The stub app root, plus the Python the command reads JSON with.
+
+    The command deliberately uses the interpreter the app carries rather than
+    whatever the machine has, so a root without one can parse nothing -- which
+    is its own test below.
+    """
+    interpreter = stub / "current" / "bin"
+    interpreter.mkdir(parents=True)
+    (interpreter / "python").symlink_to(sys.executable)
+    return stub
+
+
+def health_with(update):
+    return {"ok": True, "app": "sf-home-finder", "version": "0.5.0",
+            "scan_running": False, "update": update, "last_scan": None}
+
+
+def test_a_newer_version_is_mentioned_once_after_the_app_opens(stub_with_python) -> None:
+    """The whole point of the check: somebody who never visits the releases page
+    still learns a fix exists. It comes after the app opens, not before, so it
+    reads as a footnote rather than as something in the way."""
+    with fake_app(health_with({"available": True, "latest": "v9.9.9"})) as app:
+        result = run([], stub_with_python, port=str(app.port))
+
+    assert result.returncode == 0
+    assert "v9.9.9 is available" in result.stdout
+    assert "homefinder update" in result.stdout
+    assert result.stdout.index("opened") < result.stdout.index("v9.9.9"), (
+        "the note came before the app opened"
+    )
+    assert result.stdout.count("is available") == 1
+
+
+def test_nothing_is_said_when_there_is_nothing_to_say(stub_with_python) -> None:
+    with fake_app(health_with({"available": False, "latest": "v0.5.0"})) as app:
+        result = run([], stub_with_python, port=str(app.port))
+
+    assert result.returncode == 0
+    assert "available" not in result.stdout
+
+
+def test_nothing_is_said_when_the_app_has_never_checked(stub_with_python) -> None:
+    """A machine told not to check, or one that has never reached GitHub,
+    reports null. That is an absence of news, not news."""
+    with fake_app(health_with(None)) as app:
+        result = run([], stub_with_python, port=str(app.port))
+
+    assert result.returncode == 0
+    assert "available" not in result.stdout
+
+
+def test_an_app_that_is_not_answering_does_not_hold_up_opening(stub_with_python) -> None:
+    """Nothing about a version is worth making somebody wait for. The port here
+    has nobody on it, which is what a just-starting app looks like."""
+    result = run([], stub_with_python, port=str(free_port()))
+
+    assert result.returncode == 0
+    assert "opened" in result.stdout
+    assert "available" not in result.stdout
+
+
+def test_opening_still_reports_its_own_failure(stub_with_python) -> None:
+    """The note is an addition to opening, not a replacement for it.
+
+    Two things have to survive no longer exec'ing the opener: its exit status,
+    which is how the .command files and anything scripting this tell success
+    from failure, and its silence about versions. Somebody whose app will not
+    open is not helped by being told a newer one exists.
+    """
+    opener = stub_with_python / "tools" / "open.sh"
+    opener.write_text("#!/bin/bash\necho 'could not open' >&2\nexit 3\n")
+    opener.chmod(0o755)
+
+    with fake_app(health_with({"available": True, "latest": "v9.9.9"})) as app:
+        result = run([], stub_with_python, port=str(app.port))
+
+    assert result.returncode == 3
+    assert "could not open" in result.stderr
+    assert "available" not in result.stdout, "nagged about a version while broken"
+
+
+def test_updating_is_refused_while_a_check_is_running(stub_with_python) -> None:
+    """Installing restarts the app. Doing that underneath a running check
+    abandons it part way and spends the day's one manual check on nothing."""
+    payload = health_with({"available": True, "latest": "v9.9.9"})
+    payload["scan_running"] = True
+    with fake_app(payload) as app:
+        result = run(["update"], stub_with_python, port=str(app.port))
+
+    assert result.returncode == 1
+    assert "running right now" in result.stderr
+    assert "Try again" in result.stderr
+
+
+def test_updating_goes_through_the_one_published_installer() -> None:
+    """There is one installer and this is it: it finds the newest release and
+    checks every file against a checksum. A second download path here would be
+    a second thing to keep correct, and the one nobody would test."""
+    text = CLI.read_text()
+    update_branch = text[text.index("  update)"):text.index("  repair)")]
+    assert '/bin/bash -c "$INSTALL_LINE"' in update_branch
+    assert "curl" not in update_branch, "a second way to download crept in"
+
+
+def test_the_command_is_replaced_by_renaming_never_by_writing_over_it() -> None:
+    """bash reads a script as it runs it. `homefinder update` is that script
+    running, so copying the new one over the top would rewrite the file mid-read
+    and carry on executing whatever bytes landed where it had got to. Renaming
+    leaves the running command holding the file it started with.
+    """
+    assert '/bin/mv -f "$CLI_STAGED" "$CLI_PATH"' in INSTALLER
+    assert '/bin/cp "$TOOLS_DIR/homefinder.sh" "$CLI_PATH"' not in INSTALLER, (
+        "the command is copied straight onto itself again"
+    )
+
+
+def test_updating_confirms_the_new_version_is_the_one_answering() -> None:
+    """Read rather than run: the branch this guards begins by downloading and
+    installing a release, which a test suite must not do.
+
+    What it guards is worth guarding. The installer restarts the service, and a
+    restart that quietly did not happen -- launchctl refusing, or a copy whose
+    login service was never registered -- leaves somebody running the exact
+    version they just replaced, having been told it worked. It was seen: an
+    isolated install reported success while the old process went on serving.
+    So the closing word comes from the app rather than from the installer.
+    """
+    text = CLI.read_text()
+    branch = text[text.index("  update)"):text.index("  repair)")]
+
+    assert 'after="$(health | field version' in branch, "nothing checks what is running"
+    # The three outcomes a person can actually be in.
+    assert 'if [ -z "$after" ]' in branch, "not answering is not distinguished"
+    assert '[ "$after" = "$before" ]' in branch, "an unchanged version is reported as new"
+    assert "Now running" in branch

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 from datetime import UTC, datetime, time, timedelta
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -37,6 +38,7 @@ SCAN_JOB_ID = "housing-scans-pacific"
 CATCH_UP_JOB_ID = "housing-catch-up"
 DEEP_SWEEP_JOB_ID = "housing-deep-sweep"
 DEEP_SWEEP_CATCH_UP_JOB_ID = "housing-deep-sweep-catch-up"
+UPDATE_CHECK_JOB_ID = "housing-update-check"
 
 # When the nightly deep sweep runs. Most sources are read in full on every
 # scan because doing so costs seconds; two cannot be. Trulia and Redfin answer
@@ -416,7 +418,9 @@ def sweep_if_due(scanner: Scanner) -> bool:
         return False
 
 
-def build_scheduler(scanner: Scanner) -> BackgroundScheduler:
+def build_scheduler(
+    scanner: Scanner, update_check: Callable[[], object] | None = None
+) -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone=PACIFIC)
     scheduler.add_job(
         scanner.run_scan,
@@ -472,4 +476,31 @@ def build_scheduler(scanner: Scanner) -> BackgroundScheduler:
         coalesce=True,
         max_instances=1,
     )
+    if update_check is not None:
+        # Six-hourly, though it asks GitHub at most once a day: the job is the
+        # net, and the once-a-day rule lives in the check itself. A Mac asleep
+        # at whatever moment a daily job would have fired is the ordinary case,
+        # not the exception, and a check that silently never runs is the same
+        # as not having one.
+        #
+        # It runs once at startup too, because the most valuable moment to
+        # learn a release exists is the one just after somebody opened the app.
+        scheduler.add_job(
+            update_check,
+            IntervalTrigger(hours=6, timezone=PACIFIC),
+            id=UPDATE_CHECK_JOB_ID,
+            name="Ask whether a newer release exists",
+            replace_existing=True,
+            coalesce=True,
+            max_instances=1,
+            next_run_time=datetime.now(PACIFIC),
+            # The startup check is scheduled for the moment the scheduler is
+            # built and does not run until the app starts it, which is after
+            # the database is open and the preferences are read. APScheduler
+            # allows a job one second of lateness by default and silently
+            # drops it beyond that, so the check that was meant to happen at
+            # startup never happened at all -- it went straight to waiting six
+            # hours, on every launch, and only an install-and-watch found it.
+            misfire_grace_time=60 * 60,
+        )
     return scheduler

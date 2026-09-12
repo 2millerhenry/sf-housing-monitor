@@ -8,6 +8,33 @@ from sf_housing.database import Repository
 from sf_housing.preferences import Preferences, parse_preferences
 
 
+@pytest.fixture(autouse=True, scope="session")
+def never_touch_the_real_installation():
+    """Make the suite incapable of reaching the login service of the machine
+    running it.
+
+    A test that drives the installer, or a bug that lets one reach it, writes
+    ~/Library/LaunchAgents/com.sfhousing.monitor.plist -- the real one, shared
+    by every install on the account. It happened: a deliberately broken guard
+    let a test run the installer, and the author's own login service was left
+    pointing at a pytest temporary directory that was deleted seconds later.
+    The app was down until it was reinstalled by hand.
+
+    The installer already isolates itself completely when asked; nothing was
+    asking. Setting it here means no test has to remember, and a test that
+    forgets is harmless rather than destructive.
+    """
+    import os
+
+    previous = os.environ.get("SF_HOUSING_NO_LAUNCH_AGENT")
+    os.environ["SF_HOUSING_NO_LAUNCH_AGENT"] = "1"
+    yield
+    if previous is None:
+        os.environ.pop("SF_HOUSING_NO_LAUNCH_AGENT", None)
+    else:
+        os.environ["SF_HOUSING_NO_LAUNCH_AGENT"] = previous
+
+
 TEST_PREFERENCES = """
 minimum_score: 60
 budget:
