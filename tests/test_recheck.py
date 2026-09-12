@@ -436,7 +436,15 @@ def test_a_whole_shortlist_is_confirmed_within_one_day(tmp_path: pathlib.Path) -
             [*quiet_before, Costly([], recheck_budget=60), *quiet_after],
             detail_delay_seconds=0,
             timeout_seconds=0.05,
-            max_scan_seconds=3.0,
+            # Ten seconds is headroom, not part of what is being asserted. The
+            # reads here cost real time, and how much of a wall-clock budget a
+            # machine can turn into work varies with the machine: three seconds
+            # was ample here and left sixteen homes unconfirmed on a CI runner,
+            # which says nothing about the share arithmetic and everything
+            # about the runner. What is being asserted is below, and it does
+            # not get easier with a longer budget: with the recheck pass
+            # disabled, no budget confirms them.
+            max_scan_seconds=10.0,
         ).run_scan("scheduled")
 
     stale = {
