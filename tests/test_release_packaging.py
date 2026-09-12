@@ -338,3 +338,46 @@ def test_neither_builder_writes_the_page_back_under_its_buried_name() -> None:
         source = (ROOT / "scripts" / builder).read_text(encoding="utf-8")
         assert '"1 START HERE.txt"' in source, builder
         assert '"START_HERE.txt"' not in source, f"{builder} still writes the buried name"
+
+
+def test_the_version_cannot_drift_between_the_places_that_state_it() -> None:
+    """Six files name the version and the builder copies install.sh verbatim,
+    so nothing reconciles them at build time.
+
+    When they last disagreed the installer went looking for a wheel filename
+    that the build had not produced, and the download was broken for everybody
+    who tried it. Every one of these has to be bumped together.
+    """
+    declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = declared["project"]["version"]
+
+    installer = (ROOT / "release_assets" / "payload" / "install.sh").read_text(encoding="utf-8")
+    stated = {
+        "sf_housing/__init__.py": f'__version__ = "{version}"',
+        "scripts/build_release.py": f'VERSION = "{version}"',
+    }
+    for path, expected in stated.items():
+        assert expected in (ROOT / path).read_text(encoding="utf-8"), (
+            f"{path} does not say {version}"
+        )
+    for expected in (
+        f'VERSION="{version}"',
+        # The name the build actually writes. A mismatch here is the one that
+        # breaks the download rather than merely looking untidy.
+        f"sf_home_finder-{version}-py3-none-any.whl",
+        f'assert sf_housing.__version__ == "{version}"',
+    ):
+        assert expected in installer, f"install.sh does not say {expected}"
+
+
+def test_the_release_notes_open_on_the_version_being_shipped() -> None:
+    """The notes are the first thing a person reads on the download page, and
+    the builder does not write them, so a forgotten section ships a release
+    describing the one before it."""
+    declared = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    version = declared["project"]["version"]
+    notes = (ROOT / "release_assets" / "RELEASE_NOTES.txt").read_text(encoding="utf-8")
+
+    assert notes.startswith(f"SF Home Finder {version}\n"), (
+        f"the notes open with {notes.splitlines()[0]!r}, not SF Home Finder {version}"
+    )

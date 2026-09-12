@@ -1,3 +1,28 @@
+SF Home Finder 0.5.0
+
+The number beside the match slider is right now, in three places it was wrong.
+
+Raising your budget could not raise it. Whatever you typed, the number stopped
+at whatever your saved budget already allowed, so asking for more money looked
+like it found nothing. It was counting only the homes your last saved deal had
+already accepted, which left out every home the old budget had priced out. It
+now counts against the deal you are writing, and on a real board that is the
+difference between 423 homes and more than 1,300.
+
+People splitting a home were shown a small fraction of what is out there. The
+form asks what each person pays, and the estimate was reading that as the rent
+for the whole flat: a couple at $2,700 each was priced as though one of them
+were renting a two-bedroom alone. They can pay $5,400 between them. They were
+told about five homes where there were closer to three hundred.
+
+Naming neighborhoods made no difference to the estimate. Picking one area and
+picking eight gave the same number, because it was counting the three
+priority lists rather than the places in them.
+
+Everything above is checked against a real board of 6,935 homes, one deal at a
+time. The estimate still comes in under what is actually there, which is the
+way round it should be wrong.
+
 SF Home Finder 0.4.9
 
 The homefinder command handles being wrong about the world. If the app is not
