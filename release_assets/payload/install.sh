@@ -3,7 +3,7 @@ set -euo pipefail
 
 RELEASE_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 PAYLOAD_DIR="$RELEASE_ROOT/payload"
-VERSION="0.4.6"
+VERSION="0.4.7"
 PYTHON_VERSION="3.12.10"
 PORT="${SF_HOUSING_PORT:-8000}"
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
@@ -26,7 +26,7 @@ RUNTIMES_DIR="$APP_ROOT/runtimes"
 RELEASES_DIR="$APP_ROOT/releases"
 UV_BIN="$PAYLOAD_DIR/uv"
 LOCK_FILE="$PAYLOAD_DIR/requirements.lock"
-WHEEL_FILE="$PAYLOAD_DIR/sf_home_finder-0.4.6-py3-none-any.whl"
+WHEEL_FILE="$PAYLOAD_DIR/sf_home_finder-0.4.7-py3-none-any.whl"
 
 say() { printf '%s\n' "$*"; }
 fail() { say "Installation stopped: $*"; exit 1; }
@@ -72,7 +72,7 @@ export UV_PYTHON_INSTALL_DIR="$APP_ROOT/python"
 "$UV_BIN" venv "$STAGE/runtime" --python "$PYTHON_VERSION" --managed-python --no-project --quiet
 "$UV_BIN" pip sync "$LOCK_FILE" --python "$STAGE/runtime/bin/python" --strict --no-progress --quiet
 "$UV_BIN" pip install "$WHEEL_FILE" --python "$STAGE/runtime/bin/python" --no-deps --no-progress --quiet
-"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.6"'
+"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.7"'
 
 if [ -f "$DATA_DIR/housing.sqlite3" ] && [ -x "$APP_ROOT/current/bin/python" ]; then
   /bin/mkdir -p "$APP_ROOT/backups"
@@ -232,11 +232,31 @@ say "  It checks for you:  10:00 and 18:00, every day, on its own"
 say "  Your data lives in: $DATA_DIR"
 say ""
 if [ "${CLI_READY:-0}" = 1 ] && [ "${CLI_ON_PATH:-0}" != 1 ]; then
-  # Saying so beats silently installing a command that will not be found.
-  say "One extra step if you want the 'homefinder' command in your terminal --"
-  say "$CLI_DIR is not on your PATH yet. Run this once:"
-  say ""
-  say "  echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc && source ~/.zshrc"
+  # Telling somebody to run a line is not the same as it getting run. The first
+  # person to install this on another Mac typed homefinder, got "command not
+  # found", and never saw the step -- so this does it for them.
+  #
+  # Into the file their own shell actually reads. The message used to name
+  # ~/.zshrc unconditionally, which on a bash login shell is a file nothing
+  # opens, and that is exactly the machine it failed on.
+  case "${SHELL:-}" in
+    */bash) PROFILE="$HOME/.bash_profile" ;;
+    */fish) PROFILE="" ;;
+    *)      PROFILE="$HOME/.zshrc" ;;
+  esac
+  PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+  if [ -n "$PROFILE" ] && ! /usr/bin/grep -qF '.local/bin' "$PROFILE" 2>/dev/null; then
+    /bin/mkdir -p "$(/usr/bin/dirname "$PROFILE")"
+    printf '\n# Added by SF Home Finder so the homefinder command can be found.\n%s\n' \
+      "$PATH_LINE" >> "$PROFILE"
+    say "The 'homefinder' command needs $CLI_DIR on your PATH, so one line was"
+    say "added to $(/usr/bin/basename "$PROFILE"). Open a new Terminal window and it will work."
+  else
+    say "For the 'homefinder' command, add $CLI_DIR to your PATH:"
+    say ""
+    say "  $PATH_LINE"
+    say ""
+  fi
   say ""
 fi
 if [ "${SF_HOUSING_NO_BROWSER:-0}" != "1" ]; then

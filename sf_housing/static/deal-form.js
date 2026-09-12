@@ -57,7 +57,11 @@
         if (data.ok && data.counts) {
           document.dispatchEvent(
             new CustomEvent("cutoff-counts", {
-              detail: { counts: data.counts, approximate: data.exact === false },
+              detail: {
+                counts: data.counts,
+                approximate: data.exact === false,
+                pool: typeof data.pool === "number" ? data.pool : undefined,
+              },
             })
           );
         }

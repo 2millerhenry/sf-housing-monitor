@@ -33,13 +33,14 @@ def test_it_is_installed_somewhere_that_needs_no_password() -> None:
     assert "sudo" not in INSTALLER
 
 
-def test_a_command_that_will_not_be_found_says_so() -> None:
+def test_a_command_that_will_not_be_found_is_dealt_with() -> None:
     """Installing it onto a PATH that does not include it, and saying nothing,
     leaves somebody typing a command that does not exist and concluding the app
-    is broken."""
-    assert 'case ":$PATH:" in' in INSTALLER
-    assert "is not on your PATH yet" in INSTALLER
-    # ...and it only claims the command works when it actually will.
+    is broken. That happened on the first machine other than this one."""
+    assert 'case ":$PATH:" in' in INSTALLER, "PATH is not checked at all"
+    # Either it is already reachable, or the installer makes it reachable.
+    assert 'PROFILE=' in INSTALLER
+    # ...and it only advertises the command when it will actually work today.
     assert '[ "${CLI_READY:-0}" = 1 ] && [ "${CLI_ON_PATH:-0}" = 1 ]' in INSTALLER
 
 
@@ -136,3 +137,34 @@ def test_an_isolated_install_never_touches_the_real_account_s_command() -> None:
     assert 'CLI_PATH="$APP_ROOT/bin/homefinder"' in UNINSTALLER
     # ...and the stale-name cleanup reaches into the same shared directory.
     assert '[ "${SF_HOUSING_NO_LAUNCH_AGENT:-0}" != "1" ] && [ -f "$CLI_DIR/housefinder" ]' in INSTALLER
+
+
+def test_the_path_line_goes_into_the_shell_the_person_actually_uses() -> None:
+    """The first person to install this on another Mac got "command not found".
+
+    Their login shell was bash, and the installer told them to append to
+    ~/.zshrc -- a file bash never opens. macOS has shipped zsh as the default
+    for years, which is exactly what makes the assumption easy to miss and
+    invisible to anybody testing on their own machine.
+    """
+    assert "*/bash) PROFILE=" in INSTALLER
+    assert ".bash_profile" in INSTALLER
+    assert '*)      PROFILE="$HOME/.zshrc"' in INSTALLER
+
+
+def test_the_path_is_fixed_rather_than_described() -> None:
+    """They did not run the line. Almost nobody runs the line. The step that is
+    printed and skipped is the step that may as well not exist.
+    """
+    assert ">> \"$PROFILE\"" in INSTALLER, "the line is only printed, never written"
+    # ...and never twice, on a re-run or an upgrade.
+    assert "grep -qF '.local/bin'" in INSTALLER
+    # ...and they are told the current shell will not see it.
+    assert "Open a new Terminal window" in INSTALLER
+
+
+def test_fish_is_told_rather_than_edited() -> None:
+    """fish does not read a POSIX profile and its syntax is different, so
+    appending that line would leave a broken config rather than a working
+    command."""
+    assert "*/fish) PROFILE=" in INSTALLER

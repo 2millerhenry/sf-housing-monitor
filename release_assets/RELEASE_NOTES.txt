@@ -1,3 +1,18 @@
+SF Home Finder 0.4.7
+
+Two things somebody found installing this on a Mac that was not mine.
+
+The homefinder command could not be found. The installer told you to add a line
+to ~/.zshrc, which is the wrong file if your shell is bash, and a step that is
+printed rather than performed is a step almost nobody performs. It now adds the
+line itself, to whichever file your own shell reads, once, and tells you to
+open a new Terminal window.
+
+And while you were still filling in your deal, the match slider read "0 homes",
+because nothing had been searched yet. That looks like a verdict on your
+answers when it only means the first search has not run. The number now waits
+until there is something to count.
+
 SF Home Finder 0.4.6
 
 The repository is now github.com/2millerhenry/sf-home-finder, which is what the

@@ -20,6 +20,10 @@
   // not been saved and may be measured from a sample rather than the whole
   // pool -- so the readout has to be able to say "about".
   let approximate = false;
+  // Nothing collected yet means nothing to count. Saying "0 homes" while
+  // somebody is still writing their deal reads as a verdict on the deal, when
+  // the first search simply has not run.
+  let pool = Number(slider.dataset.cutoffPool || 0);
 
   function render() {
     const current = Number(slider.value);
@@ -29,8 +33,8 @@
     panel.style.setProperty("--cutoff-fill", fill.toFixed(2) + "%");
     value.textContent = String(current);
     const homes = counts[String(current)];
-    // A count we do not have is left unsaid rather than shown as zero.
-    if (homes === undefined) {
+    // A count we do not have -- or cannot have yet -- is left unsaid.
+    if (homes === undefined || pool === 0) {
       count.textContent = "and up";
       return;
     }
@@ -44,6 +48,7 @@
     if (!next) return;
     counts = next;
     approximate = Boolean(event.detail.approximate);
+    if (typeof event.detail.pool === "number") pool = event.detail.pool;
     render();
   });
 

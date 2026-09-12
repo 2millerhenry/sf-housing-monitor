@@ -168,3 +168,30 @@ def test_a_higher_cut_off_never_shortlists_more_than_a_lower_one(stocked: Reposi
 
     values = [counts[stop] for stop in STOPS]
     assert values == sorted(values, reverse=True)
+
+
+def test_the_count_is_silent_before_the_first_search(tmp_path: Path) -> None:
+    """A blank install has no pool, so every cut-off counts nought.
+
+    Shown as "0 homes" while somebody is still writing their deal, that reads
+    as a verdict on the deal -- the first person to set this up on another Mac
+    watched it say "70 and up, 0 homes" and reasonably thought their answers
+    had ruled everything out. Nothing had been collected yet.
+    """
+    from sf_housing.app import create_app
+    from fastapi.testclient import TestClient
+    from sf_housing.settings import Settings
+
+    data = tmp_path / "data"
+    settings = Settings(
+        data_dir=data,
+        preferences_path=data / "config" / "preferences.yaml",
+        database_path=data / "housing.sqlite3",
+        log_path=data / "housing.log",
+    )
+    application = create_app(settings=settings, sources=[], enable_scheduler=False)
+    with TestClient(application) as client:
+        page = client.get("/preferences").text
+
+    assert 'data-cutoff-pool="0"' in page, "the page does not say the pool is empty"
+    assert "0 homes" not in page, "a blank install is telling somebody it found nothing"

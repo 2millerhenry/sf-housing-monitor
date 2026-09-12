@@ -2,7 +2,7 @@
 
 import os
 
-__version__ = "0.4.6"
+__version__ = "0.4.7"
 
 # The one place the donation link is configured.
 #

@@ -240,12 +240,16 @@
         <label for="minimum_score">How close a match do you want on the shortlist?</label>
         <p class="cutoff-readout">
           <output class="cutoff-value" id="cutoff-value" for="minimum_score">{{ minimum_score }}</output>
-          <span class="cutoff-count" id="cutoff-count">and up{% if shortlist_counts.get(minimum_score) is not none %} &middot; {{ shortlist_counts[minimum_score] }} home{% if shortlist_counts[minimum_score] != 1 %}s{% endif %}{% endif %}</span>
+          {#- Before the first search there is nothing to count, and "0 homes"
+              there reads as "your deal matches nothing" when it means "we have
+              not looked yet". The number waits until there is a pool. -#}
+          <span class="cutoff-count" id="cutoff-count">and up{% if stored_listing_count and shortlist_counts.get(minimum_score) is not none %} &middot; {{ shortlist_counts[minimum_score] }} home{% if shortlist_counts[minimum_score] != 1 %}s{% endif %}{% endif %}</span>
         </p>
       </div>
       <input class="cutoff-slider" type="range" id="minimum_score" name="minimum_score"
              min="{{ cutoff_stops|first }}" max="{{ cutoff_stops|last }}" step="5" value="{{ minimum_score }}"
              data-cutoff-counts='{{ shortlist_counts|tojson }}'
+             data-cutoff-pool="{{ stored_listing_count or 0 }}"
              aria-describedby="cutoff-help">
       <div class="cutoff-scale" aria-hidden="true">
         <span>Nearly everything</span>
