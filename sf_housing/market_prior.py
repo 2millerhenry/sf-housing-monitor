@@ -135,7 +135,17 @@ def _rent_share(path: str, budget: int) -> float:
 def _area_factor(profile: DealProfile) -> float:
     if profile.anywhere_in_sf:
         return ANYWHERE_FACTOR
-    named = len(profile.areas or ())
+    # areas is a mapping of tier to the places in it, not a list of places.
+    # len() of it counted the tiers -- four, always, whoever was searching --
+    # so every estimate came back as though exactly four areas had been named
+    # and naming more made no difference to the number on screen.
+    chosen = {
+        place.casefold()
+        for tier in ("dream", "strong", "okay")
+        for place in (profile.areas or {}).get(tier, ())
+        if str(place).strip()
+    }
+    named = len(chosen)
     if named <= 0:
         # No areas named and not anywhere: the form is half-written. Treat it
         # as the narrowest case rather than the broadest.
