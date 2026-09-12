@@ -1,3 +1,10 @@
+SF Home Finder 0.4.6 for Windows x64
+
+The repository is now github.com/2millerhenry/sf-home-finder, which is what the
+app has always called itself. Links and install commands you already have keep
+working -- GitHub forwards the old address -- so there is nothing to change on
+your side.
+
 SF Home Finder 0.4.5 for Windows x64
 
 The isolated install and uninstall used for testing no longer reach into the

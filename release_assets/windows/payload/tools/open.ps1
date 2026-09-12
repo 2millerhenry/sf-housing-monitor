@@ -5,7 +5,7 @@ $AppRoot = Join-Path $env:LOCALAPPDATA 'SF Housing Monitor'
 $Url = "http://127.0.0.1:$Port/"
 
 function Test-HealthyMonitor {
-  try { $health = Invoke-RestMethod -Uri ($Url + 'health') -TimeoutSec 2; return $health.app -eq 'sf-housing-monitor' -and $health.ok -eq $true } catch { return $false }
+  try { $health = Invoke-RestMethod -Uri ($Url + 'health') -TimeoutSec 2; return $health.app -eq 'sf-home-finder' -and $health.ok -eq $true } catch { return $false }
 }
 if (-not (Test-HealthyMonitor)) {
   & schtasks.exe /Run /TN $TaskName 2>$null | Out-Null

@@ -3,8 +3,8 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sf-housing-monitor"
-version = "0.4.5"
+name = "sf-home-finder"
+version = "0.4.6"
 description = "A small local monitor for San Francisco room and housing listings"
 readme = "README.md"
 license = "MIT"
@@ -29,9 +29,9 @@ dependencies = [
 test = ["pytest>=8.3,<9"]
 
 [project.urls]
-Homepage = "https://github.com/2millerhenry/sf-housing-monitor"
-Source = "https://github.com/2millerhenry/sf-housing-monitor"
-Issues = "https://github.com/2millerhenry/sf-housing-monitor/issues"
+Homepage = "https://github.com/2millerhenry/sf-home-finder"
+Source = "https://github.com/2millerhenry/sf-home-finder"
+Issues = "https://github.com/2millerhenry/sf-home-finder/issues"
 
 [project.scripts]
 sf-housing = "sf_housing.__main__:main"

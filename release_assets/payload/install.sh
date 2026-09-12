@@ -3,7 +3,7 @@ set -euo pipefail
 
 RELEASE_ROOT="${1:-$(cd "$(dirname "$0")/../.." && pwd)}"
 PAYLOAD_DIR="$RELEASE_ROOT/payload"
-VERSION="0.4.5"
+VERSION="0.4.6"
 PYTHON_VERSION="3.12.10"
 PORT="${SF_HOUSING_PORT:-8000}"
 APP_ROOT="${SF_HOUSING_APP_ROOT:-$HOME/Library/Application Support/SF Housing Monitor}"
@@ -26,7 +26,7 @@ RUNTIMES_DIR="$APP_ROOT/runtimes"
 RELEASES_DIR="$APP_ROOT/releases"
 UV_BIN="$PAYLOAD_DIR/uv"
 LOCK_FILE="$PAYLOAD_DIR/requirements.lock"
-WHEEL_FILE="$PAYLOAD_DIR/sf_housing_monitor-0.4.5-py3-none-any.whl"
+WHEEL_FILE="$PAYLOAD_DIR/sf_housing_monitor-0.4.6-py3-none-any.whl"
 
 say() { printf '%s\n' "$*"; }
 fail() { say "Installation stopped: $*"; exit 1; }
@@ -52,7 +52,7 @@ done
 if /usr/sbin/lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   HEALTH="$(/usr/bin/curl -fsS --max-time 2 "http://127.0.0.1:$PORT/health" 2>/dev/null || true)"
   case "$HEALTH" in
-    *'"app":"sf-housing-monitor"'*|*'"app": "sf-housing-monitor"'*|*'"ok":true'*|*'"ok": true'*) ;;
+    *'"app":"sf-home-finder"'*|*'"app": "sf-home-finder"'*|*'"ok":true'*|*'"ok": true'*) ;;
     *) fail "port $PORT is already used by another app. Close that app, then run Install again. Nothing was stopped." ;;
   esac
 fi
@@ -72,7 +72,7 @@ export UV_PYTHON_INSTALL_DIR="$APP_ROOT/python"
 "$UV_BIN" venv "$STAGE/runtime" --python "$PYTHON_VERSION" --managed-python --no-project --quiet
 "$UV_BIN" pip sync "$LOCK_FILE" --python "$STAGE/runtime/bin/python" --strict --no-progress --quiet
 "$UV_BIN" pip install "$WHEEL_FILE" --python "$STAGE/runtime/bin/python" --no-deps --no-progress --quiet
-"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.5"'
+"$STAGE/runtime/bin/python" -c 'import sf_housing; assert sf_housing.__version__ == "0.4.6"'
 
 if [ -f "$DATA_DIR/housing.sqlite3" ] && [ -x "$APP_ROOT/current/bin/python" ]; then
   /bin/mkdir -p "$APP_ROOT/backups"
@@ -189,7 +189,7 @@ HEALTHY=0
 for attempt in $(/usr/bin/seq 1 150); do
   HEALTH="$(/usr/bin/curl -fsS --max-time 2 "http://127.0.0.1:$PORT/health" 2>/dev/null || true)"
   case "$HEALTH" in
-    *'"app":"sf-housing-monitor"'*|*'"app": "sf-housing-monitor"'*|*'"ok":true'*|*'"ok": true'*) HEALTHY=1; break ;;
+    *'"app":"sf-home-finder"'*|*'"app": "sf-home-finder"'*|*'"ok":true'*|*'"ok": true'*) HEALTHY=1; break ;;
   esac
   /bin/sleep 1
 done

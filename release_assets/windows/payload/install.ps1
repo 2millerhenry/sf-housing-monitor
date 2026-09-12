@@ -30,7 +30,7 @@ function Fail([string]$Message) {
 function Test-HealthyMonitor {
   try {
     $health = Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
-    return $health.app -eq 'sf-housing-monitor' -and $health.ok -eq $true
+    return $health.app -eq 'sf-home-finder' -and $health.ok -eq $true
   } catch {
     return $false
   }

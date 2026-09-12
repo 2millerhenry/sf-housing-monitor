@@ -1,7 +1,7 @@
 #!/bin/bash
 # Install SF Home Finder:
 #
-#   curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
+#   curl -fsSL https://github.com/2millerhenry/sf-home-finder/raw/HEAD/install.sh | bash
 #
 # Downloads the current release and runs the installer inside it -- the same one
 # the ZIP contains, which checks every file against a checksum before using it.
@@ -15,7 +15,7 @@
 # bytes are identical to the ZIP either way.
 set -euo pipefail
 
-REPO="2millerhenry/sf-housing-monitor"
+REPO="2millerhenry/sf-home-finder"
 fail() { printf '\nStopped: %s\n' "$*" >&2; exit 1; }
 
 [ "$(uname -s)" = Darwin ] || fail "this app is macOS only."

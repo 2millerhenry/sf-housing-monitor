@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REPO = "2millerhenry/sf-housing-monitor"
+REPO = "2millerhenry/sf-home-finder"
 RAW = f"https://raw.githubusercontent.com/{REPO}/main/docs/screenshots"
 
 

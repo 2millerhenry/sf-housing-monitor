@@ -10,7 +10,7 @@ URL="http://127.0.0.1:$PORT/"
 health() {
   RESPONSE="$(/usr/bin/curl -fsS --max-time 2 "${URL}health" 2>/dev/null || true)"
   case "$RESPONSE" in
-    *'"app":"sf-housing-monitor"'*|*'"app": "sf-housing-monitor"'*|*'"ok":true'*|*'"ok": true'*) return 0 ;;
+    *'"app":"sf-home-finder"'*|*'"app": "sf-home-finder"'*|*'"ok":true'*|*'"ok": true'*) return 0 ;;
     *) return 1 ;;
   esac
 }

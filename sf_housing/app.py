@@ -2282,7 +2282,7 @@ def create_app(
                 # unscheduled install into a failed one, which is a worse outcome
                 # than installing and flagging the schedule.
                 "ok": True,
-                "app": "sf-housing-monitor",
+                "app": "sf-home-finder",
                 "version": __version__,
                 "scan_running": scanner.is_running,
                 "schedule": ["10:00 America/Los_Angeles", "18:00 America/Los_Angeles"],

@@ -19,7 +19,7 @@ Open **Terminal** — press `Cmd` + `Space`, type `Terminal`, press Return — t
 press Return:
 
 ```
-curl -fsSL https://github.com/2millerhenry/sf-housing-monitor/raw/HEAD/install.sh | bash
+curl -fsSL https://github.com/2millerhenry/sf-home-finder/raw/HEAD/install.sh | bash
 ```
 
 <sub>*19 MB download · about 2–3 minutes · roughly 155 MB on disk when it is done · no password,
@@ -37,7 +37,7 @@ it is sitting still, it is working. Your browser opens by itself when it is done
 
 <br>
 
-1. **[Download the ZIP](https://github.com/2millerhenry/sf-housing-monitor/releases/latest)**
+1. **[Download the ZIP](https://github.com/2millerhenry/sf-home-finder/releases/latest)**
    and double-click to unpack it.
 2. Open the folder. **Control-click** `2 Install SF Home Finder.command`, choose **Open**, then
    **Open** again.
@@ -175,7 +175,7 @@ touching your deal, your saved homes or your notes.
 ### Is pasting a command from the internet safe?
 
 It is worth being suspicious of, so here is what that one does. It reads the
-[release list](https://github.com/2millerhenry/sf-housing-monitor/releases), downloads the same
+[release list](https://github.com/2millerhenry/sf-home-finder/releases), downloads the same
 ZIP the button gives you, checks every file inside it against a checksum, and runs the
 installer. It never asks for your password, because nothing here needs an administrator.
 It is [forty lines long and you can read it first](install.sh) — or skip it entirely and use
